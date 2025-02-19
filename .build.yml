@@ -22,7 +22,7 @@ tasks:
       mv tailwindcss-linux-x64-musl ~/tailwind/tailwindcss
       export PATH=~/tailwind:$PATH
       cd ~/"${REPO}"/frontend
-      SERVER_PORT=sapp.angeltvedt.net go run .
+      SERVER_URL=sappi.angeltvedt.net go run .
       rsync -e 'ssh -i ~/.ssh/4a75e973-8e90-4667-a7da-a58ca05dad38 -o StrictHostKeyChecking=no' -a --delete ./_build/ root@relay5.com:/var/spool/apps/sapp/
   - upload-backend: |
       cd ~/"${REPO}"/backend
