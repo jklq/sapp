@@ -20,7 +20,7 @@ func main() {
 	}
 	defer tx.Rollback()
 
-	query, err := os.ReadFile("./schema.sql")
+	query, err := os.ReadFile(os.Getenv("SCHEMA_PATH"))
 	if err != nil {
 		panic(err)
 	}
