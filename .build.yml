@@ -1,8 +1,7 @@
 image: alpine/edge
 secrets:
-  # sourcehut ssh key must be at top
-  - 65859560-db27-4197-9ad3-5bc094dbd214
-  - 6220d112-8c9b-4d3b-babf-81d254929c30 # change this (github)
+  - 4a75e973-8e90-4667-a7da-a58ca05dad38
+  - 65859560-db27-4197-9ad3-5bc094dbd214 # change this (github)
 sources:
   - git@git.sr.ht:~relay/sapp
 environment:
@@ -28,7 +27,7 @@ tasks:
       mv tailwindcss-linux-x64-musl ~/tailwind/tailwindcss
       export PATH=~/tailwind:$PATH
       cd ~/"${REPO}"/frontend
-      SERVER_PORT=sappi.angeltvedt.net go run .
+      SERVER_PORT=sapp.angeltvedt.net go run .
       rsync -e 'ssh -i ~/.ssh/4a75e973-8e90-4667-a7da-a58ca05dad38 -o StrictHostKeyChecking=no' -a --delete ./_build/ root@relay5.com:/var/spool/apps/sapp/frontend/
   - joint-deploy: |
       ssh -i ~/.ssh/4a75e973-8e90-4667-a7da-a58ca05dad38 -o StrictHostKeyChecking=no root@relay5.com "pc6 deploy sapp"
