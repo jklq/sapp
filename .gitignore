@@ -1,0 +1,6 @@
+tmp/
+.DS_Store
+_build
+*.db
+*.sqlite3
+*.sqlite

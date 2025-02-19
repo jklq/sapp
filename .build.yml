@@ -1,0 +1,34 @@
+image: alpine/edge
+secrets:
+  # sourcehut ssh key must be at top
+  - 65859560-db27-4197-9ad3-5bc094dbd214
+  - 6220d112-8c9b-4d3b-babf-81d254929c30 # change this (github)
+sources:
+  - git@git.sr.ht:~relay/sapp
+environment:
+  REPO: sapp
+  GH_USER: jklq
+packages:
+  - rsync
+  - go
+tasks:
+  - mirror-to-github: |
+      cd ~/"${REPO}"
+      git config --global credential.helper store
+      git push --mirror "https://github.com/${GH_USER}/${REPO}"
+  - upload-backend: |
+      cd ~/"${REPO}"/backend
+      GOOS=linux GOARCH=arm64 go build -o ./sapp ./cmd/sapp
+      GOOS=linux GOARCH=arm64 go build -o ./migrate ./cmd/migrate
+      rsync -e 'ssh -i ~/.ssh/4a75e973-8e90-4667-a7da-a58ca05dad38 -o StrictHostKeyChecking=no' -a --delete ./ root@relay5.com:/var/spool/apps/sapp/backend/
+  - upload-frontend: |
+      curl -sLO https://github.com/tailwindlabs/tailwindcss/releases/latest/download/tailwindcss-linux-x64-musl
+      chmod +x tailwindcss-linux-x64-musl
+      mkdir ~/tailwind/
+      mv tailwindcss-linux-x64-musl ~/tailwind/tailwindcss
+      export PATH=~/tailwind:$PATH
+      cd ~/"${REPO}"/frontend
+      SERVER_PORT=sappi.angeltvedt.net go run .
+      rsync -e 'ssh -i ~/.ssh/4a75e973-8e90-4667-a7da-a58ca05dad38 -o StrictHostKeyChecking=no' -a --delete ./_build/ root@relay5.com:/var/spool/apps/sapp/frontend/
+  - joint-deploy: |
+      ssh -i ~/.ssh/4a75e973-8e90-4667-a7da-a58ca05dad38 -o StrictHostKeyChecking=no root@relay5.com "pc6 deploy sapp"
