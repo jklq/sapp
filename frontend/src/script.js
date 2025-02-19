@@ -18,7 +18,7 @@ for (let option of categoryOptions) {
   option.addEventListener("click", (e) => {
     let category = option.getAttribute("data-category");
     fetch(
-      `http://${serverURL}/v1/pay/${sharedOption.value}/${amountInput.value}/${category}`,
+      `${serverURL}/v1/pay/${sharedOption.value}/${amountInput.value}/${category}`,
       {
         method: "POST",
       }
