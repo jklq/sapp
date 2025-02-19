@@ -15,11 +15,6 @@ tasks:
       cd ~/"${REPO}"
       git config --global credential.helper store
       git push --mirror "https://github.com/${GH_USER}/${REPO}"
-  - upload-backend: |
-      cd ~/"${REPO}"/backend
-      GOOS=linux GOARCH=arm64 go build -o ./sapp ./cmd/sapp
-      GOOS=linux GOARCH=arm64 go build -o ./migrate ./cmd/migrate
-      rsync -e 'ssh -i ~/.ssh/4a75e973-8e90-4667-a7da-a58ca05dad38 -o StrictHostKeyChecking=no' -a --delete ./ root@relay5.com:/var/spool/apps/sapp/backend/
   - upload-frontend: |
       curl -sLO https://github.com/tailwindlabs/tailwindcss/releases/latest/download/tailwindcss-linux-x64-musl
       chmod +x tailwindcss-linux-x64-musl
@@ -28,6 +23,12 @@ tasks:
       export PATH=~/tailwind:$PATH
       cd ~/"${REPO}"/frontend
       SERVER_PORT=sapp.angeltvedt.net go run .
-      rsync -e 'ssh -i ~/.ssh/4a75e973-8e90-4667-a7da-a58ca05dad38 -o StrictHostKeyChecking=no' -a --delete ./_build/ root@relay5.com:/var/spool/apps/sapp/frontend/
+      rsync -e 'ssh -i ~/.ssh/4a75e973-8e90-4667-a7da-a58ca05dad38 -o StrictHostKeyChecking=no' -a --delete ./_build/ root@relay5.com:/var/spool/apps/sapp/
+  - upload-backend: |
+      cd ~/"${REPO}"/backend
+      GOOS=linux GOARCH=arm64 go build -o ./sapp ./cmd/sapp
+      GOOS=linux GOARCH=arm64 go build -o ./migrate ./cmd/migrate
+      rsync -e 'ssh -i ~/.ssh/4a75e973-8e90-4667-a7da-a58ca05dad38 -o StrictHostKeyChecking=no' -a --delete ./ root@relay5.com:/var/spool/apps/sapp/backend/
+
   - joint-deploy: |
       ssh -i ~/.ssh/4a75e973-8e90-4667-a7da-a58ca05dad38 -o StrictHostKeyChecking=no root@relay5.com "pc6 deploy sapp"
