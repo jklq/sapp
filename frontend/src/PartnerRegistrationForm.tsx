@@ -1,6 +1,6 @@
 import { useState, FormEvent } from 'react';
 import { registerPartners } from './api';
-import { PartnerRegistrationPayload, UserRegistrationDetails, PartnerRegistrationResponse } from './types';
+import { PartnerRegistrationPayload, UserRegistrationDetails } from './types';
 
 interface PartnerRegistrationFormProps {
     onRegistrationSuccess: () => void; // Callback to navigate back to login or show success
