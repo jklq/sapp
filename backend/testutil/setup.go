@@ -152,9 +152,9 @@ func SetupTestEnvironment(t *testing.T) *TestEnv {
 		t.Fatalf("failed to open in-memory database: %v", err)
 	}
 
-	// Keep the connection alive for the duration of the test run
-	db.SetMaxIdleConns(1)
-	db.SetMaxOpenConns(1)
+	// Allow a couple of connections for potential concurrency during tests
+	db.SetMaxIdleConns(2)
+	db.SetMaxOpenConns(2)
 
 	// Test connection
 	if err := db.Ping(); err != nil {
