@@ -11,9 +11,12 @@ func HandlePayRoute(db *sql.DB) func(w http.ResponseWriter, r *http.Request) {
 	return func(w http.ResponseWriter, r *http.Request) {
 		tx, err := db.Begin()
 		if err != nil {
+			slog.Error("failed to begin transaction", "url", r.URL, "err", err)
 			w.WriteHeader(http.StatusInternalServerError)
 			return
 		}
+		// Defer rollback in case of errors before commit
+		defer tx.Rollback()
 
 		var shared_with *int
 
