@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"io"
+	"log/slog" // Import slog
 	"net/http"
 )
 
@@ -27,6 +28,12 @@ type OpenRouterAPI struct {
 }
 
 func NewOpenRouterAPI(apiKey string, model string) OpenRouterAPI {
+	if apiKey == "" {
+		slog.Warn("OpenRouter API key is empty. Ensure OPENROUTER_KEY environment variable is set.")
+	} else {
+		// Log length for confirmation, not the key itself for security
+		slog.Info("OpenRouter API key loaded.", "key_length", len(apiKey))
+	}
 	return OpenRouterAPI{apiKey: apiKey, model: model}
 }
 
