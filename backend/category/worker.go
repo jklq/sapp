@@ -141,13 +141,44 @@ func (p CategorizingPool) worker(jobCh <-chan Job, errCh chan<- error) {
 				break
 			}
 
-			var sharedWithId *int64 = nil
-			if spending.ApportionMode != "alone" {
+			// Determine shared_with based on the individual spending's apportion_mode
+			var sharedWithId *int64 = nil // Default to NULL (alone)
+			sharedUserTakesAll := false
+
+			switch spending.ApportionMode {
+			case "shared":
+				// If mode is 'shared', use the job's shared partner ID (if one exists)
+				sharedWithId = job.SharedWithId // Stays nil if job.SharedWithId is nil
+			case "other":
+				// If mode is 'other', use the job's shared partner ID (must exist) and set flag
+				if job.SharedWithId == nil {
+					// This case should ideally be caught by validation in ProcessCategorizationJob,
+					// but double-check here to prevent DB errors.
+					tx.Rollback()
+					failed = true
+					slog.Error("logic error: apportion_mode is 'other' but job has no shared_with ID", "job_id", job.Id, "spending_desc", spending.Description)
+					errCh <- fmt.Errorf("invalid state: apportion_mode 'other' without shared_with ID")
+					break // Break inner loop
+				}
 				sharedWithId = job.SharedWithId
+				sharedUserTakesAll = true
+			case "alone":
+				// sharedWithId remains nil
+			default:
+				// Should not happen due to validation in ProcessCategorizationJob
+				tx.Rollback()
+				failed = true
+				slog.Error("logic error: invalid apportion_mode reached worker", "job_id", job.Id, "spending_desc", spending.Description, "mode", spending.ApportionMode)
+				errCh <- fmt.Errorf("invalid state: invalid apportion_mode '%s'", spending.ApportionMode)
+				break // Break inner loop
 			}
 
-			_, err = tx.Exec(`INSERT INTO user_spendings (spending_id, buyer, shared_with, shared_user_takes_all) 
-			VALUES (?,?,?,?)`, id, job.Buyer, sharedWithId, spending.ApportionMode == "other")
+			if failed { // Check if break was due to an error above
+				break
+			}
+
+			_, err = tx.Exec(`INSERT INTO user_spendings (spending_id, buyer, shared_with, shared_user_takes_all)
+			VALUES (?,?,?,?)`, id, job.Buyer, sharedWithId, sharedUserTakesAll)
 
 			if err != nil {
 				tx.Rollback()

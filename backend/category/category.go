@@ -85,23 +85,45 @@ func ProcessCategorizationJob(params CategorizationParams) (JobResult, error) {
 
 	var countedTotal float64 = 0
 
-	for i, t := range job.Spendings {
-		if params.SharedMode == "shared" {
-			job.Spendings[i].ApportionMode = "shared"
-		} else if params.SharedMode == "alone" {
-			job.Spendings[i].ApportionMode = "alone"
-		} else if params.SharedMode == "mix" && (t.ApportionMode != "alone" && t.ApportionMode != "shared" && t.ApportionMode != "other") {
-			slog.Warn("generated sharedStatus was not correct")
-			return ProcessCategorizationJob(params)
-		} else if params.SharedMode != "mix" {
-			slog.Warn("invalid sharedStatus")
-			return JobResult{}, fmt.Errorf("invalid shared status")
+	for _, spending := range job.Spendings {
+		// Validate the ApportionMode provided by the AI for each spending item.
+		isValidApportionMode := false
+		validModes := []string{"alone", "shared", "other"}
+		for _, mode := range validModes {
+			if spending.ApportionMode == mode {
+				isValidApportionMode = true
+				break
+			}
 		}
 
-		countedTotal += t.Amount
+		if !isValidApportionMode {
+			slog.Warn("AI returned invalid apportion_mode", "spending_description", spending.Description, "invalid_mode", spending.ApportionMode)
+			return ProcessCategorizationJob(params) // Retry
+		}
+
+		// If there's no shared person, the mode MUST be 'alone'.
+		if params.SharedWith == nil && spending.ApportionMode != "alone" {
+			slog.Warn("AI returned non-'alone' apportion_mode when there is no shared person", "spending_description", spending.Description, "mode", spending.ApportionMode)
+			return ProcessCategorizationJob(params) // Retry
+		}
+
+		// If there IS a shared person, the mode cannot be 'other' if the initial hint was 'alone'.
+		// (It doesn't make sense for the other person to pay if the buyer initially said it was 'alone')
+		// Allow 'shared' or 'alone' even if hint was 'alone', as prompt might clarify.
+		// Allow 'alone', 'shared', or 'other' if hint was 'shared' or 'mix'.
+		if params.SharedWith != nil && params.SharedMode == "alone" && spending.ApportionMode == "other" {
+			slog.Warn("AI returned 'other' apportion_mode when initial hint was 'alone'", "spending_description", spending.Description)
+			return ProcessCategorizationJob(params) // Retry
+		}
+
+
+		countedTotal += spending.Amount
 	}
 
-	if math.Abs(countedTotal-params.TotalAmount) > 3 {
+	// Check if the sum of amounts matches the total amount (within tolerance)
+	// Use a small tolerance for floating point comparisons
+	tolerance := 0.01 // e.g., 1 cent
+	if math.Abs(countedTotal-params.TotalAmount) > tolerance {
 		slog.Warn("spending amount and total amount did not match up", "counted_total", countedTotal, "actual_total", params.TotalAmount)
 		return ProcessCategorizationJob(params)
 	}

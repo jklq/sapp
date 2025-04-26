@@ -53,20 +53,33 @@ func getPrompt(params CategorizationParams) (string, error) {
 	Svaret skal altså BARE være json, UTEN markdown formatering.
 	`
 
-	var sharedStatusDescription, jsonFormatString, mixTip, userInfo string
-
-	if params.SharedMode == "mix" {
-		userInfo = fmt.Sprintf("Personen som har betalt (og oppgitt beskrivelsen) heter %s, mens den andre personen heter %s", params.Buyer.Name, params.SharedWith.Name)
-		sharedStatusDescription = "Deler av kjøpet skal deles med en annen person, mens den andre delen skal tas alene."
-		jsonFormatString = "{\"ambiguity_flag\": <string, tomt om ikke aktivert>, \"spendings\":[{\"apportion_mode\":\"shared\"|\"alone\"|\"other\", \"category\": <category_name>, \"amount\": <amount>, \"description\":<description>}..]}"
-		mixTip = `Hvis for eksempel et av to elementer er spesifisert som kjøpt alene, så MÅ det andre være delt.
-		- apportion_mode: "alone" dersom personen tar kjøpet alene, "shared" hvis kjøpet deles likt med den andre, "other" hvis den andre skal ta hele beløpet.`
+	// Always include user info if shared person exists, regardless of mode hint.
+	var userInfo string
+	if params.SharedWith != nil {
+		userInfo = fmt.Sprintf("Personen som har betalt (og oppgitt beskrivelsen) heter %s. Kjøpet kan potensielt deles med %s.", params.Buyer.Name, params.SharedWith.Name)
 	} else {
-		userInfo = ""
-		sharedStatusDescription = ""
-		jsonFormatString = "{ \"ambiguity_flag\": <string, empty if nothing>, \"spendings\":[{\"category\": <category_name>, \"amount\": <amount>, \"description\":<description>}..]}"
-		mixTip = ""
+		userInfo = fmt.Sprintf("Personen som har betalt (og oppgitt beskrivelsen) heter %s. Kjøpet er ikke delt med noen.", params.Buyer.Name)
 	}
 
-	return fmt.Sprintf(baseString, preambleString, userInfo, params.TotalAmount, sharedStatusDescription, params.Prompt, jsonFormatString, categoryListString, mixTip), nil
+	// Always use the JSON format that includes apportion_mode.
+	const jsonFormatString string = "{\"ambiguity_flag\": <string, tomt om ikke aktivert>, \"spendings\":[{\"apportion_mode\":\"shared\"|\"alone\"|\"other\", \"category\": <category_name>, \"amount\": <amount>, \"description\":<description>}..]}"
+
+	// Always explain apportion_mode.
+	const apportionModeExplanation string = `- apportion_mode: Angir hvordan hver del av kjøpet skal fordeles.
+		- "alone": Kjøperen (%s) tar denne delen av kostnaden alene.
+		- "shared": Kostnaden for denne delen deles likt mellom kjøperen (%s) og den andre personen (%s).
+		- "other": Den andre personen (%s) skal dekke hele kostnaden for denne delen.`
+
+	var filledApportionModeExplanation string
+	if params.SharedWith != nil {
+		filledApportionModeExplanation = fmt.Sprintf(apportionModeExplanation, params.Buyer.Name, params.Buyer.Name, params.SharedWith.Name, params.SharedWith.Name)
+	} else {
+		// Simplified explanation if there's no shared person involved. AI should only use 'alone'.
+		filledApportionModeExplanation = fmt.Sprintf("- apportion_mode: Skal være \"alone\" siden kjøpet ikke deles.")
+	}
+
+
+	// Construct the final prompt string
+	// Note: sharedStatusDescription is removed as the prompt now always handles potential mixes.
+	return fmt.Sprintf(baseString, preambleString, userInfo, params.TotalAmount, "", params.Prompt, jsonFormatString, filledApportionModeExplanation, categoryListString), nil
 }
