@@ -25,10 +25,8 @@ async function fetchWithAuth(url: string, options: RequestInit = {}): Promise<Re
   const headers = new Headers(options.headers || {});
 
   if (token) {
-    // --- INSECURE: Sending UserID as raw token for Dev ---
-    // TODO: Replace with proper Bearer token when JWT is implemented
-    headers.set('Authorization', token); // Send raw token (user ID string)
-    // --- End INSECURE ---
+    // Prepend "Bearer " to the token for standard JWT authorization
+    headers.set('Authorization', `Bearer ${token}`);
   }
   // Ensure Content-Type is set for methods that have a body
   if (options.body && !headers.has('Content-Type')) {
