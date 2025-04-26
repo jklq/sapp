@@ -45,7 +45,6 @@ type Person struct {
 }
 
 type CategorizationParams struct {
-	DB          *sql.DB
 	TotalAmount float64
 	SharedMode  string
 	Buyer       Person

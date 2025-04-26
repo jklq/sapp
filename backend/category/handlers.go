@@ -74,29 +74,52 @@ func HandleAICategorize(db *sql.DB, pool CategorizingPoolStrategy) http.HandlerF
 			return
 		}
 
-		// 3. Determine Buyer and SharedWith (FIXME: Hardcoded user IDs)
-		// Similar to pay.go, we'll hardcode the buyer and potential shared partner for now.
-		// This should be replaced with actual user authentication and selection logic.
-		buyer := Person{Id: 1, Name: "UserOne"} // FIXME: Hardcoded buyer ID and Name
-		var sharedWith *Person = nil
+		// 3. Determine Buyer and SharedWith (FIXME: Hardcoded user IDs - using ID 1 for both)
+		// This section now validates the hardcoded IDs against the database.
+		var buyer Person
+		buyerID := int64(1) // FIXME: Hardcoded buyer ID
+		buyerRow := db.QueryRow("SELECT first_name FROM users WHERE id = ?", buyerID)
+		err := buyerRow.Scan(&buyer.Name)
+		if err != nil {
+			if err == sql.ErrNoRows {
+				slog.Error("buyer user not found in database", "url", r.URL, "buyer_id", buyerID)
+				http.Error(w, "Internal Server Error: Buyer user configuration issue", http.StatusInternalServerError)
+			} else {
+				slog.Error("failed to query buyer user", "url", r.URL, "buyer_id", buyerID, "err", err)
+				http.Error(w, "Internal Server Error", http.StatusInternalServerError)
+			}
+			return
+		}
+		buyer.Id = buyerID
 
+		var sharedWith *Person = nil
 		if payload.SharedStatus != "alone" {
-			// FIXME: Hardcoded shared_with user ID and Name.
-			// In a real app, this might come from the request or user context.
-			// Also, need to handle the case where the user doesn't exist.
-			sharedWith = &Person{Id: 1, Name: "UserOne"} // FIXME: Using buyer ID for shared partner for now
-			// If shared_status is 'mix' or 'shared', we need a valid shared partner.
-			// If the hardcoded ID is invalid or doesn't exist, AddJob might fail later or behave unexpectedly.
-			// A check against the DB here would be better.
+			sharedWithID := int64(1) // FIXME: Hardcoded shared_with ID
+			// Ensure sharedWithID is different from buyerID if necessary for your logic,
+			// currently they are the same (1).
+			var sharedWithName string
+			sharedRow := db.QueryRow("SELECT first_name FROM users WHERE id = ?", sharedWithID)
+			err := sharedRow.Scan(&sharedWithName)
+			if err != nil {
+				if err == sql.ErrNoRows {
+					slog.Error("shared_with user not found in database", "url", r.URL, "shared_with_id", sharedWithID)
+					http.Error(w, "Internal Server Error: Shared user configuration issue", http.StatusInternalServerError)
+				} else {
+					slog.Error("failed to query shared_with user", "url", r.URL, "shared_with_id", sharedWithID, "err", err)
+					http.Error(w, "Internal Server Error", http.StatusInternalServerError)
+				}
+				return
+			}
+			sharedWith = &Person{Id: sharedWithID, Name: sharedWithName}
 		}
 
 		// 4. Prepare parameters for the categorization job
 		params := CategorizationParams{
-			DB:          db, // Pass the DB connection
+			// DB is no longer needed here as AddJob uses the pool's db connection
 			TotalAmount: payload.Amount,
 			SharedMode:  payload.SharedStatus,
-			Buyer:       buyer,
-			SharedWith:  sharedWith,
+			Buyer:       buyer, // Use validated buyer object
+			SharedWith:  sharedWith, // Use validated sharedWith object (or nil)
 			Prompt:      payload.Prompt,
 			// 'tries' is handled internally by ProcessCategorizationJob
 		}

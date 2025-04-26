@@ -78,7 +78,6 @@ func (p CategorizingPool) worker(jobCh <-chan Job, errCh chan<- error) {
 		}
 
 		result, err := ProcessCategorizationJob(CategorizationParams{
-			DB:          p.db,
 			TotalAmount: job.TotalAmount,
 			SharedMode:  job.SharedMode,
 			Buyer: Person{
