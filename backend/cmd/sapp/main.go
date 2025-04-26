@@ -6,6 +6,7 @@ import (
 	"net/http"
 	"os"
 
+	"git.sr.ht/~relay/sapp-backend/category"
 	"git.sr.ht/~relay/sapp-backend/pay"
 	"github.com/rs/cors"
 	_ "modernc.org/sqlite"
@@ -23,6 +24,7 @@ func main() {
 	defer db.Close()
 
 	mux.HandleFunc("POST /v1/pay/{shared_status}/{amount}/{category}", pay.HandlePayRoute(db))
+	mux.HandleFunc("GET /v1/categories", category.HandleGetCategories(db))
 
 	port := os.Getenv("PORT")
 
