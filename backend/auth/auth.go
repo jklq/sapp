@@ -6,16 +6,19 @@ import (
 	"encoding/json"
 	"log/slog"
 	"net/http"
-	"strconv" // Import strconv
+	"os" // Import os to read environment variables
+	"strconv"
+	"time" // Import time for token expiration
 
+	"github.com/golang-jwt/jwt/v5" // Import JWT library
 	"golang.org/x/crypto/bcrypt"
 )
 
-// Simple static token for demo purposes
-const demoUserToken = "demo-user-auth-token"
-const demoUserID = int64(1)
+// JWT secret key - SHOULD be loaded securely from environment variables in production
+// For development, we can use a default, but warn if it's not set.
+var jwtSecretKey = []byte(os.Getenv("JWT_SECRET_KEY"))
 
-// const partnerUserID = int64(2) // REMOVED: Partner ID is now dynamic via partnerships table
+const defaultJwtSecret = "a-secure-secret-key-for-dev-only-replace-in-prod" // CHANGE THIS IN PRODUCTION
 
 type contextKey string
 
@@ -32,6 +35,12 @@ type LoginResponse struct {
 	Token     string `json:"token"`
 	UserID    int64  `json:"user_id"`
 	FirstName string `json:"first_name"`
+}
+
+// Claims defines the structure for JWT claims
+type Claims struct {
+	UserID int64 `json:"user_id"`
+	jwt.RegisteredClaims
 }
 
 // PartnerRegistrationRequest defines the structure for the partner registration request body
@@ -52,6 +61,39 @@ type PartnerRegistrationResponse struct {
 	Message string `json:"message"`
 	User1ID int64  `json:"user1_id"`
 	User2ID int64  `json:"user2_id"`
+}
+
+// generateJWT generates a new JWT for a given user ID.
+func generateJWT(userID int64) (string, error) {
+	if len(jwtSecretKey) == 0 {
+		slog.Warn("JWT_SECRET_KEY environment variable not set, using insecure default key for development.")
+		jwtSecretKey = []byte(defaultJwtSecret)
+		// In a real production scenario, you might want to return an error here
+		// return "", errors.New("JWT secret key is not configured")
+	}
+
+	// Set token claims (e.g., expiration time)
+	expirationTime := time.Now().Add(24 * time.Hour) // Token valid for 24 hours
+	claims := &Claims{
+		UserID: userID,
+		RegisteredClaims: jwt.RegisteredClaims{
+			ExpiresAt: jwt.NewNumericDate(expirationTime),
+			IssuedAt:  jwt.NewNumericDate(time.Now()),
+			NotBefore: jwt.NewNumericDate(time.Now()),
+			Issuer:    "sapp-backend", // Optional: identify the issuer
+		},
+	}
+
+	// Create token with claims
+	token := jwt.NewWithClaims(jwt.SigningMethodHS256, claims)
+
+	// Sign the token with the secret key
+	tokenString, err := token.SignedString(jwtSecretKey)
+	if err != nil {
+		return "", fmt.Errorf("failed to sign token: %w", err)
+	}
+
+	return tokenString, nil
 }
 
 // HandleLogin creates a handler for user login
@@ -94,56 +136,94 @@ func HandleLogin(db *sql.DB) http.HandlerFunc {
 			return
 		}
 
-		// --- TODO: Replace static token with proper JWT generation ---
-		// Password matches - return the static token for the demo user (for now)
-		// This allows any authenticated user to log in, but they all get the same token.
-		slog.Info("User logged in successfully", "username", req.Username, "userID", userID, "firstName", firstName)
-
-		// --- INSECURE: Returning UserID as Token for Dev ---
-		// TODO: Replace with proper JWT generation
-		tokenString := strconv.FormatInt(userID, 10)
-		// --- End INSECURE ---
+		// Password matches - Generate JWT
+		slog.Info("User logged in successfully, generating JWT", "username", req.Username, "userID", userID, "firstName", firstName)
+		tokenString, err := generateJWT(userID)
+		if err != nil {
+			slog.Error("Failed to generate JWT", "username", req.Username, "userID", userID, "err", err)
+			http.Error(w, "Internal server error during login", http.StatusInternalServerError)
+			return
+		}
 
 		w.Header().Set("Content-Type", "application/json")
 		json.NewEncoder(w).Encode(LoginResponse{
-			Token:     tokenString, // Return user ID string as token
+			Token:     tokenString, // Return the generated JWT
 			UserID:    userID,
 			FirstName: firstName,
 		})
 	}
 }
 
-// --- INSECURE: Middleware expects UserID as Token for Dev ---
-// TODO: Replace with proper JWT validation
+// AuthMiddleware validates the JWT token from the Authorization header.
 func AuthMiddleware(next http.Handler) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		tokenString := r.Header.Get("Authorization") // Expect raw user ID string
-		if tokenString == "" {
-			http.Error(w, "Authorization header required (expecting user ID)", http.StatusUnauthorized)
+		// Check if JWT secret is configured (only needs to check once, but doing it here is simple)
+		if len(jwtSecretKey) == 0 {
+			slog.Warn("JWT_SECRET_KEY environment variable not set, using insecure default key for development.")
+			jwtSecretKey = []byte(defaultJwtSecret)
+			// Allow proceeding in dev, but log warning. In prod, you might want to fail here.
+		}
+
+		authHeader := r.Header.Get("Authorization")
+		if authHeader == "" {
+			http.Error(w, "Authorization header required", http.StatusUnauthorized)
 			return
 		}
 
-		// Attempt to parse the token string as a user ID
-		userID, err := strconv.ParseInt(tokenString, 10, 64)
+		// Expecting "Bearer <token>"
+		parts := strings.Split(authHeader, " ")
+		if len(parts) != 2 || strings.ToLower(parts[0]) != "bearer" {
+			http.Error(w, "Authorization header format must be Bearer {token}", http.StatusUnauthorized)
+			return
+		}
+		tokenString := parts[1]
+
+		// Parse and validate the token
+		claims := &Claims{}
+		token, err := jwt.ParseWithClaims(tokenString, claims, func(token *jwt.Token) (interface{}, error) {
+			// Check the signing method
+			if _, ok := token.Method.(*jwt.SigningMethodHMAC); !ok {
+				return nil, fmt.Errorf("unexpected signing method: %v", token.Header["alg"])
+			}
+			return jwtSecretKey, nil
+		})
+
 		if err != nil {
-			slog.Warn("Invalid Authorization header format: expected user ID", "token", tokenString, "err", err)
-			http.Error(w, "Invalid authorization token format", http.StatusUnauthorized)
+			if errors.Is(err, jwt.ErrTokenExpired) {
+				slog.Warn("JWT validation failed: token expired", "url", r.URL)
+				http.Error(w, "Token expired", http.StatusUnauthorized)
+			} else {
+				slog.Warn("JWT validation failed", "url", r.URL, "err", err)
+				http.Error(w, "Invalid token", http.StatusUnauthorized)
+			}
 			return
 		}
 
-		// Optional: Verify user ID exists in DB? Might be overkill for this temporary fix.
-		// var exists int
-		// err = db.QueryRow("SELECT 1 FROM users WHERE id = ?", userID).Scan(&exists)
-		// if err != nil { ... handle error or sql.ErrNoRows ... }
+		if !token.Valid {
+			slog.Warn("JWT validation failed: token invalid", "url", r.URL)
+			http.Error(w, "Invalid token", http.StatusUnauthorized)
+			return
+		}
 
-		// Add the parsed user ID to context
-		slog.Debug("AuthMiddleware: User identified", "userID", userID)
+		// Token is valid, extract user ID and add to context
+		userID := claims.UserID
+		if userID <= 0 {
+			// Should not happen if token generation is correct, but check defensively
+			slog.Error("Invalid user ID found in valid JWT claims", "url", r.URL, "userID", userID)
+			http.Error(w, "Invalid token claims", http.StatusUnauthorized)
+			return
+		}
+
+		// Optional: Verify user ID exists in DB? Can add overhead but increases security.
+		// var exists int
+		// err = db.QueryRow("SELECT 1 FROM users WHERE id = ?", userID).Scan(&exists) // Need DB access here
+		// if err != nil { ... handle error or sql.ErrNoRows ... http.StatusUnauthorized }
+
+		slog.Debug("AuthMiddleware: User identified via JWT", "userID", userID)
 		ctx := context.WithValue(r.Context(), userContextKey, userID)
 		next.ServeHTTP(w, r.WithContext(ctx))
 	})
 }
-
-// --- End INSECURE ---
 
 // GetUserIDFromContext retrieves the user ID stored in the request context.
 // Returns 0 and false if the user ID is not found or not an int64.
