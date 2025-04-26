@@ -1,7 +1,5 @@
 import { useState, useEffect } from 'react';
 import { getToken, storeToken, removeToken } from './api';
-import { useState, useEffect } from 'react';
-import { getToken, storeToken, removeToken } from './api';
 import { LoginResponse } from './types';
 import LoginForm from './LoginForm';
 import LogSpendingForm from './LogSpendingForm';
