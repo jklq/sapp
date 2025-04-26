@@ -1,6 +1,7 @@
 package category
 
 import (
+	"database/sql" // Import the sql package
 	"encoding/json"
 	"fmt"
 	"log/slog"
