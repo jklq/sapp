@@ -6,7 +6,7 @@ CREATE TABLE IF NOT EXISTS users (
 
 CREATE TABLE IF NOT EXISTS categories (
 		id INTEGER PRIMARY KEY AUTOINCREMENT,
-		name TEXT NOT NULL,
+		name TEXT NOT NULL UNIQUE,
         mean_min_amount REAL,
         mean_max_amount REAL,
         variation REAL DEFAULT 1
