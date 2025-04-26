@@ -200,3 +200,50 @@ export async function updateSpendingItem(spendingId: number, payload: UpdateSpen
         // Optionally handle other success codes if the backend changes
     }
 }
+
+// --- Transfer API Functions ---
+
+// Fetches the current transfer status between the user and partner
+export async function fetchTransferStatus(): Promise<TransferStatusResponse> {
+    const url = `${API_BASE_URL}/v1/transfer/status`;
+    const response = await fetchWithAuth(url); // GET request
+
+    if (!response.ok) {
+        const errorBody = await response.text();
+        let errorMessage = `Failed to fetch transfer status: ${response.statusText}`;
+        try {
+            const errData = JSON.parse(errorBody);
+            errorMessage = errData.message || errData.error || errorMessage;
+        } catch (e) {
+             errorMessage += ` - ${errorBody}`;
+        }
+        throw new Error(errorMessage);
+    }
+
+    const data: TransferStatusResponse = await response.json();
+    console.log("Fetched Transfer Status:", data); // Debug log
+    return data;
+}
+
+// Records that a transfer/settlement has occurred
+export async function recordTransfer(): Promise<void> {
+    const url = `${API_BASE_URL}/v1/transfer/record`;
+    const response = await fetchWithAuth(url, { method: "POST" });
+
+    if (!response.ok) {
+        const errorBody = await response.text();
+        let errorMessage = `Failed to record transfer: ${response.statusText}`;
+         try {
+            const errData = JSON.parse(errorBody);
+            errorMessage = errData.message || errData.error || errorMessage;
+        } catch (e) {
+             errorMessage += ` - ${errorBody}`;
+        }
+        throw new Error(errorMessage);
+    }
+
+    // Expecting 200 OK on success
+    if (response.status !== 200) {
+        console.warn(`Unexpected status code after recording transfer: ${response.status}`);
+    }
+}
