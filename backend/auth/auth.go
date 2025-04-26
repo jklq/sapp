@@ -4,10 +4,12 @@ import (
 	"context"
 	"database/sql"
 	"encoding/json"
+	"errors"
+	"fmt"
 	"log/slog"
 	"net/http"
 	"os" // Import os to read environment variables
-	"strconv"
+	"strings"
 	"time" // Import time for token expiration
 
 	"github.com/golang-jwt/jwt/v5" // Import JWT library
