@@ -40,11 +40,6 @@ func HandlePayRoute(db *sql.DB) func(w http.ResponseWriter, r *http.Request) {
 		default:
 			w.WriteHeader(http.StatusBadRequest)
 			w.Write([]byte("Invalid shared status."))
-				return
-			}
-		default:
-			w.WriteHeader(http.StatusBadRequest)
-			w.Write([]byte("Invalid shared status."))
 			return
 		}
 
