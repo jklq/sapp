@@ -232,26 +232,67 @@ function SpendingsList({ onBack }: SpendingsListProps) {
         } else {
             // --- Render Display Row/Card (Responsive) ---
             return (
-                <div key={item.id} className={containerClasses}>
-                    {/* Description (Primary info on mobile) */}
-                    <div className="px-4 py-3 md:table-cell md:whitespace-nowrap text-sm text-gray-900">
-                        <span className="text-xs font-medium text-gray-500 uppercase md:hidden">Desc.: </span>
-                        {item.description || '-'}
+                // Container for one item: block on mobile, table-row on md+
+                // Add padding and border for mobile card appearance
+                <div key={item.id} className={`${containerClasses} p-3 md:p-0 md:border-b md:border-gray-200`}>
+
+                    {/* Mobile View Structure (md:hidden) */}
+                    <div className="md:hidden space-y-2">
+                        {/* Description (Primary info) */}
+                        <div>
+                            <span className="text-xs font-medium text-gray-500 uppercase">Description</span>
+                            <p className="text-sm text-gray-900 break-words">{item.description || '-'}</p>
+                        </div>
+
+                        {/* Category */}
+                        <div>
+                            <span className="text-xs font-medium text-gray-500 uppercase">Category</span>
+                            <p className="text-sm text-gray-500">{item.category_name}</p>
+                        </div>
+
+                        {/* Amount */}
+                        <div>
+                            <span className="text-xs font-medium text-gray-500 uppercase">Amount</span>
+                            <p className="text-sm text-gray-900">{formatCurrency(item.amount)}</p>
+                        </div>
+
+                        {/* Sharing Status */}
+                        <div>
+                            <span className="text-xs font-medium text-gray-500 uppercase">Sharing</span>
+                            <div> {/* Wrap badge in div for block layout */}
+                                <span className={`mt-1 px-2 inline-flex text-xs leading-5 font-semibold rounded-full ${
+                                    item.sharing_status === 'Alone' ? 'bg-blue-100 text-blue-800' :
+                                    item.sharing_status.startsWith('Shared') ? 'bg-green-100 text-green-800' :
+                                    item.sharing_status.startsWith('Paid by') ? 'bg-yellow-100 text-yellow-800' :
+                                    'bg-gray-100 text-gray-800' // Fallback
+                                }`}>
+                                    {item.sharing_status}
+                                </span>
+                            </div>
+                        </div>
+
+                        {/* Action (Edit Button) */}
+                        <div className="pt-2 text-right"> {/* Add padding top for separation */}
+                            <button
+                                onClick={() => handleEditClick(item)}
+                                disabled={editingItemId !== null} // Disable other edit buttons while one is active
+                                className={`text-sm text-indigo-600 hover:text-indigo-900 ${editingItemId !== null ? 'opacity-50 cursor-not-allowed' : ''}`}
+                            >
+                                Edit
+                            </button>
+                        </div>
                     </div>
-                     {/* Category */}
-                    <div className="px-4 py-3 md:table-cell md:whitespace-nowrap text-sm text-gray-500">
-                         <span className="text-xs font-medium text-gray-500 uppercase md:hidden">Category: </span>
-                         {item.category_name}
-                    </div>
-                    {/* Amount - Moved and aligned left on mobile */}
-                    <div className="px-4 py-3 md:table-cell md:whitespace-nowrap text-sm text-gray-900 md:text-right"> {/* Keep text-right for md+ */}
-                         <span className="text-xs font-medium text-gray-500 uppercase md:hidden">Amount: </span>
-                         {formatCurrency(item.amount)}
-                    </div>
+
+                    {/* Desktop Table Cell View (hidden on mobile) */}
+                    {/* Description */}
+                    <div className="hidden md:table-cell px-4 py-3 whitespace-nowrap text-sm text-gray-900">{item.description || '-'}</div>
+                    {/* Category */}
+                    <div className="hidden md:table-cell px-4 py-3 whitespace-nowrap text-sm text-gray-500">{item.category_name}</div>
+                    {/* Amount */}
+                    <div className="hidden md:table-cell px-4 py-3 whitespace-nowrap text-sm text-gray-900 text-right">{formatCurrency(item.amount)}</div>
                     {/* Sharing Status */}
-                    <div className="px-4 py-3 md:table-cell md:whitespace-nowrap text-sm text-gray-500">
-                         <span className="text-xs font-medium text-gray-500 uppercase md:hidden">Sharing: </span>
-                         <span className={`px-2 inline-flex text-xs leading-5 font-semibold rounded-full ${
+                    <div className="hidden md:table-cell px-4 py-3 whitespace-nowrap text-sm text-gray-500">
+                        <span className={`px-2 inline-flex text-xs leading-5 font-semibold rounded-full ${
                             item.sharing_status === 'Alone' ? 'bg-blue-100 text-blue-800' :
                             item.sharing_status.startsWith('Shared') ? 'bg-green-100 text-green-800' :
                             item.sharing_status.startsWith('Paid by') ? 'bg-yellow-100 text-yellow-800' :
@@ -260,17 +301,17 @@ function SpendingsList({ onBack }: SpendingsListProps) {
                             {item.sharing_status}
                         </span>
                     </div>
-                    {/* Action (Edit Button) - Moved below other fields on mobile */}
-                    <div className="px-4 py-3 md:table-cell md:whitespace-nowrap text-right text-sm font-medium">
+                    {/* Action (Edit Button) */}
+                    <div className="hidden md:table-cell px-4 py-3 whitespace-nowrap text-right text-sm font-medium">
                         <button
                             onClick={() => handleEditClick(item)}
-                            disabled={editingItemId !== null} // Disable other edit buttons while one is active
+                            disabled={editingItemId !== null}
                             className={`text-indigo-600 hover:text-indigo-900 ${editingItemId !== null ? 'opacity-50 cursor-not-allowed' : ''}`}
                         >
                             Edit
                         </button>
                     </div>
-                </div> // Close the main div for the display row
+                </div> // Close the main div for the display row/card
             );
         }
     };
@@ -365,7 +406,8 @@ function SpendingsList({ onBack }: SpendingsListProps) {
                                     </tbody>
                                 </table>
                                 {/* Card/List structure for mobile (rendered via helper) */}
-                                <div className="md:hidden divide-y divide-gray-100"> {/* Add divider for mobile cards */}
+                                {/* Use space-y for separation instead of divide-y for more control */}
+                                <div className="md:hidden space-y-3 p-2 bg-gray-50"> {/* Add padding and slight background */}
                                      {group.spendings.map(renderSpendingItemRow)}
                                      {group.spendings.length === 0 && (
                                         <div className="px-4 py-3 text-center text-sm text-gray-500 italic">No spending items generated for this job.</div>
