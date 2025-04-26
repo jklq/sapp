@@ -139,7 +139,6 @@ func TestGetCategories(t *testing.T) {
 		testutil.AssertStatusCode(t, rr, http.StatusUnauthorized)
 		testutil.AssertBodyContains(t, rr, "Invalid token")
 	})
-	})
 }
 
 // TestAICategorize tests the /v1/categorize endpoint.
@@ -225,8 +224,8 @@ func TestAICategorize(t *testing.T) {
 				if tc.name == "InvalidJSON" {
 					// Create request with invalid body manually
 					req = testutil.NewAuthenticatedRequest(t, http.MethodPost, "/v1/categorize", env.AuthToken, nil) // body=nil is fine
-					req.Body = io.NopCloser(strings.NewReader("{invalid json"))                                       // Set invalid body
-					req.Header.Set("Content-Type", "application/json")                                                // Still need content type
+					req.Body = io.NopCloser(strings.NewReader("{invalid json"))                                      // Set invalid body
+					req.Header.Set("Content-Type", "application/json")                                               // Still need content type
 				} else {
 					req = testutil.NewAuthenticatedRequest(t, http.MethodPost, "/v1/categorize", env.AuthToken, tc.payload)
 				}
@@ -269,7 +268,7 @@ func TestGetSpendings(t *testing.T) {
 	// Job 1: Shared groceries and alone transport
 	job1ID := testutil.InsertAIJob(t, env.DB, env.UserID, &env.PartnerID, "Groceries and bus ticket", 75.0, "finished", true, false, nil)
 	spending1_1 := testutil.InsertSpending(t, env.DB, env.UserID, &env.PartnerID, groceriesID, 50.0, "Milk & Bread", false, &job1ID, nil) // Shared
-	spending1_2 := testutil.InsertSpending(t, env.DB, env.UserID, nil, transportID, 25.0, "Bus Ticket", false, &job1ID, nil)             // Alone
+	spending1_2 := testutil.InsertSpending(t, env.DB, env.UserID, nil, transportID, 25.0, "Bus Ticket", false, &job1ID, nil)              // Alone
 
 	// Job 2: Paid by partner
 	job2ID := testutil.InsertAIJob(t, env.DB, env.UserID, &env.PartnerID, "Gift for me from Partner", 100.0, "finished", true, false, nil)
@@ -369,7 +368,7 @@ func TestUpdateSpending(t *testing.T) {
 	// Spending 2: Initially alone transport
 	spendingIDAlone := testutil.InsertSpending(t, env.DB, env.UserID, nil, transportID, 25.0, "Initial Alone", false, nil, nil)
 	// Spending 3: Initially paid by partner
-	spendingIDPaidByPartner := testutil.InsertSpending(t, env.DB, env.UserID, &env.PartnerID, shoppingID, 100.0, "Initial PaidByPartner", true, nil, nil)
+	_ = testutil.InsertSpending(t, env.DB, env.UserID, &env.PartnerID, shoppingID, 100.0, "Initial PaidByPartner", true, nil, nil)
 	// Spending 4: Belongs to partner (for forbidden test)
 	_ = testutil.InsertSpending(t, env.DB, env.PartnerID, &env.UserID, groceriesID, 30.0, "Partner's Spending", false, nil, nil)
 
@@ -379,15 +378,15 @@ func TestUpdateSpending(t *testing.T) {
 		spendingID     int64
 		payload        spendings.UpdateSpendingPayload
 		expectedStatus int
-		expectedBody   string // Substring to check in body for errors
+		expectedBody   string                       // Substring to check in body for errors
 		verifyFunc     func(t *testing.T, id int64) // Optional verification function
 	}{
 		{
 			name:       "SuccessUpdateToAlone",
 			spendingID: spendingIDShared,
 			payload: spendings.UpdateSpendingPayload{
-				Description:  "Updated to Alone",
-				CategoryName: "Transport",
+				Description:   "Updated to Alone",
+				CategoryName:  "Transport",
 				SharingStatus: spendings.StatusAlone,
 			},
 			expectedStatus: http.StatusOK,
@@ -418,8 +417,8 @@ func TestUpdateSpending(t *testing.T) {
 			name:       "SuccessUpdateToShared",
 			spendingID: spendingIDAlone,
 			payload: spendings.UpdateSpendingPayload{
-				Description:  "Updated to Shared",
-				CategoryName: "Groceries",
+				Description:   "Updated to Shared",
+				CategoryName:  "Groceries",
 				SharingStatus: spendings.StatusShared,
 			},
 			expectedStatus: http.StatusOK,
@@ -442,8 +441,8 @@ func TestUpdateSpending(t *testing.T) {
 			name:       "SuccessUpdateToPaidByPartner",
 			spendingID: spendingIDAlone, // Use the one previously updated to shared
 			payload: spendings.UpdateSpendingPayload{
-				Description:  "Updated to PaidByPartner",
-				CategoryName: "Shopping",
+				Description:   "Updated to PaidByPartner",
+				CategoryName:  "Shopping",
 				SharingStatus: spendings.StatusPaidByPartner,
 			},
 			expectedStatus: http.StatusOK,
@@ -466,8 +465,8 @@ func TestUpdateSpending(t *testing.T) {
 			name:       "ErrorNotFound",
 			spendingID: 99999,
 			payload: spendings.UpdateSpendingPayload{
-				Description:  "Test",
-				CategoryName: "Groceries",
+				Description:   "Test",
+				CategoryName:  "Groceries",
 				SharingStatus: spendings.StatusAlone,
 			},
 			expectedStatus: http.StatusNotFound,
@@ -477,8 +476,8 @@ func TestUpdateSpending(t *testing.T) {
 			name:       "ErrorForbidden",
 			spendingID: 4, // Belongs to partner
 			payload: spendings.UpdateSpendingPayload{
-				Description:  "Attempt Forbidden Update",
-				CategoryName: "Groceries",
+				Description:   "Attempt Forbidden Update",
+				CategoryName:  "Groceries",
 				SharingStatus: spendings.StatusAlone,
 			},
 			expectedStatus: http.StatusForbidden,
@@ -488,8 +487,8 @@ func TestUpdateSpending(t *testing.T) {
 			name:       "ErrorInvalidCategory",
 			spendingID: spendingIDShared,
 			payload: spendings.UpdateSpendingPayload{
-				Description:  "Test",
-				CategoryName: "NonExistentCategory",
+				Description:   "Test",
+				CategoryName:  "NonExistentCategory",
 				SharingStatus: spendings.StatusAlone,
 			},
 			expectedStatus: http.StatusBadRequest, // Bad request because category is invalid input
@@ -499,8 +498,8 @@ func TestUpdateSpending(t *testing.T) {
 			name:       "ErrorInvalidStatus",
 			spendingID: spendingIDShared,
 			payload: spendings.UpdateSpendingPayload{
-				Description:  "Test",
-				CategoryName: "Groceries",
+				Description:   "Test",
+				CategoryName:  "Groceries",
 				SharingStatus: "invalid_status",
 			},
 			expectedStatus: http.StatusBadRequest,
@@ -510,8 +509,8 @@ func TestUpdateSpending(t *testing.T) {
 			name:       "ErrorMissingCategory",
 			spendingID: spendingIDShared,
 			payload: spendings.UpdateSpendingPayload{
-				Description:  "Test",
-				CategoryName: "", // Missing category
+				Description:   "Test",
+				CategoryName:  "", // Missing category
 				SharingStatus: spendings.StatusAlone,
 			},
 			expectedStatus: http.StatusBadRequest,
@@ -539,8 +538,8 @@ func TestUpdateSpending(t *testing.T) {
 	t.Run("Unauthorized", func(t *testing.T) {
 		url := fmt.Sprintf("/v1/spendings/%d", spendingIDShared)
 		payload := spendings.UpdateSpendingPayload{
-			Description:  "Unauthorized Update",
-			CategoryName: "Groceries",
+			Description:   "Unauthorized Update",
+			CategoryName:  "Groceries",
 			SharingStatus: spendings.StatusAlone,
 		}
 		req := testutil.NewAuthenticatedRequest(t, http.MethodPut, url, "invalid-token", payload)
@@ -735,7 +734,7 @@ func TestPay(t *testing.T) {
 		amount         string
 		category       string
 		expectedStatus int
-		expectedBody   string // Substring for error messages
+		expectedBody   string             // Substring for error messages
 		verifyFunc     func(t *testing.T) // Optional verification
 	}{
 		{
