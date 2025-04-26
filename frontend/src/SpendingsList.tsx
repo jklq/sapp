@@ -22,6 +22,8 @@ function SpendingsList({ onBack }: SpendingsListProps) {
     const [editingItemId, setEditingItemId] = useState<number | null>(null);
     const [editFormData, setEditFormData] = useState<UpdateSpendingPayload | null>(null);
     const [isSaving, setIsSaving] = useState<boolean>(false);
+    const [deletingJobId, setDeletingJobId] = useState<number | null>(null); // Track which job is being deleted
+    const [deleteError, setDeleteError] = useState<string | null>(null); // Separate error state for deletion
 
     // Expansion state
     const [expandedGroupIds, setExpandedGroupIds] = useState<Set<number>>(new Set());
@@ -32,6 +34,7 @@ function SpendingsList({ onBack }: SpendingsListProps) {
         setIsFetchingCategories(true);
         setError(null);
         setEditError(null); // Clear edit errors on reload
+        setDeleteError(null); // Clear delete errors on reload
 
         const spendingsPromise = fetchSpendings();
         const categoriesPromise = fetchCategories();
@@ -144,6 +147,31 @@ function SpendingsList({ onBack }: SpendingsListProps) {
             return newSet;
         });
     };
+
+    // --- Delete Handler ---
+    const handleDeleteJob = async (jobId: number) => {
+        // Basic confirmation dialog
+        if (!window.confirm(`Are you sure you want to delete this entire transaction (Job ID: ${jobId}) and all its associated spending items? This action cannot be undone.`)) {
+            return;
+        }
+
+        setDeletingJobId(jobId);
+        setDeleteError(null);
+
+        try {
+            await deleteAIJob(jobId);
+            // Option 1: Refetch all data
+            // loadData();
+            // Option 2: Remove the group from local state for faster UI update
+            setTransactionGroups(prevGroups => prevGroups.filter(group => group.job_id !== jobId));
+        } catch (err) {
+            console.error("Failed to delete job:", err);
+            setDeleteError(err instanceof Error ? err.message : 'Failed to delete the transaction.');
+        } finally {
+            setDeletingJobId(null);
+        }
+    };
+
 
     // --- Render Logic ---
 
@@ -333,8 +361,12 @@ function SpendingsList({ onBack }: SpendingsListProps) {
 
 
             {isLoading && <div className="text-center p-4">Loading history...</div>}
-            {error && <div className="bg-red-100 border border-red-400 text-red-700 px-4 py-3 rounded relative mb-4" role="alert">Error loading history: {error}</div>}
+            {/* Display general loading/fetch error */}
+            {error && !isLoading && <div className="bg-red-100 border border-red-400 text-red-700 px-4 py-3 rounded relative mb-4" role="alert">Error loading history: {error}</div>}
+            {/* Display edit error */}
             {editError && <div className="bg-red-100 border border-red-400 text-red-700 px-4 py-3 rounded relative mb-4" role="alert">Error saving changes: {editError}</div>}
+            {/* Display delete error */}
+            {deleteError && <div className="bg-red-100 border border-red-400 text-red-700 px-4 py-3 rounded relative mb-4" role="alert">Error deleting transaction: {deleteError}</div>}
 
 
             {!isLoading && !error && transactionGroups.length === 0 && (
@@ -361,19 +393,36 @@ function SpendingsList({ onBack }: SpendingsListProps) {
                                             {formatDate(group.job_created_at)} by <span className="font-medium">{group.buyer_name}</span> - Total: {formatCurrency(group.total_amount)}
                                         </p>
                                     </div>
-                                    {/* Right side: Ambiguity flag and Expander Icon */}
-                                    <div className="flex items-center flex-shrink-0">
+                                    {/* Right side: Ambiguity flag, Delete Button, Expander Icon */}
+                                    <div className="flex items-center flex-shrink-0 space-x-2"> {/* Add space-x-2 */}
                                         {group.is_ambiguity_flagged && (
                                             <span
-                                                className="mr-2 px-2 py-1 inline-flex text-xs leading-4 font-semibold rounded-full bg-yellow-100 text-yellow-800 cursor-help"
+                                                className="px-2 py-1 inline-flex text-xs leading-4 font-semibold rounded-full bg-yellow-100 text-yellow-800 cursor-help"
                                                 title={`Ambiguity Reason: ${group.ambiguity_flag_reason || 'No reason provided'}`}
                                                 onClick={(e) => e.stopPropagation()} // Prevent title click from toggling group
                                             >
                                                 ⚠️ Ambiguous
                                             </span>
                                         )}
+                                        {/* Delete Button */}
+                                        <button
+                                            onClick={(e) => {
+                                                e.stopPropagation(); // Prevent toggling group when clicking delete
+                                                handleDeleteJob(group.job_id);
+                                            }}
+                                            disabled={deletingJobId === group.job_id || editingItemId !== null} // Disable while deleting this or editing any item
+                                            className={`text-red-600 hover:text-red-800 disabled:opacity-50 disabled:cursor-not-allowed p-1 rounded focus:outline-none focus:ring-2 focus:ring-red-500 focus:ring-offset-1`}
+                                            title="Delete this entire transaction"
+                                        >
+                                            {/* Simple Trash Icon (SVG or character) */}
+                                            <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                                                <path strokeLinecap="round" strokeLinejoin="round" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
+                                            </svg>
+                                            {/* Show spinner if deleting this specific job */}
+                                            {deletingJobId === group.job_id && <span className="ml-1 text-xs">(Deleting...)</span>}
+                                        </button>
                                         {/* Expander Icon */}
-                                        <span className="text-gray-500 text-lg">
+                                        <span className="text-gray-500 text-lg cursor-pointer"> {/* Make icon itself clickable */}
                                             {expandedGroupIds.has(group.job_id) ? '▲' : '▼'}
                                         </span>
                                     </div>

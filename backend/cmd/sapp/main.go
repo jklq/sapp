@@ -108,6 +108,7 @@ func main() {
 	updateSpendingHandler := http.HandlerFunc(spendings.HandleUpdateSpending(db))
 	getTransferStatusHandler := http.HandlerFunc(transfer.HandleGetTransferStatus(db)) // Create handler for transfer status
 	recordTransferHandler := http.HandlerFunc(transfer.HandleRecordTransfer(db))       // Create handler for recording transfer
+	deleteAIJobHandler := http.HandlerFunc(spendings.HandleDeleteAIJob(db))             // Create handler for deleting AI job
 
 	// Apply AuthMiddleware to protected handlers
 	mux.Handle("POST /v1/pay/{shared_status}/{amount}/{category}", applyMiddleware(payHandler, auth.AuthMiddleware))
@@ -115,6 +116,7 @@ func main() {
 	mux.Handle("POST /v1/categorize", applyMiddleware(categorizeHandler, auth.AuthMiddleware))
 	mux.Handle("GET /v1/spendings", applyMiddleware(getSpendingsHandler, auth.AuthMiddleware))
 	mux.Handle("PUT /v1/spendings/{spending_id}", applyMiddleware(updateSpendingHandler, auth.AuthMiddleware))
+	mux.Handle("DELETE /v1/jobs/{job_id}", applyMiddleware(deleteAIJobHandler, auth.AuthMiddleware))       // Add route for deleting AI job
 	mux.Handle("GET /v1/transfer/status", applyMiddleware(getTransferStatusHandler, auth.AuthMiddleware)) // Add route for transfer status
 	mux.Handle("POST /v1/transfer/record", applyMiddleware(recordTransferHandler, auth.AuthMiddleware))   // Add route for recording transfer
 

@@ -226,6 +226,129 @@ func HandleGetSpendings(db *sql.DB) http.HandlerFunc {
 	}
 }
 
+// HandleDeleteAIJob handles the deletion of an AI categorization job and its associated spendings.
+func HandleDeleteAIJob(db *sql.DB) http.HandlerFunc {
+	return func(w http.ResponseWriter, r *http.Request) {
+		userID, ok := auth.GetUserIDFromContext(r.Context())
+		if !ok {
+			slog.Error("failed to get user ID from context for deleting AI job", "url", r.URL)
+			http.Error(w, "Authentication error", http.StatusInternalServerError)
+			return
+		}
+
+		// 1. Get Job ID from path
+		jobIDStr := r.PathValue("job_id")
+		jobID, err := strconv.ParseInt(jobIDStr, 10, 64)
+		if err != nil {
+			slog.Warn("invalid job ID format for deletion", "url", r.URL, "user_id", userID, "job_id_str", jobIDStr, "err", err)
+			http.Error(w, "Invalid job ID", http.StatusBadRequest)
+			return
+		}
+
+		// 2. Begin Transaction
+		tx, err := db.Begin()
+		if err != nil {
+			slog.Error("failed to begin transaction for deleting AI job", "url", r.URL, "user_id", userID, "job_id", jobID, "err", err)
+			http.Error(w, "Internal server error", http.StatusInternalServerError)
+			return
+		}
+		defer tx.Rollback() // Rollback on error
+
+		// 3. Verify Ownership: Check if the user is the buyer of this job
+		var buyerID int64
+		err = tx.QueryRow("SELECT buyer FROM ai_categorization_jobs WHERE id = ?", jobID).Scan(&buyerID)
+		if err != nil {
+			if errors.Is(err, sql.ErrNoRows) {
+				slog.Warn("delete AI job attempt on non-existent job", "url", r.URL, "user_id", userID, "job_id", jobID)
+				http.Error(w, "Job not found", http.StatusNotFound)
+			} else {
+				slog.Error("failed to query buyer for AI job", "url", r.URL, "user_id", userID, "job_id", jobID, "err", err)
+				http.Error(w, "Internal server error", http.StatusInternalServerError)
+			}
+			return
+		}
+		if buyerID != userID {
+			slog.Warn("unauthorized attempt to delete AI job", "url", r.URL, "user_id", userID, "job_id", jobID, "actual_buyer_id", buyerID)
+			http.Error(w, "Forbidden: You can only delete your own jobs", http.StatusForbidden)
+			return
+		}
+
+		// 4. Find associated spending IDs
+		spendingIDs := []int64{}
+		rows, err := tx.Query("SELECT spending_id FROM ai_categorized_spendings WHERE job_id = ?", jobID)
+		if err != nil {
+			slog.Error("failed to query spending IDs for job deletion", "url", r.URL, "user_id", userID, "job_id", jobID, "err", err)
+			http.Error(w, "Internal server error", http.StatusInternalServerError)
+			return
+		}
+		defer rows.Close()
+		for rows.Next() {
+			var spendingID int64
+			if err := rows.Scan(&spendingID); err != nil {
+				slog.Error("failed to scan spending ID during job deletion", "url", r.URL, "user_id", userID, "job_id", jobID, "err", err)
+				http.Error(w, "Internal server error", http.StatusInternalServerError)
+				return
+			}
+			spendingIDs = append(spendingIDs, spendingID)
+		}
+		if err := rows.Err(); err != nil {
+			slog.Error("error iterating spending IDs during job deletion", "url", r.URL, "user_id", userID, "job_id", jobID, "err", err)
+			http.Error(w, "Internal server error", http.StatusInternalServerError)
+			return
+		}
+
+		// 5. Delete associated data (if any spendings found)
+		if len(spendingIDs) > 0 {
+			// Build placeholders for IN clause
+			placeholders := make([]string, len(spendingIDs))
+			args := make([]interface{}, len(spendingIDs))
+			for i, id := range spendingIDs {
+				placeholders[i] = "?"
+				args[i] = id
+			}
+			inClause := strings.Join(placeholders, ",")
+
+			// Delete from user_spendings
+			userSpendingsQuery := fmt.Sprintf("DELETE FROM user_spendings WHERE spending_id IN (%s)", inClause)
+			_, err = tx.Exec(userSpendingsQuery, args...)
+			if err != nil {
+				slog.Error("failed to delete from user_spendings during job deletion", "url", r.URL, "user_id", userID, "job_id", jobID, "err", err)
+				http.Error(w, "Internal server error", http.StatusInternalServerError)
+				return
+			}
+
+			// Delete from spendings
+			spendingsQuery := fmt.Sprintf("DELETE FROM spendings WHERE id IN (%s)", inClause)
+			_, err = tx.Exec(spendingsQuery, args...)
+			if err != nil {
+				slog.Error("failed to delete from spendings during job deletion", "url", r.URL, "user_id", userID, "job_id", jobID, "err", err)
+				http.Error(w, "Internal server error", http.StatusInternalServerError)
+				return
+			}
+			// Note: ai_categorized_spendings will be deleted by cascade when the job is deleted.
+		}
+
+		// 6. Delete the job itself
+		_, err = tx.Exec("DELETE FROM ai_categorization_jobs WHERE id = ?", jobID)
+		if err != nil {
+			// This shouldn't fail if the ownership check passed, but handle defensively
+			slog.Error("failed to delete from ai_categorization_jobs", "url", r.URL, "user_id", userID, "job_id", jobID, "err", err)
+			http.Error(w, "Internal server error", http.StatusInternalServerError)
+			return
+		}
+
+		// 7. Commit Transaction
+		if err = tx.Commit(); err != nil {
+			slog.Error("failed to commit transaction for deleting AI job", "url", r.URL, "user_id", userID, "job_id", jobID, "err", err)
+			http.Error(w, "Internal server error", http.StatusInternalServerError)
+			return
+		}
+
+		slog.Info("AI job and associated spendings deleted successfully", "url", r.URL, "user_id", userID, "job_id", jobID)
+		w.WriteHeader(http.StatusNoContent) // Send 204 No Content on success
+	}
+}
+
 
 // HandleUpdateSpending allows updating the description, category, and sharing status of a specific spending item.
 func HandleUpdateSpending(db *sql.DB) http.HandlerFunc {

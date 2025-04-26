@@ -89,6 +89,107 @@ func TestLogin(t *testing.T) {
 	})
 }
 
+// TestDeleteAIJob tests the DELETE /v1/jobs/{job_id} endpoint.
+func TestDeleteAIJob(t *testing.T) {
+	env := testutil.SetupTestEnvironment(t)
+	defer env.TearDownDB()
+
+	groceriesID := testutil.GetCategoryID(t, env.DB, "Groceries")
+	transportID := testutil.GetCategoryID(t, env.DB, "Transport")
+
+	// --- Setup Data ---
+	// Job 1 (User's job with spendings)
+	jobIDUser := testutil.InsertAIJob(t, env.DB, env.UserID, &env.PartnerID, "User Job", 75.0, "finished", true, false, nil)
+	spending1_1 := testutil.InsertSpending(t, env.DB, env.UserID, &env.PartnerID, groceriesID, 50.0, "User Shared", false, &jobIDUser, nil)
+	spending1_2 := testutil.InsertSpending(t, env.DB, env.UserID, nil, transportID, 25.0, "User Alone", false, &jobIDUser, nil)
+
+	// Job 2 (Partner's job - for forbidden test)
+	jobIDPartner := testutil.InsertAIJob(t, env.DB, env.PartnerID, &env.UserID, "Partner Job", 100.0, "finished", true, false, nil)
+	_ = testutil.InsertSpending(t, env.DB, env.PartnerID, &env.UserID, groceriesID, 100.0, "Partner Shared", false, &jobIDPartner, nil)
+
+	// --- Test Case: Success ---
+	t.Run("Success", func(t *testing.T) {
+		// Verify data exists before deletion
+		var jobCount, spendingCount, userSpendingCount int
+		env.DB.QueryRow("SELECT COUNT(*) FROM ai_categorization_jobs WHERE id = ?", jobIDUser).Scan(&jobCount)
+		env.DB.QueryRow("SELECT COUNT(*) FROM spendings WHERE id IN (?, ?)", spending1_1, spending1_2).Scan(&spendingCount)
+		env.DB.QueryRow("SELECT COUNT(*) FROM user_spendings WHERE spending_id IN (?, ?)", spending1_1, spending1_2).Scan(&userSpendingCount)
+		if jobCount != 1 || spendingCount != 2 || userSpendingCount != 2 {
+			t.Fatalf("Pre-delete check failed: job=%d, spendings=%d, user_spendings=%d", jobCount, spendingCount, userSpendingCount)
+		}
+
+		url := fmt.Sprintf("/v1/jobs/%d", jobIDUser)
+		req := testutil.NewAuthenticatedRequest(t, http.MethodDelete, url, env.AuthToken, nil)
+		rr := testutil.ExecuteRequest(t, env.Handler, req)
+
+		testutil.AssertStatusCode(t, rr, http.StatusNoContent)
+
+		// Verify data is deleted
+		env.DB.QueryRow("SELECT COUNT(*) FROM ai_categorization_jobs WHERE id = ?", jobIDUser).Scan(&jobCount)
+		env.DB.QueryRow("SELECT COUNT(*) FROM spendings WHERE id IN (?, ?)", spending1_1, spending1_2).Scan(&spendingCount)
+		env.DB.QueryRow("SELECT COUNT(*) FROM user_spendings WHERE spending_id IN (?, ?)", spending1_1, spending1_2).Scan(&userSpendingCount)
+		if jobCount != 0 || spendingCount != 0 || userSpendingCount != 0 {
+			t.Errorf("Post-delete check failed: job=%d, spendings=%d, user_spendings=%d", jobCount, spendingCount, userSpendingCount)
+		}
+	})
+
+	// --- Test Case: Not Found ---
+	t.Run("NotFound", func(t *testing.T) {
+		url := "/v1/jobs/99999" // Non-existent job ID
+		req := testutil.NewAuthenticatedRequest(t, http.MethodDelete, url, env.AuthToken, nil)
+		rr := testutil.ExecuteRequest(t, env.Handler, req)
+
+		testutil.AssertStatusCode(t, rr, http.StatusNotFound)
+		testutil.AssertBodyContains(t, rr, "Job not found")
+	})
+
+	// --- Test Case: Forbidden ---
+	t.Run("Forbidden", func(t *testing.T) {
+		url := fmt.Sprintf("/v1/jobs/%d", jobIDPartner) // Job belongs to partner
+		req := testutil.NewAuthenticatedRequest(t, http.MethodDelete, url, env.AuthToken, nil)
+		rr := testutil.ExecuteRequest(t, env.Handler, req)
+
+		testutil.AssertStatusCode(t, rr, http.StatusForbidden)
+		testutil.AssertBodyContains(t, rr, "Forbidden")
+
+		// Verify partner's job was NOT deleted
+		var jobCount int
+		env.DB.QueryRow("SELECT COUNT(*) FROM ai_categorization_jobs WHERE id = ?", jobIDPartner).Scan(&jobCount)
+		if jobCount != 1 {
+			t.Errorf("Partner's job should not have been deleted, count=%d", jobCount)
+		}
+	})
+
+	// --- Test Case: Unauthorized ---
+	t.Run("Unauthorized", func(t *testing.T) {
+		// Re-insert user's job as it was deleted in the success test
+		jobIDUserReinsert := testutil.InsertAIJob(t, env.DB, env.UserID, &env.PartnerID, "User Job Reinsert", 10.0, "finished", true, false, nil)
+
+		url := fmt.Sprintf("/v1/jobs/%d", jobIDUserReinsert)
+		req := testutil.NewAuthenticatedRequest(t, http.MethodDelete, url, "invalid-token", nil) // Invalid token
+		rr := testutil.ExecuteRequest(t, env.Handler, req)
+
+		testutil.AssertStatusCode(t, rr, http.StatusUnauthorized)
+
+		// Verify job was NOT deleted
+		var jobCount int
+		env.DB.QueryRow("SELECT COUNT(*) FROM ai_categorization_jobs WHERE id = ?", jobIDUserReinsert).Scan(&jobCount)
+		if jobCount != 1 {
+			t.Errorf("Job should not have been deleted by unauthorized request, count=%d", jobCount)
+		}
+	})
+
+	// --- Test Case: Invalid Job ID Format ---
+	t.Run("InvalidJobIDFormat", func(t *testing.T) {
+		url := "/v1/jobs/abc" // Invalid format
+		req := testutil.NewAuthenticatedRequest(t, http.MethodDelete, url, env.AuthToken, nil)
+		rr := testutil.ExecuteRequest(t, env.Handler, req)
+
+		testutil.AssertStatusCode(t, rr, http.StatusBadRequest)
+		testutil.AssertBodyContains(t, rr, "Invalid job ID")
+	})
+}
+
 // TestGetCategories tests the /v1/categories endpoint.
 func TestGetCategories(t *testing.T) {
 	env := testutil.SetupTestEnvironment(t)
