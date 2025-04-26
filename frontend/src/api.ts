@@ -1,8 +1,8 @@
-import { Category, PayPayload } from './types';
+import { Category, PayPayload } from "./types";
 
 // Define the base URL for your backend API
 // You might want to use environment variables for this in a real app
-const API_BASE_URL = import.meta.env.VITE_API_URL || 'http://localhost:8080';
+const API_BASE_URL = import.meta.env.VITE_API_URL || "http://localhost:3000";
 
 export async function fetchCategories(): Promise<Category[]> {
   const response = await fetch(`${API_BASE_URL}/v1/categories`);
@@ -23,7 +23,7 @@ export async function submitPayment(payload: PayPayload): Promise<void> {
   const url = `${API_BASE_URL}/v1/pay/${shared_status}/${amount}/${category}`;
 
   const response = await fetch(url, {
-    method: 'POST',
+    method: "POST",
     headers: {
       // No Content-Type needed for POST without body
     },
@@ -32,14 +32,16 @@ export async function submitPayment(payload: PayPayload): Promise<void> {
 
   if (!response.ok) {
     const errorBody = await response.text();
-    throw new Error(`Failed to submit payment: ${response.statusText} - ${errorBody}`);
+    throw new Error(
+      `Failed to submit payment: ${response.statusText} - ${errorBody}`
+    );
   }
 
   // Check if the response status is 201 Created
   if (response.status !== 201) {
-      const responseBody = await response.text();
-      console.warn(`Unexpected status code: ${response.status}`, responseBody);
-      // Optionally throw an error or handle differently
+    const responseBody = await response.text();
+    console.warn(`Unexpected status code: ${response.status}`, responseBody);
+    // Optionally throw an error or handle differently
   }
 
   // No content expected on success based on backend code
