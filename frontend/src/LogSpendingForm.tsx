@@ -148,10 +148,12 @@ function LogSpendingForm({ }: LogSpendingFormProps) { // Destructure props if ad
 
 
     return (
-        <div className="bg-white shadow-md rounded-lg p-6 w-full max-w-md">
-            <h1 className="text-2xl font-bold mb-4 text-center text-gray-700">Log Spending</h1>
+        // Remove p-6, add p-4 inside for content spacing
+        <div className="bg-white shadow-md rounded-lg w-full max-w-md">
+            <div className="p-4"> {/* Add inner padding */}
+                <h1 className="text-2xl font-bold mb-4 text-center text-gray-700">Log Spending</h1>
 
-            {/* Mode Switcher (Tabs) */}
+                {/* Mode Switcher (Tabs) */}
             <div className="mb-6 flex justify-center border-b border-gray-200">
                 <button
                     onClick={() => setMode('ai')}
@@ -282,10 +284,11 @@ function LogSpendingForm({ }: LogSpendingFormProps) { // Destructure props if ad
                         disabled={isSubmitDisabled}
                         className={`w-full flex justify-center py-2 px-4 border border-transparent rounded-md shadow-sm text-sm font-medium text-white ${isSubmitDisabled ? 'bg-indigo-300 cursor-not-allowed' : 'bg-indigo-600 hover:bg-indigo-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500'}`}
                     >
-                        {isLoading ? 'Submitting...' : (mode === 'ai' ? 'Submit for AI Categorization' : 'Submit Manual Payment')}
-                    </button>
-                </div>
-            </form>
+                            {isLoading ? 'Submitting...' : (mode === 'ai' ? 'Submit for AI Categorization' : 'Submit Manual Payment')}
+                        </button>
+                    </div>
+                </form>
+            </div> {/* Close inner padding div */}
         </div>
     );
 }

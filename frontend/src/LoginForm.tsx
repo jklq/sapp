@@ -56,11 +56,14 @@ function LoginForm({ onLoginSuccess }: LoginFormProps) {
 
 
   return (
-    <div className="min-h-screen bg-gray-100 flex items-center justify-center p-4">
-      <div className="bg-white shadow-md rounded-lg p-6 w-full max-w-sm">
-        <h1 className="text-2xl font-bold mb-6 text-center text-gray-700">Login</h1>
-        {error && <div className="bg-red-100 border border-red-400 text-red-700 px-4 py-3 rounded relative mb-4" role="alert">{error}</div>}
-        <form onSubmit={handleSubmit} className="space-y-4">
+    // Keep centering container, remove its padding
+    <div className="min-h-screen bg-gray-100 flex items-center justify-center">
+      {/* Remove p-6 from card, add p-4 inside */}
+      <div className="bg-white shadow-md rounded-lg w-full max-w-sm">
+        <div className="p-4"> {/* Add inner padding */}
+          <h1 className="text-2xl font-bold mb-6 text-center text-gray-700">Login</h1>
+          {error && <div className="bg-red-100 border border-red-400 text-red-700 px-4 py-3 rounded relative mb-4" role="alert">{error}</div>}
+          <form onSubmit={handleSubmit} className="space-y-4">
           <div>
             <label htmlFor="username" className="block text-sm font-medium text-gray-700">Username</label>
             <input
@@ -112,7 +115,7 @@ function LoginForm({ onLoginSuccess }: LoginFormProps) {
             {isDemoLoading ? 'Logging in as Demo...' : 'Login as Demo User'}
           </button>
         </div>
-
+        </div> {/* Close inner padding div */}
       </div>
     </div>
   );

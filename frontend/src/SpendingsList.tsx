@@ -131,28 +131,37 @@ function SpendingsList({ onBack }: SpendingsListProps) {
 
     // --- Render Logic ---
 
-    // Helper to render either display row or edit form
+    // Helper to render either display row or edit form - now responsive
     const renderSpendingItemRow = (item: SpendingItem) => {
-        if (editingItemId === item.id && editFormData) {
-            // Render Edit Form Row
+        const isEditing = editingItemId === item.id && editFormData;
+
+        // Common classes for the container (card on mobile, table row on md+)
+        const containerClasses = `block md:table-row ${isEditing ? 'bg-yellow-50' : 'bg-white'} border-b border-gray-200 md:border-none`; // Add border for mobile cards
+
+        if (isEditing) {
+            // --- Render Edit Form (Responsive) ---
             return (
-                <tr key={`${item.id}-edit`} className="bg-yellow-50">
-                    {/* Description Input */}
-                    <td className="px-4 py-3 whitespace-nowrap">
-                        <input
+                <div key={`${item.id}-edit`} className={containerClasses}>
+                    {/* Description Input (Full width on mobile, table cell on md+) */}
+                    <div className="px-4 py-3 md:table-cell md:whitespace-nowrap">
+                         <label htmlFor={`edit-desc-${item.id}`} className="text-xs font-medium text-gray-500 uppercase md:hidden">Desc.</label>
+                         <input
+                            id={`edit-desc-${item.id}`}
                             type="text"
                             value={editFormData.description}
                             onChange={(e) => handleEditFormChange('description', e.target.value)}
-                            className="w-full px-2 py-1 border border-gray-300 rounded text-sm"
+                            className="mt-1 md:mt-0 w-full px-2 py-1 border border-gray-300 rounded text-sm"
                             placeholder="Description"
                         />
-                    </td>
-                    {/* Category Select */}
-                    <td className="px-4 py-3 whitespace-nowrap">
-                        <select
+                    </div>
+                    {/* Category Select (Full width on mobile, table cell on md+) */}
+                    <div className="px-4 py-3 md:table-cell md:whitespace-nowrap">
+                         <label htmlFor={`edit-cat-${item.id}`} className="text-xs font-medium text-gray-500 uppercase md:hidden">Category</label>
+                         <select
+                            id={`edit-cat-${item.id}`}
                             value={editFormData.category_name}
                             onChange={(e) => handleEditFormChange('category_name', e.target.value)}
-                            className="w-full px-2 py-1 border border-gray-300 rounded text-sm bg-white"
+                            className="mt-1 md:mt-0 w-full px-2 py-1 border border-gray-300 rounded text-sm bg-white"
                             disabled={isFetchingCategories || categories.length === 0}
                         >
                             {isFetchingCategories ? (
@@ -165,25 +174,28 @@ function SpendingsList({ onBack }: SpendingsListProps) {
                                 ))
                             )}
                         </select>
-                    </td>
-                    {/* Amount (Read-only) */}
-                    <td className="px-4 py-3 whitespace-nowrap text-sm text-gray-500 text-right">
-                        {formatCurrency(item.amount)}
-                    </td>
-                    {/* Sharing Status Select */}
-                    <td className="px-4 py-3 whitespace-nowrap">
+                    </div>
+                    {/* Amount (Read-only) (Align right on mobile too) */}
+                    <div className="px-4 py-3 md:table-cell md:whitespace-nowrap text-sm text-gray-500 text-right">
+                         <span className="text-xs font-medium text-gray-500 uppercase md:hidden">Amount: </span>
+                         {formatCurrency(item.amount)}
+                    </div>
+                    {/* Sharing Status Select (Full width on mobile, table cell on md+) */}
+                    <div className="px-4 py-3 md:table-cell md:whitespace-nowrap">
+                         <label htmlFor={`edit-share-${item.id}`} className="text-xs font-medium text-gray-500 uppercase md:hidden">Sharing</label>
                          <select
+                            id={`edit-share-${item.id}`}
                             value={editFormData.sharing_status}
                             onChange={(e) => handleEditFormChange('sharing_status', e.target.value)}
-                            className="w-full px-2 py-1 border border-gray-300 rounded text-sm bg-white"
+                            className="mt-1 md:mt-0 w-full px-2 py-1 border border-gray-300 rounded text-sm bg-white"
                         >
                             <option value="Alone">Alone</option>
                             <option value="Shared">Shared</option>
                             <option value="Paid by Partner">Paid by Partner</option>
                         </select>
-                    </td>
-                    {/* Actions (Save/Cancel) */}
-                    <td className="px-4 py-3 whitespace-nowrap text-right text-sm font-medium space-x-2">
+                    </div>
+                    {/* Actions (Save/Cancel) (Align right on mobile too) */}
+                    <div className="px-4 py-3 md:table-cell md:whitespace-nowrap text-right text-sm font-medium space-x-2">
                         <button
                             onClick={handleSaveEdit}
                             disabled={isSaving}
@@ -198,18 +210,32 @@ function SpendingsList({ onBack }: SpendingsListProps) {
                         >
                             Cancel
                         </button>
-                    </td>
-                </tr>
+                    </div>
+                </div> // Close the main div for the edit row
             );
         } else {
-            // Render Display Row
+            // --- Render Display Row/Card (Responsive) ---
             return (
-                <tr key={item.id}>
-                    <td className="px-4 py-3 whitespace-nowrap text-sm text-gray-900">{item.description || '-'}</td>
-                    <td className="px-4 py-3 whitespace-nowrap text-sm text-gray-500">{item.category_name}</td>
-                    <td className="px-4 py-3 whitespace-nowrap text-sm text-gray-900 text-right">{formatCurrency(item.amount)}</td>
-                    <td className="px-4 py-3 whitespace-nowrap text-sm text-gray-500">
-                        <span className={`px-2 inline-flex text-xs leading-5 font-semibold rounded-full ${
+                <div key={item.id} className={containerClasses}>
+                    {/* Description (Primary info on mobile) */}
+                    <div className="px-4 py-3 md:table-cell md:whitespace-nowrap text-sm text-gray-900">
+                        <span className="text-xs font-medium text-gray-500 uppercase md:hidden">Desc.: </span>
+                        {item.description || '-'}
+                    </div>
+                     {/* Category */}
+                    <div className="px-4 py-3 md:table-cell md:whitespace-nowrap text-sm text-gray-500">
+                         <span className="text-xs font-medium text-gray-500 uppercase md:hidden">Category: </span>
+                         {item.category_name}
+                    </div>
+                    {/* Amount (Align right) */}
+                    <div className="px-4 py-3 md:table-cell md:whitespace-nowrap text-sm text-gray-900 text-right">
+                         <span className="text-xs font-medium text-gray-500 uppercase md:hidden">Amount: </span>
+                         {formatCurrency(item.amount)}
+                    </div>
+                    {/* Sharing Status */}
+                    <div className="px-4 py-3 md:table-cell md:whitespace-nowrap text-sm text-gray-500">
+                         <span className="text-xs font-medium text-gray-500 uppercase md:hidden">Sharing: </span>
+                         <span className={`px-2 inline-flex text-xs leading-5 font-semibold rounded-full ${
                             item.sharing_status === 'Alone' ? 'bg-blue-100 text-blue-800' :
                             item.sharing_status.startsWith('Shared') ? 'bg-green-100 text-green-800' :
                             item.sharing_status.startsWith('Paid by') ? 'bg-yellow-100 text-yellow-800' :
@@ -217,9 +243,9 @@ function SpendingsList({ onBack }: SpendingsListProps) {
                         }`}>
                             {item.sharing_status}
                         </span>
-                    </td>
-                    {/* Action (Edit Button) */}
-                    <td className="px-4 py-3 whitespace-nowrap text-right text-sm font-medium">
+                    </div>
+                    {/* Action (Edit Button) (Align right) */}
+                    <div className="px-4 py-3 md:table-cell md:whitespace-nowrap text-right text-sm font-medium">
                         <button
                             onClick={() => handleEditClick(item)}
                             disabled={editingItemId !== null} // Disable other edit buttons while one is active
@@ -227,18 +253,20 @@ function SpendingsList({ onBack }: SpendingsListProps) {
                         >
                             Edit
                         </button>
-                    </td>
-                </tr>
+                    </div>
+                </div> // Close the main div for the display row
             );
         }
     };
 
 
     return (
-        <div className="bg-white shadow-md rounded-lg p-6 w-full max-w-4xl"> {/* Increased max-width */}
-            <div className="flex justify-between items-center mb-4">
-                <h1 className="text-2xl font-bold text-gray-700">Spending History</h1>
-                <button
+        // Remove p-6, add p-4 inside
+        <div className="bg-white shadow-md rounded-lg w-full max-w-4xl">
+            <div className="p-4"> {/* Add inner padding */}
+                <div className="flex flex-wrap justify-between items-center mb-4 gap-2"> {/* Allow wrapping */}
+                    <h1 className="text-2xl font-bold text-gray-700">Spending History</h1>
+                    <button
                     onClick={onBack}
                     className="text-sm text-indigo-600 hover:text-indigo-800"
                 >
@@ -263,9 +291,10 @@ function SpendingsList({ onBack }: SpendingsListProps) {
                         <div key={group.job_id} className="border border-gray-200 rounded-lg shadow-sm overflow-hidden">
                             {/* Transaction Group Header */}
                             <div className="bg-gray-50 p-3 border-b border-gray-200">
-                                <div className="flex justify-between items-center flex-wrap gap-2">
-                                    <div className="flex-1 min-w-0">
-                                        <p className="text-sm font-medium text-indigo-600 truncate" title={group.prompt}>
+                                <div className="flex justify-between items-start flex-wrap gap-2"> {/* Align items-start */}
+                                    <div className="flex-1 min-w-0"> {/* Allow shrinking */}
+                                        {/* Make prompt wrap instead of truncate */}
+                                        <p className="text-sm font-medium text-indigo-600 break-words" title={group.prompt}>
                                             Prompt: <span className="text-gray-700 font-normal">{group.prompt}</span>
                                         </p>
                                         <p className="text-xs text-gray-500">
@@ -285,11 +314,13 @@ function SpendingsList({ onBack }: SpendingsListProps) {
                                 </div>
                             </div>
 
-                            {/* Spending Items Table within the Group */}
-                            <div className="overflow-x-auto">
-                                <table className="min-w-full divide-y divide-gray-200">
-                                    {/* Optional: Add a subtle thead for clarity within the group */}
-                                    <thead className="bg-white">
+                            {/* Spending Items Container (Responsive: Table on md+, Cards below) */}
+                            {/* No overflow-x needed now */}
+                            <div>
+                                {/* Table structure for medium screens and up */}
+                                <table className="min-w-full hidden md:table">
+                                    {/* Table Head (Hidden on mobile) */}
+                                    <thead className="bg-white hidden md:table-header-group">
                                         <tr>
                                             <th scope="col" className="px-4 py-2 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Item Desc.</th>
                                             <th scope="col" className="px-4 py-2 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Category</th>
@@ -298,20 +329,29 @@ function SpendingsList({ onBack }: SpendingsListProps) {
                                             <th scope="col" className="px-4 py-2 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">Actions</th>
                                         </tr>
                                     </thead>
-                                    <tbody className="bg-white divide-y divide-gray-200">
-                                        {group.spendings.map(renderSpendingItemRow)} {/* Use the helper function */}
+                                    {/* Table Body (Hidden on mobile, rendered via helper) */}
+                                    <tbody className="hidden md:table-row-group">
+                                        {group.spendings.map(renderSpendingItemRow)}
                                         {group.spendings.length === 0 && (
-                                            <tr>
-                                                <td colSpan={5} className="px-4 py-3 text-center text-sm text-gray-500 italic">No spending items generated for this job.</td>
+                                            <tr className="md:table-row">
+                                                <td colSpan={5} className="md:table-cell px-4 py-3 text-center text-sm text-gray-500 italic">No spending items generated for this job.</td>
                                             </tr>
                                         )}
                                     </tbody>
                                 </table>
+                                {/* Card/List structure for mobile (rendered via helper) */}
+                                <div className="md:hidden">
+                                     {group.spendings.map(renderSpendingItemRow)}
+                                     {group.spendings.length === 0 && (
+                                        <div className="px-4 py-3 text-center text-sm text-gray-500 italic">No spending items generated for this job.</div>
+                                     )}
+                                </div>
                             </div>
                         </div>
                     ))}
                 </div>
             )}
+            </div> {/* Close inner padding div */}
         </div>
     );
 }

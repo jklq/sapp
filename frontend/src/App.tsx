@@ -67,10 +67,13 @@ function App() {
 
     // User is logged in, show header and selected view
     return (
-      <>
-        <div className="w-full max-w-4xl mb-4 flex justify-between items-center"> {/* Adjusted width */}
-          <div>
-            {userInfo && <span className="text-gray-600 text-sm mr-4">Welcome, {userInfo.firstName}!</span>}
+      // Use w-full and max-w-4xl for content consistency, add padding here
+      <div className="w-full max-w-4xl p-4">
+        {/* Header: Make flex wrap and add spacing for mobile */}
+        <div className="mb-4 flex flex-wrap justify-between items-center gap-2">
+          {/* Left side: Welcome message and navigation */}
+          <div className="flex flex-wrap items-center gap-x-3 gap-y-1">
+            {userInfo && <span className="text-gray-600 text-sm">Welcome, {userInfo.firstName}!</span>}
             {/* Navigation Links/Buttons */}
             <button
               onClick={() => setCurrentView('logSpending')}
@@ -86,33 +89,35 @@ function App() {
             >
               View History
             </button>
-             <button
+            <button
               onClick={() => setCurrentView('transfer')}
-              className={`text-sm ml-3 ${currentView === 'transfer' ? 'text-indigo-700 font-semibold' : 'text-indigo-600 hover:text-indigo-800'}`}
+              className={`text-sm ${currentView === 'transfer' ? 'text-indigo-700 font-semibold' : 'text-indigo-600 hover:text-indigo-800'}`}
               disabled={currentView === 'transfer'}
             >
               Transfer Status
             </button>
           </div>
+          {/* Right side: Logout button */}
           <button
             onClick={handleLogout}
-            className="text-sm text-red-600 hover:text-red-800"
+            className="text-sm text-red-600 hover:text-red-800 flex-shrink-0"
           >
             Logout
           </button>
         </div>
 
-        {/* Render the selected view */}
+        {/* Render the selected view - these components now manage their own internal padding */}
         {currentView === 'logSpending' && <LogSpendingForm />}
         {currentView === 'viewSpendings' && <SpendingsList onBack={() => setCurrentView('logSpending')} />}
         {currentView === 'transfer' && <TransferPage onBack={() => setCurrentView('logSpending')} />}
-      </>
+      </div>
     );
   };
 
 
   return (
-    <div className="min-h-screen bg-gray-100 flex flex-col items-center pt-8 px-4"> {/* Adjusted padding */}
+    // Remove overall padding (pt-8 px-4), add padding within content sections as needed
+    <div className="min-h-screen bg-gray-100 flex flex-col items-center">
       {renderContent()}
     </div>
   );

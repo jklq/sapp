@@ -96,10 +96,12 @@ function TransferPage({ onBack }: TransferPageProps) {
     const canRecordTransfer = status && (status.owed_by !== null || status.owed_to !== null);
 
     return (
-        <div className="bg-white shadow-md rounded-lg p-6 w-full max-w-md">
-            <div className="flex justify-between items-center mb-6">
-                <h1 className="text-2xl font-bold text-gray-700">Transfer Status</h1>
-                <button
+        // Remove p-6, add p-4 inside
+        <div className="bg-white shadow-md rounded-lg w-full max-w-md">
+             <div className="p-4"> {/* Add inner padding */}
+                <div className="flex flex-wrap justify-between items-center mb-6 gap-2"> {/* Allow wrapping */}
+                    <h1 className="text-2xl font-bold text-gray-700">Transfer Status</h1>
+                    <button
                     onClick={onBack}
                     className="text-sm text-indigo-600 hover:text-indigo-800"
                 >
@@ -124,9 +126,10 @@ function TransferPage({ onBack }: TransferPageProps) {
                      <p className="text-sm text-gray-500 mt-2">Balance is already settled.</p>
                 )}
             </div>
-             <p className="text-xs text-gray-500 mt-4 text-center italic">
-                This action marks all currently shared expenses between you and {status?.partner_name || 'your partner'} as settled. It assumes the necessary bank transfer has been made outside of this app.
-            </p>
+                <p className="text-xs text-gray-500 mt-4 text-center italic">
+                    This action marks all currently shared expenses between you and {status?.partner_name || 'your partner'} as settled. It assumes the necessary bank transfer has been made outside of this app.
+                </p>
+            </div> {/* Close inner padding div */}
         </div>
     );
 }
