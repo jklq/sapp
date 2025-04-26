@@ -1,4 +1,4 @@
-import { Category, PayPayload, AICategorizationPayload, LoginPayload, LoginResponse, GroupedSpendingsResponse, UpdateSpendingPayload, TransferStatusResponse } from "./types";
+import { Category, PayPayload, AICategorizationPayload, LoginPayload, LoginResponse, GroupedSpendingsResponse, UpdateSpendingPayload, TransferStatusResponse, PartnerRegistrationPayload, PartnerRegistrationResponse } from "./types";
 
 // --- Token Management ---
 
