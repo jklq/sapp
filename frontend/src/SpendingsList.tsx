@@ -1,6 +1,6 @@
-import { useState, useEffect, Fragment, useCallback } from 'react'; // Added Fragment, useCallback
+import { useState, useEffect, useCallback } from 'react'; // Removed Fragment
 import { fetchSpendings, fetchCategories, updateSpendingItem } from './api'; // Added fetchCategories, updateSpendingItem
-import { TransactionGroup, SpendingItem, GroupedSpendingsResponse, Category, UpdateSpendingPayload, EditableSharingStatus } from './types'; // Import new types
+import { SpendingItem, GroupedSpendingsResponse, Category, UpdateSpendingPayload, EditableSharingStatus } from './types'; // Removed TransactionGroup, Import new types
 
 interface SpendingsListProps {
     onBack: () => void;
