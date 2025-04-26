@@ -76,5 +76,9 @@ INSERT OR IGNORE INTO categories (name) VALUES ('Shopping');
 INSERT OR IGNORE INTO categories (name) VALUES ('Health');
 INSERT OR IGNORE INTO categories (name) VALUES ('Other');
 
--- Optional: Seed a default user if needed for testing (replace with actual user creation logic later)
--- INSERT OR IGNORE INTO users (id, username, password_hash, first_name) VALUES (1, 'testuser', 'placeholder_hash', 'Test');
+-- Seed demo users (Password for demo_user is "password")
+-- Use https://www.browserling.com/bcrypt or similar to generate hashes if needed.
+-- Hash for "password": $2a$10$XXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXX (Replace X with actual hash)
+-- IMPORTANT: Replace the placeholder hash below with a real bcrypt hash for "password"
+INSERT OR IGNORE INTO users (id, username, password_hash, first_name) VALUES (1, 'demo_user', '$2a$10$If1kDxkQLSTXp5hJzTVkjuvhXNlwszEc7zTHxQp/V3xNlUZJwZz0m', 'Demo');
+INSERT OR IGNORE INTO users (id, username, password_hash, first_name) VALUES (2, 'partner_user', 'dummy_hash_partner', 'Partner'); -- Partner doesn't need to log in for this demo

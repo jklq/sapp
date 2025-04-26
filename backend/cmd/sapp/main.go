@@ -5,14 +5,26 @@ import (
 	"fmt"
 	"log/slog"
 	"net/http"
+	"fmt"
+	"log/slog"
+	"net/http"
 	"os"
 	"runtime" // Import runtime package
 
+	"git.sr.ht/~relay/sapp-backend/auth" // Import auth package
 	"git.sr.ht/~relay/sapp-backend/category"
 	"git.sr.ht/~relay/sapp-backend/pay"
 	"github.com/rs/cors"
 	_ "modernc.org/sqlite"
 )
+
+// Helper function to apply middleware
+func applyMiddleware(h http.Handler, middleware ...func(http.Handler) http.Handler) http.Handler {
+	for i := len(middleware) - 1; i >= 0; i-- {
+		h = middleware[i](h)
+	}
+	return h
+}
 
 func main() {
 	// Setup logging
@@ -59,14 +71,29 @@ func main() {
 	// --- HTTP Server Setup ---
 	mux := http.NewServeMux()
 
-	// Register routes
-	mux.HandleFunc("POST /v1/pay/{shared_status}/{amount}/{category}", pay.HandlePayRoute(db))
-	mux.HandleFunc("GET /v1/categories", category.HandleGetCategories(db))
-	// Register the new AI categorization route
-	mux.HandleFunc("POST /v1/categorize", category.HandleAICategorize(db, categorizationPool)) // Pass pool
+	// --- Public Routes ---
+	mux.HandleFunc("POST /v1/login", auth.HandleLogin(db)) // Login is public
 
-	// CORS handler
-	handler := cors.Default().Handler(mux) // Use default CORS settings for now
+	// --- Protected Routes ---
+	// Create handlers for protected routes
+	payHandler := http.HandlerFunc(pay.HandlePayRoute(db))
+	getCategoriesHandler := http.HandlerFunc(category.HandleGetCategories(db))
+	categorizeHandler := http.HandlerFunc(category.HandleAICategorize(db, categorizationPool))
+
+	// Apply AuthMiddleware to protected handlers
+	mux.Handle("POST /v1/pay/{shared_status}/{amount}/{category}", applyMiddleware(payHandler, auth.AuthMiddleware))
+	mux.Handle("GET /v1/categories", applyMiddleware(getCategoriesHandler, auth.AuthMiddleware))
+	mux.Handle("POST /v1/categorize", applyMiddleware(categorizeHandler, auth.AuthMiddleware))
+
+
+	// CORS handler - Apply CORS *after* routing but *before* auth potentially
+	// Or apply CORS as the outermost layer if auth doesn't rely on headers modified by CORS
+	corsHandler := cors.New(cors.Options{
+		AllowedOrigins: []string{"*"}, // Allow all origins for now, restrict in production
+		AllowedMethods: []string{"GET", "POST", "PUT", "DELETE", "OPTIONS"},
+		AllowedHeaders: []string{"Authorization", "Content-Type"}, // Ensure Authorization is allowed
+	})
+	handler := corsHandler.Handler(mux)
 
 	// Server configuration
 	port := os.Getenv("PORT")

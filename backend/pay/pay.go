@@ -2,89 +2,129 @@ package pay
 
 import (
 	"database/sql"
+	"errors" // Import errors package
 	"log/slog"
 	"net/http"
 	"strconv"
+
+	"git.sr.ht/~relay/sapp-backend/auth" // Import auth package
 )
 
-func HandlePayRoute(db *sql.DB) func(w http.ResponseWriter, r *http.Request) {
+func HandlePayRoute(db *sql.DB) http.HandlerFunc { // Return http.HandlerFunc directly
 	return func(w http.ResponseWriter, r *http.Request) {
+		// Get authenticated user ID from context
+		userID, ok := auth.GetUserIDFromContext(r.Context())
+		if !ok {
+			slog.Error("failed to get user ID from context", "url", r.URL)
+			http.Error(w, "Authentication error", http.StatusInternalServerError) // Should not happen if middleware is correct
+			return
+		}
+
 		tx, err := db.Begin()
 		if err != nil {
-			slog.Error("failed to begin transaction", "url", r.URL, "err", err)
+			slog.Error("failed to begin transaction", "url", r.URL, "user_id", userID, "err", err)
 			w.WriteHeader(http.StatusInternalServerError)
 			return
 		}
-		// Defer rollback in case of errors before commit
-		defer tx.Rollback()
+		defer tx.Rollback() // Defer rollback in case of errors before commit
 
-		var shared_with *int
+		var shared_with_id *int64 // Use *int64 for nullable foreign key
 
-		switch r.PathValue("shared_status") {
+		sharedStatus := r.PathValue("shared_status")
+		switch sharedStatus {
 		case "alone":
-			shared_with = nil
+			shared_with_id = nil
 		case "shared":
-			// Declare a variable to hold the scanned ID
-			var sharedWithID int
-			// Query the user ID (FIXME: Still hardcoded to user 1)
-			row := tx.QueryRow("SELECT id FROM users WHERE id = ? LIMIT 1", 1) //FIXME
-			// Scan the result into the address of sharedWithID
-			err = row.Scan(&sharedWithID)
+			// Get the hardcoded partner ID for the authenticated user
+			partnerID, partnerOk := auth.GetPartnerUserID(userID)
+			if !partnerOk {
+				slog.Error("could not determine partner user ID for sharing", "url", r.URL, "user_id", userID)
+				http.Error(w, "Cannot share: Partner not configured for this user.", http.StatusBadRequest)
+				return
+			}
+			// Check if partner exists in DB (optional, but good practice)
+			var exists int
+			err := tx.QueryRow("SELECT 1 FROM users WHERE id = ?", partnerID).Scan(&exists)
 			if err != nil {
-				slog.Error("querying shared_with user failed", "url", r.URL, "err", err)
-				w.WriteHeader(http.StatusInternalServerError)
+				if err == sql.ErrNoRows {
+					slog.Error("configured partner user ID not found in database", "url", r.URL, "user_id", userID, "partner_id", partnerID)
+					http.Error(w, "Internal server error: Partner configuration issue", http.StatusInternalServerError)
+				} else {
+					slog.Error("failed to query partner user", "url", r.URL, "user_id", userID, "partner_id", partnerID, "err", err)
+					http.Error(w, "Internal server error", http.StatusInternalServerError)
+				}
 				return
 			}
-			// Now that we have a valid ID, assign its address to the pointer
-			shared_with = &sharedWithID
+			shared_with_id = &partnerID // Assign the partner ID
 		default:
-			w.WriteHeader(http.StatusBadRequest)
-			w.Write([]byte("Invalid shared status."))
+			slog.Warn("invalid shared status received", "url", r.URL, "user_id", userID, "status", sharedStatus)
+			http.Error(w, "Invalid shared status.", http.StatusBadRequest)
 			return
 		}
 
-		amount, err := strconv.ParseFloat(r.PathValue("amount"), 64)
+		amountStr := r.PathValue("amount")
+		amount, err := strconv.ParseFloat(amountStr, 64)
 		if err != nil {
-			slog.Error("parsing amount float failed", "url", r.URL, "err", err)
-			w.WriteHeader(http.StatusInternalServerError)
+			slog.Error("parsing amount float failed", "url", r.URL, "user_id", userID, "amount_str", amountStr, "err", err)
+			http.Error(w, "Invalid amount format", http.StatusBadRequest)
+			return
+		}
+		if amount <= 0 {
+			slog.Warn("non-positive amount received", "url", r.URL, "user_id", userID, "amount", amount)
+			http.Error(w, "Amount must be positive", http.StatusBadRequest)
 			return
 		}
 
-		var category_id string
-		row := tx.QueryRow("SELECT id FROM categories WHERE name = ? LIMIT 1", r.PathValue("category"))
 
+		var category_id int64 // Category ID is integer
+		categoryName := r.PathValue("category")
+		row := tx.QueryRow("SELECT id FROM categories WHERE name = ? LIMIT 1", categoryName)
 		err = row.Scan(&category_id)
-
 		if err != nil {
-			if err == sql.ErrNoRows {
-				w.WriteHeader(http.StatusBadRequest)
-				w.Write([]byte("Category not found."))
+			if errors.Is(err, sql.ErrNoRows) {
+				slog.Warn("category not found", "url", r.URL, "user_id", userID, "category_name", categoryName)
+				http.Error(w, "Category not found.", http.StatusBadRequest)
 				return
 			}
-			slog.Error("querying category failed", "url", r.URL, "err", err)
-			w.WriteHeader(http.StatusInternalServerError)
+			slog.Error("querying category failed", "url", r.URL, "user_id", userID, "category_name", categoryName, "err", err)
+			http.Error(w, "Internal server error", http.StatusInternalServerError)
 			return
 		}
 
-		//FIXME: hardcoded made_by user id 1
-		_, err = tx.Exec("INSERT INTO transactions (amount,made_by,shared_with,category) VALUES (?, ?, ?, ?)",
-			-amount,
-			1,
-			shared_with,
-			category_id,
-		)
-
+		// Insert into spendings table (assuming manual pay creates a single 'spending')
+		// Note: The original code inserted into a 'transactions' table which doesn't exist in the schema.
+		// Adapting to insert into 'spendings' and 'user_spendings' like the AI worker does.
+		spendingDesc := "Manual Entry" // Or potentially get description from frontend if added later
+		res, err := tx.Exec(`INSERT INTO spendings (amount, description, category, made_by)
+		VALUES (?,?,?,?)`, amount, spendingDesc, category_id, userID)
 		if err != nil {
-			slog.Error("inserting transaction failed", "url", r.URL, "err", err)
-
-			w.WriteHeader(http.StatusInternalServerError)
+			slog.Error("inserting spending failed", "url", r.URL, "user_id", userID, "err", err)
+			http.Error(w, "Internal server error", http.StatusInternalServerError)
 			return
 		}
 
-		if err = tx.Commit(); err != nil {
-			slog.Error("commiting transaction failed", "url", r.URL, "err", err)
+		spendingID, err := res.LastInsertId()
+		if err != nil {
+			slog.Error("failed to get last insert ID for spending", "url", r.URL, "user_id", userID, "err", err)
+			http.Error(w, "Internal server error", http.StatusInternalServerError)
+			return
+		}
 
-			w.WriteHeader(http.StatusInternalServerError)
+		// Insert into user_spendings
+		// For manual pay, shared_user_takes_all is always false.
+		_, err = tx.Exec(`INSERT INTO user_spendings (spending_id, buyer, shared_with, shared_user_takes_all)
+		VALUES (?,?,?,?)`, spendingID, userID, shared_with_id, false)
+		if err != nil {
+			slog.Error("inserting user_spending failed", "url", r.URL, "user_id", userID, "spending_id", spendingID, "err", err)
+			http.Error(w, "Internal server error", http.StatusInternalServerError)
+			return
+		}
+
+
+		// Commit the transaction
+		if err = tx.Commit(); err != nil {
+			slog.Error("commiting transaction failed", "url", r.URL, "user_id", userID, "err", err)
+			http.Error(w, "Internal server error", http.StatusInternalServerError)
 			return
 		}
 
