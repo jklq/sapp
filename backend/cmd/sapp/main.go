@@ -9,7 +9,6 @@ import (
 	"runtime" // Import runtime package
 
 	"git.sr.ht/~relay/sapp-backend/auth"
-	"git.sr.ht/~relay/sapp-backend/auth"
 	"git.sr.ht/~relay/sapp-backend/category"
 	"git.sr.ht/~relay/sapp-backend/pay"
 	"git.sr.ht/~relay/sapp-backend/spendings" // Import the spendings package
