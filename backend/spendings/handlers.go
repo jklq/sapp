@@ -149,7 +149,7 @@ func HandleGetSpendings(db *sql.DB) http.HandlerFunc {
 			}
 			// Ensure spendingRows is closed after the inner loop finishes
 			// Do NOT defer here, as it's inside the outer jobRows loop.
-			defer spendingRows.Close() // Close rows associated with this specific job
+			// defer spendingRows.Close() // Close rows associated with this specific job <-- REMOVED DEFER
 
 			group.Spendings = []SpendingItem{} // Initialize slice
 			for spendingRows.Next() {
@@ -198,7 +198,7 @@ func HandleGetSpendings(db *sql.DB) http.HandlerFunc {
 				}
 				group.Spendings = append(group.Spendings, item)
 			}
-			// spendingRows.Close() // Moved to defer right after spendingStmt.Query
+			spendingRows.Close() // Explicitly close rows after iterating
 
 			// Check for errors during spending iteration
 			if err := spendingRows.Err(); err != nil { // spendingRows.Err() checks for errors after the loop
