@@ -191,8 +191,8 @@ function SpendingsList({ onBack }: SpendingsListProps) {
                             )}
                         </select>
                     </div>
-                    {/* Amount (Read-only) (Align right on mobile too) */}
-                    <div className="px-4 py-3 md:table-cell md:whitespace-nowrap text-sm text-gray-500 text-right">
+                    {/* Amount (Read-only) - Moved and aligned left on mobile */}
+                    <div className="px-4 py-3 md:table-cell md:whitespace-nowrap text-sm text-gray-500 md:text-right"> {/* Keep text-right for md+ */}
                          <span className="text-xs font-medium text-gray-500 uppercase md:hidden">Amount: </span>
                          {formatCurrency(item.amount)}
                     </div>
