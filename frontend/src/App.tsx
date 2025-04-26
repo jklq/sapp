@@ -68,9 +68,10 @@ function App() {
     // User is logged in, show header and selected view
     return (
       // Use w-full and max-w-4xl for content consistency, add padding here
-      <div className="w-full max-w-4xl p-4">
-        {/* Header: Make flex wrap and add spacing for mobile */}
-        <div className="mb-4 flex flex-wrap justify-between items-center gap-2">
+      // Make this a flex container to center the view component inside
+      <div className="w-full max-w-4xl p-4 flex flex-col items-center">
+        {/* Header: Wrap in w-full div to prevent centering */}
+        <div className="w-full mb-4 flex flex-wrap justify-between items-center gap-2">
           {/* Left side: Welcome message and navigation */}
           <div className="flex flex-wrap items-center gap-x-3 gap-y-1">
             {userInfo && <span className="text-gray-600 text-sm">Welcome, {userInfo.firstName}!</span>}
@@ -104,9 +105,10 @@ function App() {
           >
             Logout
           </button>
-        </div>
+        </div> {/* End Header Wrapper */}
 
         {/* Render the selected view - these components now manage their own internal padding */}
+        {/* The flex container above will center these components horizontally */}
         {currentView === 'logSpending' && <LogSpendingForm />}
         {currentView === 'viewSpendings' && <SpendingsList onBack={() => setCurrentView('logSpending')} />}
         {currentView === 'transfer' && <TransferPage onBack={() => setCurrentView('logSpending')} />}
