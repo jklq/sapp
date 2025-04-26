@@ -21,12 +21,22 @@ func HandlePayRoute(db *sql.DB) func(w http.ResponseWriter, r *http.Request) {
 		case "alone":
 			shared_with = nil
 		case "shared":
+			// Declare a variable to hold the scanned ID
+			var sharedWithID int
+			// Query the user ID (FIXME: Still hardcoded to user 1)
 			row := tx.QueryRow("SELECT id FROM users WHERE id = ? LIMIT 1", 1) //FIXME
-
-			err = row.Scan(shared_with)
+			// Scan the result into the address of sharedWithID
+			err = row.Scan(&sharedWithID)
 			if err != nil {
 				slog.Error("querying shared_with user failed", "url", r.URL, "err", err)
 				w.WriteHeader(http.StatusInternalServerError)
+				return
+			}
+			// Now that we have a valid ID, assign its address to the pointer
+			shared_with = &sharedWithID
+		default:
+			w.WriteHeader(http.StatusBadRequest)
+			w.Write([]byte("Invalid shared status."))
 				return
 			}
 		default:
