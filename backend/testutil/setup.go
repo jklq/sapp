@@ -256,6 +256,78 @@ func SetupTestEnvironment(t *testing.T) *TestEnv {
 	}
 }
 
+// Helper function to get category ID by name
+func GetCategoryID(t *testing.T, db *sql.DB, categoryName string) int64 {
+	t.Helper()
+	var categoryID int64
+	err := db.QueryRow("SELECT id FROM categories WHERE name = ?", categoryName).Scan(&categoryID)
+	if err != nil {
+		t.Fatalf("Failed to get category ID for '%s': %v", categoryName, err)
+	}
+	return categoryID
+}
+
+// Helper function to insert a spending item for testing
+func InsertSpending(t *testing.T, db *sql.DB, buyerID int64, partnerID *int64, categoryID int64, amount float64, description string, sharedUserTakesAll bool, jobID *int64, settledAt *time.Time) int64 {
+	t.Helper()
+
+	tx, err := db.Begin()
+	if err != nil {
+		t.Fatalf("Failed to begin transaction for inserting spending: %v", err)
+	}
+	defer tx.Rollback()
+
+	// Insert into spendings
+	res, err := tx.Exec(`INSERT INTO spendings (amount, description, category, made_by) VALUES (?, ?, ?, ?)`,
+		amount, description, categoryID, buyerID)
+	if err != nil {
+		t.Fatalf("Failed to insert into spendings table: %v", err)
+	}
+	spendingID, err := res.LastInsertId()
+	if err != nil {
+		t.Fatalf("Failed to get last insert ID for spending: %v", err)
+	}
+
+	// Insert into user_spendings
+	_, err = tx.Exec(`INSERT INTO user_spendings (spending_id, buyer, shared_with, shared_user_takes_all, settled_at) VALUES (?, ?, ?, ?, ?)`,
+		spendingID, buyerID, partnerID, sharedUserTakesAll, settledAt)
+	if err != nil {
+		t.Fatalf("Failed to insert into user_spendings table: %v", err)
+	}
+
+	// Optionally link to AI job
+	if jobID != nil {
+		_, err = tx.Exec(`INSERT INTO ai_categorized_spendings (spending_id, job_id) VALUES (?, ?)`,
+			spendingID, *jobID)
+		if err != nil {
+			t.Fatalf("Failed to insert into ai_categorized_spendings table: %v", err)
+		}
+	}
+
+	if err = tx.Commit(); err != nil {
+		t.Fatalf("Failed to commit transaction for inserting spending: %v", err)
+	}
+
+	return spendingID
+}
+
+// Helper function to insert an AI job for testing
+func InsertAIJob(t *testing.T, db *sql.DB, buyerID int64, partnerID *int64, prompt string, totalAmount float64, status string, isFinished bool, isAmbiguous bool, ambiguityReason *string) int64 {
+	t.Helper()
+	res, err := db.Exec(`INSERT INTO ai_categorization_jobs
+		(buyer, shared_with, prompt, total_amount, status, is_finished, is_ambiguity_flagged, ambiguity_flag_reason, created_at, status_updated_at)
+		VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+		buyerID, partnerID, prompt, totalAmount, status, isFinished, isAmbiguous, ambiguityReason, time.Now().UTC(), time.Now().UTC())
+	if err != nil {
+		t.Fatalf("Failed to insert AI job: %v", err)
+	}
+	jobID, err := res.LastInsertId()
+	if err != nil {
+		t.Fatalf("Failed to get last insert ID for AI job: %v", err)
+	}
+	return jobID
+}
+
 // Helper function to create a new request with JSON body and auth token.
 func NewAuthenticatedRequest(t *testing.T, method, path, token string, body interface{}) *http.Request {
 	t.Helper()
