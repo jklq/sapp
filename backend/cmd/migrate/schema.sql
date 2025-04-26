@@ -44,7 +44,7 @@ CREATE TABLE IF NOT EXISTS ai_categorization_jobs (
     status TEXT NOT NULL DEFAULT 'queued', -- e.g., queued, processing, finished, failed
     prompt TEXT NOT NULL,
     buyer INTEGER NOT NULL, -- User who initiated the job (references users.id)
-    shared_mode TEXT NOT NULL, -- 'alone', 'shared', 'mix' (from frontend)
+    -- shared_mode TEXT NOT NULL, -- Removed: AI now infers apportionment from prompt
     shared_with INTEGER, -- User potentially sharing (references users.id), NULL if alone
     total_amount REAL NOT NULL,
     is_finished BOOLEAN DEFAULT 0,

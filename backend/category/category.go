@@ -44,11 +44,11 @@ type Person struct {
 	Name string
 }
 
+// SharedMode removed, AI infers apportionment from prompt
 type CategorizationParams struct {
 	TotalAmount float64
-	SharedMode  string
 	Buyer       Person
-	SharedWith  *Person
+	SharedWith  *Person // Potential partner, AI decides if used
 	Prompt      string
 	tries       int
 }
@@ -107,14 +107,14 @@ func ProcessCategorizationJob(db *sql.DB, params CategorizationParams) (JobResul
 			return ProcessCategorizationJob(db, params) // Retry
 		}
 
-		// If there IS a shared person, the mode cannot be 'other' if the initial hint was 'alone'.
-		// (It doesn't make sense for the other person to pay if the buyer initially said it was 'alone')
-		// Allow 'shared' or 'alone' even if hint was 'alone', as prompt might clarify.
-		// Allow 'alone', 'shared', or 'other' if hint was 'shared' or 'mix'.
-		if params.SharedWith != nil && params.SharedMode == "alone" && spending.ApportionMode == "other" {
-			slog.Warn("AI returned 'other' apportion_mode when initial hint was 'alone'", "spending_description", spending.Description)
+		// Validation based on SharedMode hint is removed.
+		// The AI now decides apportionment based solely on the prompt.
+		// We still validate that 'other' is only used if a partner *exists*.
+		if spending.ApportionMode == "other" && params.SharedWith == nil {
+			slog.Warn("AI returned 'other' apportion_mode when there is no shared person configured", "spending_description", spending.Description)
 			return ProcessCategorizationJob(db, params) // Retry
 		}
+
 
 		countedTotal += spending.Amount
 	}

@@ -74,11 +74,11 @@ func HandleAICategorize(db *sql.DB, pool CategorizingPoolStrategy) http.HandlerF
 		}
 
 		// 1. Decode the JSON payload from the request body
+		// shared_status is removed from the payload
 		var payload struct {
-			SharedStatus string  `json:"shared_status"` // Matches AICategorizationPayload in frontend/types.ts (should be 'alone' or 'shared')
-			Amount       float64 `json:"amount"`
-			Prompt       string  `json:"prompt"`
-		} // <-- Add missing closing brace here
+			Amount float64 `json:"amount"`
+			Prompt string  `json:"prompt"`
+		}
 
 		if err := json.NewDecoder(r.Body).Decode(&payload); err != nil {
 			slog.Error("failed to decode AI categorization request body", "url", r.URL, "user_id", userID, "err", err)
@@ -88,14 +88,15 @@ func HandleAICategorize(db *sql.DB, pool CategorizingPoolStrategy) http.HandlerF
 		defer r.Body.Close()
 
 		// 2. Validate payload
-		// 'mix' is not directly supported by this simplified demo setup for submission, AI might still use it.
-		if payload.Prompt == "" || payload.Amount <= 0 || (payload.SharedStatus != "alone" && payload.SharedStatus != "shared") {
+		// shared_status validation is removed
+		if payload.Prompt == "" || payload.Amount <= 0 {
 			slog.Warn("invalid AI categorization payload received", "url", r.URL, "user_id", userID, "payload", payload)
-			http.Error(w, "Bad Request: Missing prompt, invalid amount, or invalid shared_status (must be 'alone' or 'shared')", http.StatusBadRequest)
+			http.Error(w, "Bad Request: Missing prompt or invalid amount", http.StatusBadRequest)
 			return
 		}
 
-		// 3. Determine Buyer and SharedWith using authenticated user and partner logic
+		// 3. Determine Buyer and potentially SharedWith using authenticated user and partner logic
+		// We always fetch the partner now, if one exists, and let the AI decide based on the prompt.
 		var buyer Person
 		buyerRow := db.QueryRow("SELECT first_name FROM users WHERE id = ?", userID)
 		err := buyerRow.Scan(&buyer.Name)
@@ -112,37 +113,40 @@ func HandleAICategorize(db *sql.DB, pool CategorizingPoolStrategy) http.HandlerF
 		}
 		buyer.Id = userID
 
+		// Always try to find the partner, regardless of the old shared_status hint.
 		var sharedWith *Person = nil
-		if payload.SharedStatus == "shared" {
-			partnerID, partnerOk := auth.GetPartnerUserID(userID)
-			if !partnerOk {
-				slog.Error("could not determine partner user ID for sharing (AI categorization)", "url", r.URL, "user_id", userID)
-				http.Error(w, "Cannot share: Partner not configured for this user.", http.StatusBadRequest)
-				return
-			}
-
+		partnerID, partnerOk := auth.GetPartnerUserID(userID)
+		if partnerOk {
+			// Partner relationship exists, fetch partner details
 			var partnerName string
 			partnerRow := db.QueryRow("SELECT first_name FROM users WHERE id = ?", partnerID)
 			err := partnerRow.Scan(&partnerName)
 			if err != nil {
 				if errors.Is(err, sql.ErrNoRows) {
+					// Log error but don't fail the request, maybe partner was deleted? AI can proceed without partner name.
 					slog.Error("configured partner user ID not found in database (AI categorization)", "url", r.URL, "user_id", userID, "partner_id", partnerID)
-					http.Error(w, "Internal Server Error: Partner configuration issue", http.StatusInternalServerError)
+					// sharedWith remains nil
 				} else {
+					// Log DB error but don't fail the request, proceed without partner name.
 					slog.Error("failed to query partner user (AI categorization)", "url", r.URL, "user_id", userID, "partner_id", partnerID, "err", err)
-					http.Error(w, "Internal Server Error", http.StatusInternalServerError)
+					// sharedWith remains nil
 				}
-				return
+			} else {
+				// Partner found, set the sharedWith object
+				sharedWith = &Person{Id: partnerID, Name: partnerName}
+				slog.Info("Partner found for AI categorization", "user_id", userID, "partner_id", partnerID, "partner_name", partnerName)
 			}
-			sharedWith = &Person{Id: partnerID, Name: partnerName}
+		} else {
+			slog.Info("No partner configured for user (AI categorization)", "user_id", userID)
 		}
 
+
 		// 4. Prepare parameters for the categorization job
+		// SharedMode is removed
 		params := CategorizationParams{
 			TotalAmount: payload.Amount,
-			SharedMode:  payload.SharedStatus, // Pass the original status ('alone' or 'shared')
-			Buyer:       buyer,                // Use authenticated buyer object
-			SharedWith:  sharedWith,           // Use determined sharedWith object (or nil)
+			Buyer:       buyer,      // Use authenticated buyer object
+			SharedWith:  sharedWith, // Use determined sharedWith object (or nil)
 			Prompt:      payload.Prompt,
 			// 'tries' is handled internally by ProcessCategorizationJob
 		}
@@ -155,7 +159,7 @@ func HandleAICategorize(db *sql.DB, pool CategorizingPoolStrategy) http.HandlerF
 			return
 		}
 
-		slog.Info("AI categorization job added", "url", r.URL, "user_id", userID, "job_id", jobID, "amount", payload.Amount, "shared_status", payload.SharedStatus)
+		slog.Info("AI categorization job added", "url", r.URL, "user_id", userID, "job_id", jobID, "amount", payload.Amount) // Removed shared_status log
 
 		// 6. Respond with 202 Accepted
 		w.Header().Set("Content-Type", "application/json")

@@ -88,11 +88,13 @@ export async function submitManualPayment(payload: PayPayload): Promise<void> {
 }
 
 
+// shared_status is removed from the payload
 export async function submitAICategorization(payload: AICategorizationPayload): Promise<void> {
   const url = `${API_BASE_URL}/v1/categorize`;
 
   const response = await fetchWithAuth(url, {
     method: "POST",
+    // fetchWithAuth will set Content-Type: application/json if needed
     body: JSON.stringify(payload),
     // fetchWithAuth will set Content-Type: application/json if needed
   });

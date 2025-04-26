@@ -92,9 +92,9 @@ function LogSpendingForm({ }: LogSpendingFormProps) { // Destructure props if ad
                     return;
                 }
 
+                // shared_status is removed, AI infers it
                 const aiPayload: AICategorizationPayload = {
                     amount: numericAmount,
-                    shared_status: sharedStatus, // Use sharedStatus state here
                     prompt: prompt,
                 };
                 console.log("Submitting AI Payload:", aiPayload); // Debug log
@@ -229,12 +229,13 @@ function LogSpendingForm({ }: LogSpendingFormProps) { // Destructure props if ad
                     </div>
                 )}
 
-                {/* Shared Status Radio (Common to both modes now based on backend) */}
-                <div>
-                    <span className="block text-sm font-medium text-gray-700 mb-1">Shared Status</span>
-                    <div className="flex items-center space-x-4">
-                        <label className="inline-flex items-center">
-                            <input
+                {/* Shared Status Radio (Only shown in Manual mode) */}
+                {mode === 'manual' && (
+                  <div>
+                      <span className="block text-sm font-medium text-gray-700 mb-1">Shared Status</span>
+                      <div className="flex items-center space-x-4">
+                          <label className="inline-flex items-center">
+                              <input
                                 type="radio"
                                 name="sharedStatus"
                                 value="alone"
@@ -254,23 +255,24 @@ function LogSpendingForm({ }: LogSpendingFormProps) { // Destructure props if ad
                                 className="form-radio h-4 w-4 text-indigo-600"
                             />
                             <span className="ml-2 text-sm text-gray-700">Shared</span>
-                        </label>
-                        {/* Add 'mix' if/when backend supports it properly via pay endpoint */}
-                        {/*
-                       <label className="inline-flex items-center">
-                         <input
-                           type="radio"
-                           name="sharedStatus"
-                           value="mix"
-                           checked={sharedStatus === 'mix'}
-                           onChange={() => setSharedStatus('mix')}
-                           className="form-radio h-4 w-4 text-indigo-600"
-                         />
-                         <span className="ml-2 text-sm text-gray-700">Mix</span>
-                       </label>
-                       */}
-                    </div>
-                </div>
+                          </label>
+                          {/* Add 'mix' if/when backend supports it properly via pay endpoint */}
+                          {/*
+                         <label className="inline-flex items-center">
+                           <input
+                             type="radio"
+                             name="sharedStatus"
+                             value="mix"
+                             checked={sharedStatus === 'mix'}
+                             onChange={() => setSharedStatus('mix')}
+                             className="form-radio h-4 w-4 text-indigo-600"
+                           />
+                           <span className="ml-2 text-sm text-gray-700">Mix</span>
+                         </label>
+                         */}
+                      </div>
+                  </div>
+                )}
 
 
                 {/* Submit Button (Common) */}

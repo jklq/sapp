@@ -6,11 +6,11 @@ import (
 	"log/slog"
 )
 
+// SharedMode removed from Job struct
 type Job struct {
 	Id           int64 `json:"id"`
 	TotalAmount  float64
 	Status       string `json:"status"`
-	SharedMode   string `json:"shared_mode"`
 	IsFinished   bool   `json:"isFinished"`
 	Prompt       string `json:"prompt"`
 	Buyer        int64  `json:"buyer_id"`
@@ -47,8 +47,9 @@ func (p CategorizingPool) AddJob(params CategorizationParams) (int64, error) {
 		otherPersonInt = &params.SharedWith.Id
 	}
 
-	result, err := tx.Exec(`INSERT INTO ai_categorization_jobs (buyer, shared_with, prompt, total_amount, shared_mode) 
-	VALUES (?, ?, ?, ?, ?)`, params.Buyer.Id, otherPersonInt, params.Prompt, params.TotalAmount, params.SharedMode)
+	// shared_mode removed from INSERT statement
+	result, err := tx.Exec(`INSERT INTO ai_categorization_jobs (buyer, shared_with, prompt, total_amount)
+	VALUES (?, ?, ?, ?)`, params.Buyer.Id, otherPersonInt, params.Prompt, params.TotalAmount)
 	if err != nil {
 		slog.Error("error inserting ai categorization job", "error", err)
 		return 0, err

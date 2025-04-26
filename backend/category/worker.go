@@ -10,7 +10,8 @@ func (w CategorizingPool) jobDbPoller(errCh chan<- error) {
 	for {
 		time.Sleep(2 * time.Second)
 
-		rows, err := w.db.Query(`SELECT id, status, prompt, buyer, shared_mode, shared_with, total_amount
+		// shared_mode removed from SELECT query
+		rows, err := w.db.Query(`SELECT id, status, prompt, buyer, shared_with, total_amount
 		FROM ai_categorization_jobs WHERE status="queued"`)
 
 		if err != nil {
@@ -23,7 +24,8 @@ func (w CategorizingPool) jobDbPoller(errCh chan<- error) {
 		for rows.Next() {
 			var job Job = Job{}
 
-			err := rows.Scan(&job.Id, &job.Status, &job.Prompt, &job.Buyer, &job.SharedMode, &job.SharedWithId, &job.TotalAmount)
+			// shared_mode removed from Scan
+			err := rows.Scan(&job.Id, &job.Status, &job.Prompt, &job.Buyer, &job.SharedWithId, &job.TotalAmount)
 			if err != nil {
 				slog.Error("polling error", "error", err)
 
@@ -52,21 +54,18 @@ func (p CategorizingPool) worker(jobCh <-chan Job, errCh chan<- error) {
 			continue
 		}
 
+		// Determine sharedWith based only on whether SharedWithId is present in the job.
+		// The old SharedMode logic is removed.
 		var sharedWith *Person = nil
-		if job.SharedMode != "alone" {
-			if job.SharedWithId == nil {
-				slog.Error("share mode is not alone, but sharedWith id is nil")
-				errCh <- err
-				continue
-			}
-
+		if job.SharedWithId != nil {
+			// A potential partner exists for this job, fetch their name.
 			sharedWith = &Person{Id: *job.SharedWithId}
 			row := p.db.QueryRow("SELECT first_name FROM users WHERE id = ?", job.SharedWithId)
 			err = row.Scan(&sharedWith.Name)
 			if err != nil {
-				slog.Error("failed when getting first name of sharedWith", "error", err)
-				errCh <- err
-				continue
+				// Log error but continue processing, AI can work without the partner's name if needed.
+				slog.Error("failed when getting first name of sharedWith partner", "error", err, "job_id", job.Id, "partner_id", *job.SharedWithId)
+				sharedWith.Name = "Partner" // Use a placeholder name
 			}
 		}
 
@@ -79,9 +78,9 @@ func (p CategorizingPool) worker(jobCh <-chan Job, errCh chan<- error) {
 		}
 
 		// Pass the db connection (p.db) to ProcessCategorizationJob
+		// SharedMode is removed from CategorizationParams
 		result, err := ProcessCategorizationJob(p.db, CategorizationParams{
 			TotalAmount: job.TotalAmount,
-			SharedMode:  job.SharedMode,
 			Buyer: Person{
 				Name: buyerName,
 				Id:   job.Buyer,
