@@ -70,11 +70,11 @@ func HandleLogin(db *sql.DB) http.HandlerFunc {
 
 		var storedHash, firstName string
 		var userID int64
-		// Query only the specific demo user for this simplified setup
-		err := db.QueryRow("SELECT id, password_hash, first_name FROM users WHERE username = ? AND id = ?", req.Username, demoUserID).Scan(&userID, &storedHash, &firstName)
+		// Query user by username only
+		err := db.QueryRow("SELECT id, password_hash, first_name FROM users WHERE username = ?", req.Username).Scan(&userID, &storedHash, &firstName)
 		if err != nil {
 			if err == sql.ErrNoRows {
-				slog.Warn("Login attempt failed: user not found or not demo user", "username", req.Username)
+				slog.Warn("Login attempt failed: user not found", "username", req.Username)
 				http.Error(w, "Invalid credentials", http.StatusUnauthorized)
 			} else {
 				slog.Error("Database error during login", "err", err)

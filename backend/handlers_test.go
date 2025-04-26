@@ -105,12 +105,35 @@ func TestLogin(t *testing.T) {
 // TestPartnerRegistration tests the POST /v1/register/partners endpoint.
 func TestPartnerRegistration(t *testing.T) {
 	// Use a separate env setup because we want a clean DB without the default users
+	// Use a separate env setup because we want a clean DB for some sub-tests
 	env := testutil.SetupTestEnvironment(t)
 	defer env.TearDownDB()
 
-	// Clear existing users and partnerships if the setup created them (optional, depends on test isolation needs)
-	// _, _ = env.DB.Exec("DELETE FROM partnerships")
-	// _, _ = env.DB.Exec("DELETE FROM users")
+	// --- Pre-computation for Conflict Test ---
+	// Get the username of the user seeded by SetupTestEnvironment for the conflict test later.
+	// We need this *before* potentially deleting users for the Success test.
+	seededUsername := env.User1Name
+
+
+	// --- Test Case: Successful Registration ---
+	// This test expects a clean slate regarding the users being registered.
+	t.Run("Success", func(t *testing.T) {
+		// Explicitly delete potential conflicting users for this specific sub-test
+		// to ensure a clean environment for registering 'alice' and 'bob'.
+		// We delete ALL users and partnerships to be certain.
+		// Note: This means subsequent tests in this function might need to re-seed if they depend on the original demo users.
+		// Consider splitting registration tests further if this becomes problematic.
+		_, err := env.DB.Exec("DELETE FROM partnerships")
+		if err != nil {
+			t.Fatalf("Failed to clear partnerships table for Success test: %v", err)
+		}
+		_, err = env.DB.Exec("DELETE FROM users")
+		if err != nil {
+			t.Fatalf("Failed to clear users table for Success test: %v", err)
+		}
+		// Also reset auto-increment sequence for sqlite if necessary (might not be strictly needed depending on test logic)
+		_, _ = env.DB.Exec("DELETE FROM sqlite_sequence WHERE name='users'")
+		_, _ = env.DB.Exec("DELETE FROM sqlite_sequence WHERE name='partnerships'") // Though partnerships doesn't auto-increment ID
 
 	// --- Test Case: Successful Registration ---
 	t.Run("Success", func(t *testing.T) {
@@ -194,9 +217,19 @@ func TestPartnerRegistration(t *testing.T) {
 
 	// --- Test Case: Username Conflict ---
 	t.Run("UsernameConflict", func(t *testing.T) {
-		// Use the seeded demo user from the initial setup
+		// Re-seed the necessary user for the conflict check, as the Success test cleared the DB.
+		// We use the username captured before the DB clear.
+		// Hash for "password"
+		hashedPassword, _ := bcrypt.GenerateFromPassword([]byte("password"), bcrypt.DefaultCost)
+		_, err := env.DB.Exec("INSERT INTO users (username, password_hash, first_name) VALUES (?, ?, ?)", seededUsername, string(hashedPassword), "SeededForConflictTest")
+		if err != nil {
+			t.Fatalf("Failed to re-seed user for UsernameConflict test: %v", err)
+		}
+
+
+		// Attempt to register using the now-existing username
 		payload := auth.PartnerRegistrationRequest{
-			User1: auth.UserRegistrationDetails{Username: env.User1Name, Password: "password123", FirstName: "Conflict"}, // Use existing username
+			User1: auth.UserRegistrationDetails{Username: seededUsername, Password: "password123", FirstName: "Conflict"}, // Use existing username
 			User2: auth.UserRegistrationDetails{Username: "newuser", Password: "password456", FirstName: "New"},
 		}
 		req := testutil.NewAuthenticatedRequest(t, http.MethodPost, "/v1/register/partners", "", payload)
