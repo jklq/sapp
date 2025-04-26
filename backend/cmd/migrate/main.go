@@ -2,8 +2,6 @@ package main
 
 import (
 	"database/sql"
-	"fmt"
-	"fmt"
 	"log" // Use standard log for simplicity here
 	"os"
 

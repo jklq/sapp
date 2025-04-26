@@ -14,7 +14,6 @@ import (
 	"git.sr.ht/~relay/sapp-backend/pay"
 	"git.sr.ht/~relay/sapp-backend/spendings"
 	"git.sr.ht/~relay/sapp-backend/transfer"
-	"github.com/rs/cors"
 	_ "modernc.org/sqlite"
 )
 
@@ -124,7 +123,7 @@ func main() {
 	// --- Run Migrations ---
 	// Assume schema.sql is relative to the project root or adjust path as needed.
 	// This might require running the test binary from the project root.
-	schemaPath := "backend/cmd/migrate/schema.sql"
+	schemaPath := "cmd/migrate/schema.sql"
 	if _, err := os.Stat(schemaPath); os.IsNotExist(err) {
 		slog.Error("schema.sql not found", "path", schemaPath, "error", err)
 		slog.Error("Ensure the test executable is run from the project root directory containing the 'backend' folder.")
@@ -194,12 +193,12 @@ func main() {
 	mux.Handle("POST /v1/transfer/record", applyMiddleware(recordTransferHandler, auth.AuthMiddleware))
 
 	// --- Apply Middleware (CORS, Logging) ---
-	corsHandler := cors.New(cors.Options{
-		AllowedOrigins: []string{"*"}, // Keep permissive for testing
-		AllowedMethods: []string{"GET", "POST", "PUT", "DELETE", "OPTIONS"},
-		AllowedHeaders: []string{"Authorization", "Content-Type"},
-	})
-	handler := corsHandler.Handler(loggingMiddleware(mux))
+	//corsHandler := cors.New(cors.Options{
+	//	AllowedOrigins: []string{"*"}, // Keep permissive for testing
+	//	AllowedMethods: []string{"GET", "POST", "PUT", "DELETE", "OPTIONS"},
+	//	AllowedHeaders: []string{"Authorization", "Content-Type"},
+	//	})
+	//	handler := corsHandler.Handler(loggingMiddleware(mux))
 
 	// --- Test Execution Placeholder ---
 	slog.Info("Test environment setup complete. HTTP handler is configured.")
