@@ -29,10 +29,12 @@ func HandleGetTransferStatus(db *sql.DB) http.HandlerFunc {
 			return
 		}
 
-		partnerID, partnerOk := auth.GetPartnerUserID(userID)
+		// Use the new GetPartnerUserID which queries the DB
+		partnerID, partnerOk := auth.GetPartnerUserID(db, userID) // Pass db connection
 		if !partnerOk {
-			slog.Warn("no partner configured for user, cannot calculate transfer status", "url", r.URL, "user_id", userID)
-			http.Error(w, "No partner configured for this user.", http.StatusBadRequest)
+			// GetPartnerUserID logs errors, just return appropriate response
+			// slog.Warn("no partner configured for user, cannot calculate transfer status", "url", r.URL, "user_id", userID)
+			http.Error(w, "Partner not found or not configured for this user.", http.StatusBadRequest) // More specific error
 			return
 		}
 
@@ -156,10 +158,12 @@ func HandleRecordTransfer(db *sql.DB) http.HandlerFunc {
 			return
 		}
 
-		partnerID, partnerOk := auth.GetPartnerUserID(userID)
+		// Use the new GetPartnerUserID which queries the DB
+		partnerID, partnerOk := auth.GetPartnerUserID(db, userID) // Pass db connection
 		if !partnerOk {
-			slog.Warn("no partner configured for user, cannot record transfer", "url", r.URL, "user_id", userID)
-			http.Error(w, "No partner configured for this user.", http.StatusBadRequest)
+			// GetPartnerUserID logs errors
+			// slog.Warn("no partner configured for user, cannot record transfer", "url", r.URL, "user_id", userID)
+			http.Error(w, "Partner not found or not configured for this user.", http.StatusBadRequest)
 			return
 		}
 

@@ -113,9 +113,9 @@ func HandleAICategorize(db *sql.DB, pool CategorizingPoolStrategy) http.HandlerF
 		}
 		buyer.Id = userID
 
-		// Always try to find the partner, regardless of the old shared_status hint.
+		// Always try to find the partner using the new DB query method.
 		var sharedWith *Person = nil
-		partnerID, partnerOk := auth.GetPartnerUserID(userID)
+		partnerID, partnerOk := auth.GetPartnerUserID(db, userID) // Pass db connection
 		if partnerOk {
 			// Partner relationship exists, fetch partner details
 			var partnerName string

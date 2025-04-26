@@ -4,9 +4,10 @@ import { LoginResponse } from './types';
 import LoginForm from './LoginForm';
 import LogSpendingForm from './LogSpendingForm';
 import SpendingsList from './SpendingsList';
-import TransferPage from './TransferPage'; // Import the new TransferPage component
+import TransferPage from './TransferPage';
+import PartnerRegistrationForm from './PartnerRegistrationForm'; // Import the registration form
 
-type View = 'login' | 'logSpending' | 'viewSpendings' | 'transfer'; // Add 'transfer' view
+type View = 'login' | 'register' | 'logSpending' | 'viewSpendings' | 'transfer'; // Add 'register' view
 
 interface UserInfo {
   userId: number;
@@ -20,8 +21,8 @@ function App() {
   const [userInfo, setUserInfo] = useState<UserInfo | null>(null);
   const [isLoadingAuth, setIsLoadingAuth] = useState<boolean>(true);
 
-  // View state (determines which component to show after login)
-  const [currentView, setCurrentView] = useState<View>('logSpending'); // Default view after login
+  // View state (determines which component to show: login, register, or one of the authenticated views)
+  const [currentView, setCurrentView] = useState<View>('login'); // Start at login by default
 
   // Effect to check token validity or fetch user info on load
   useEffect(() => {
@@ -34,14 +35,20 @@ function App() {
       setAuthToken(currentToken);
       // We don't have user info from just the token, handleLoginSuccess sets it.
       // If you stored user info in localStorage, load it here.
+      // If token exists, assume logged in and go to default logged-in view
+      setCurrentView('logSpending');
+    } else {
+      // No token, stay on login view (or potentially register view if navigated there)
+      // setCurrentView('login'); // Already the default
     }
     setIsLoadingAuth(false); // Finished checking auth status
-  }, []);
+  }, []); // Run only once on initial load
 
   const handleLoginSuccess = (data: LoginResponse) => {
     storeToken(data.token);
     setAuthToken(data.token);
     setUserInfo({ userId: data.user_id, firstName: data.first_name });
+    setCurrentView('logSpending'); // Go to main app view after login
     // Optionally store user info in localStorage as well
     // localStorage.setItem('userInfo', JSON.stringify({ userId: data.user_id, firstName: data.first_name }));
   };
@@ -50,21 +57,39 @@ function App() {
     removeToken();
     setAuthToken(null);
     setUserInfo(null);
+    setCurrentView('login'); // Go back to login view on logout
     // Optionally remove user info from localStorage
     // localStorage.removeItem('userInfo');
-    setCurrentView('logSpending'); // Reset view on logout
   };
+
+  // Navigate to registration page
+  const showRegistration = () => {
+    setCurrentView('register');
+  };
+
+  // Navigate back to login page (e.g., from registration)
+  const showLogin = () => {
+    setCurrentView('login');
+  };
+
 
   // Determine which component to render based on auth and view state
   const renderContent = () => {
     if (isLoadingAuth) {
       return <div className="min-h-screen bg-gray-100 flex items-center justify-center">Loading...</div>;
+      return <div className="min-h-screen bg-gray-100 flex items-center justify-center">Loading...</div>;
     }
 
+    // --- Unauthenticated Views ---
     if (!authToken) {
-      return <LoginForm onLoginSuccess={handleLoginSuccess} />;
+      if (currentView === 'register') {
+        return <PartnerRegistrationForm onRegistrationSuccess={showLogin} onBackToLogin={showLogin} />;
+      }
+      // Default unauthenticated view is login
+      return <LoginForm onLoginSuccess={handleLoginSuccess} onNavigateToRegister={showRegistration} />;
     }
 
+    // --- Authenticated Views ---
     // User is logged in, show header and selected view
     return (
       // Use w-full and max-w-4xl for content consistency, add padding here

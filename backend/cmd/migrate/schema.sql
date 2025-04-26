@@ -76,6 +76,17 @@ CREATE TABLE IF NOT EXISTS transfers (
     FOREIGN KEY(settled_with_user_id) REFERENCES users(id) ON UPDATE CASCADE ON DELETE CASCADE
 );
 
+-- Partnerships table links two users together
+CREATE TABLE IF NOT EXISTS partnerships (
+    user1_id INTEGER NOT NULL,
+    user2_id INTEGER NOT NULL,
+    PRIMARY KEY (user1_id, user2_id), -- Ensures unique pairs, order matters due to CHECK
+    FOREIGN KEY(user1_id) REFERENCES users(id) ON DELETE CASCADE,
+    FOREIGN KEY(user2_id) REFERENCES users(id) ON DELETE CASCADE,
+    CHECK (user1_id < user2_id) -- Ensures consistent ordering (user1 always lower ID) and prevents self-partnership
+);
+
+
 -- Add settled_at column to user_spendings to track settlement status
 -- We need to add this column separately as ALTER TABLE ADD COLUMN is standard SQL
 -- Note: This migration script might need adjustment depending on how it's run.
@@ -97,6 +108,9 @@ INSERT OR IGNORE INTO categories (name) VALUES ('Other');
 -- Seed demo users (Password for demo_user is "password")
 -- Use https://www.browserling.com/bcrypt or similar to generate hashes if needed.
 -- Hash for "password": $2a$10$XXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXX (Replace X with actual hash)
--- Hash for "password" generated with cost 10:
+-- Hash for "password" generated with cost 12:
 INSERT OR IGNORE INTO users (id, username, password_hash, first_name) VALUES (1, 'demo_user', '$2a$12$JCHo4VpnfYXYxj7PQvhdFemKCwabcmK2NmtFXMK69b4rSoY5wHq8a', 'Demo');
-INSERT OR IGNORE INTO users (id, username, password_hash, first_name) VALUES (2, 'partner_user', '$2a$10$dummyhashplaceholderpartner.', 'Partner'); -- Partner doesn't need to log in for this demo
+INSERT OR IGNORE INTO users (id, username, password_hash, first_name) VALUES (2, 'partner_user', '$2a$12$JCHo4VpnfYXYxj7PQvhdFemKCwabcmK2NmtFXMK69b4rSoY5wHq8a', 'Partner'); -- Partner doesn't need to log in for this demo, use same hash for simplicity
+
+-- Seed partnership for demo users (ensure user1_id < user2_id)
+INSERT OR IGNORE INTO partnerships (user1_id, user2_id) VALUES (1, 2);

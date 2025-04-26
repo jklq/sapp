@@ -7,7 +7,8 @@ import (
 
 const preambleString string = "Du skal nå kategorisere et kjøp ut ifra en liste med kategorier og en beskrivelse på kjøpet. Dette er ET kjøp på EN butikk."
 
-// getPrompt requires the db connection. SharedMode is removed from params.
+// getPrompt requires the db connection.
+// CategorizationParams.SharedWith should be populated by the caller (handler) if a partner exists.
 func getPrompt(db *sql.DB, params CategorizationParams) (string, error) {
 	rows, err := db.Query("SELECT name, ai_notes FROM categories")
 

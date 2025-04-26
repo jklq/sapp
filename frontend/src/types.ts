@@ -99,3 +99,26 @@ export interface TransferStatusResponse {
   owed_by: string | null; // Name of the person who owes (null if settled)
   owed_to: string | null; // Name of the person who is owed (null if settled)
 }
+
+
+// --- Types for Partner Registration ---
+
+// Details for registering a single user within the partner registration form
+export interface UserRegistrationDetails {
+  username: string;
+  password: string;
+  first_name: string;
+}
+
+// Payload for the POST /v1/register/partners endpoint
+export interface PartnerRegistrationPayload {
+  user1: UserRegistrationDetails;
+  user2: UserRegistrationDetails;
+}
+
+// Response from the POST /v1/register/partners endpoint
+export interface PartnerRegistrationResponse {
+  message: string;
+  user1_id: number;
+  user2_id: number;
+}

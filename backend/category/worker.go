@@ -54,20 +54,22 @@ func (p CategorizingPool) worker(jobCh <-chan Job, errCh chan<- error) {
 			continue
 		}
 
-		// Determine sharedWith based only on whether SharedWithId is present in the job.
-		// The old SharedMode logic is removed.
+		// Determine sharedWith Person object based on job.SharedWithId
+		// This is needed for CategorizationParams passed to ProcessCategorizationJob
 		var sharedWith *Person = nil
 		if job.SharedWithId != nil {
-			// A potential partner exists for this job, fetch their name.
-			sharedWith = &Person{Id: *job.SharedWithId}
-			row := p.db.QueryRow("SELECT first_name FROM users WHERE id = ?", job.SharedWithId)
-			err = row.Scan(&sharedWith.Name)
+			// A partner ID is associated with the job, fetch their details.
+			partnerID := *job.SharedWithId
+			sharedWith = &Person{Id: partnerID} // Initialize with ID
+			row := p.db.QueryRow("SELECT first_name FROM users WHERE id = ?", partnerID)
+			err = row.Scan(&sharedWith.Name) // Scan the name into the Person struct
 			if err != nil {
 				// Log error but continue processing, AI can work without the partner's name if needed.
-				slog.Error("failed when getting first name of sharedWith partner", "error", err, "job_id", job.Id, "partner_id", *job.SharedWithId)
-				sharedWith.Name = "Partner" // Use a placeholder name
+				slog.Error("failed when getting first name of sharedWith partner", "error", err, "job_id", job.Id, "partner_id", partnerID)
+				sharedWith.Name = "[Partner Name]" // Use a placeholder name if fetch fails
 			}
 		}
+		// If job.SharedWithId is nil, sharedWith remains nil.
 
 		_, err = p.db.Exec("UPDATE ai_categorization_jobs SET status = \"processing\", status_updated_at=? WHERE id = ?", time.Now().UTC(), job.Id)
 
@@ -77,17 +79,18 @@ func (p CategorizingPool) worker(jobCh <-chan Job, errCh chan<- error) {
 			continue
 		}
 
-		// Pass the db connection (p.db) and the pool's api (p.api) to ProcessCategorizationJob
-		// SharedMode is removed from CategorizationParams
-		result, err := ProcessCategorizationJob(p.db, p.api, CategorizationParams{
+		// Pass the db connection (p.db), the pool's api (p.api), and the populated sharedWith Person
+		// to ProcessCategorizationJob.
+		params := CategorizationParams{
 			TotalAmount: job.TotalAmount,
 			Buyer: Person{
 				Name: buyerName,
 				Id:   job.Buyer,
 			},
-			SharedWith: sharedWith,
+			SharedWith: sharedWith, // Pass the Person struct (or nil)
 			Prompt:     job.Prompt,
-		})
+		}
+		result, err := ProcessCategorizationJob(p.db, p.api, params)
 
 		if err != nil {
 			slog.Error("error getting categorized spendings", "error", err)

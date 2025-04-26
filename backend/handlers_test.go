@@ -17,6 +17,7 @@ import (
 	"git.sr.ht/~relay/sapp-backend/spendings"
 	"git.sr.ht/~relay/sapp-backend/testutil" // Import the new test utility package
 	"git.sr.ht/~relay/sapp-backend/transfer"
+	"golang.org/x/crypto/bcrypt" // Import bcrypt for password verification in registration test
 )
 
 // TestLogin tests the /v1/login endpoint.
@@ -28,7 +29,8 @@ func TestLogin(t *testing.T) {
 	t.Run("Success", func(t *testing.T) {
 		loginPayload := auth.LoginRequest{
 			Username: "demo_user",
-			Password: "password", // Use the correct password seeded in schema.sql
+			Username: env.User1Name, // Use the name from the test env setup
+			Password: "password",   // Use the correct password seeded in schema.sql
 		}
 		req := testutil.NewAuthenticatedRequest(t, http.MethodPost, "/v1/login", "", loginPayload) // No token needed for login
 		rr := testutil.ExecuteRequest(t, env.Handler, req)
@@ -44,15 +46,15 @@ func TestLogin(t *testing.T) {
 		if respBody.UserID != env.UserID {
 			t.Errorf("handler returned unexpected user ID: got %v want %v", respBody.UserID, env.UserID)
 		}
-		if respBody.FirstName != "Demo" { // Check first name seeded in schema
-			t.Errorf("handler returned unexpected first name: got %v want %v", respBody.FirstName, "Demo")
+		if respBody.FirstName != env.User1Name { // Check first name from test env setup
+			t.Errorf("handler returned unexpected first name: got %v want %v", respBody.FirstName, env.User1Name)
 		}
 	})
 
 	// --- Test Case: Incorrect Password ---
 	t.Run("IncorrectPassword", func(t *testing.T) {
 		loginPayload := auth.LoginRequest{
-			Username: "demo_user",
+			Username: env.User1Name, // Use correct username from env
 			Password: "wrongpassword",
 		}
 		req := testutil.NewAuthenticatedRequest(t, http.MethodPost, "/v1/login", "", loginPayload)
@@ -62,17 +64,28 @@ func TestLogin(t *testing.T) {
 		testutil.AssertBodyContains(t, rr, "Invalid credentials")
 	})
 
-	// --- Test Case: User Not Found ---
-	t.Run("UserNotFound", func(t *testing.T) {
+	// --- Test Case: User Not Found (or not the specific demo user allowed by simplified login handler) ---
+	t.Run("UserNotFoundOrNotDemo", func(t *testing.T) {
 		loginPayload := auth.LoginRequest{
-			Username: "nonexistent_user",
+			Username: "nonexistent_user", // A user that doesn't exist
 			Password: "password",
 		}
 		req := testutil.NewAuthenticatedRequest(t, http.MethodPost, "/v1/login", "", loginPayload)
 		rr := testutil.ExecuteRequest(t, env.Handler, req)
 
-		testutil.AssertStatusCode(t, rr, http.StatusUnauthorized) // Expect Unauthorized as user doesn't match demo user check
+		testutil.AssertStatusCode(t, rr, http.StatusUnauthorized) // Expect Unauthorized as user doesn't match demo user check in HandleLogin
 		testutil.AssertBodyContains(t, rr, "Invalid credentials")
+
+		// Also test with the partner user - login handler only allows demo_user (ID 1)
+		loginPayloadPartner := auth.LoginRequest{
+			Username: env.PartnerName, // Partner user exists but isn't ID 1
+			Password: "password",
+		}
+		reqPartner := testutil.NewAuthenticatedRequest(t, http.MethodPost, "/v1/login", "", loginPayloadPartner)
+		rrPartner := testutil.ExecuteRequest(t, env.Handler, reqPartner)
+		testutil.AssertStatusCode(t, rrPartner, http.StatusUnauthorized) // Expect Unauthorized
+		testutil.AssertBodyContains(t, rrPartner, "Invalid credentials")
+
 	})
 
 	// --- Test Case: Missing Username ---
@@ -89,6 +102,112 @@ func TestLogin(t *testing.T) {
 	})
 }
 
+// TestPartnerRegistration tests the POST /v1/register/partners endpoint.
+func TestPartnerRegistration(t *testing.T) {
+	// Use a separate env setup because we want a clean DB without the default users
+	env := testutil.SetupTestEnvironment(t)
+	defer env.TearDownDB()
+
+	// Clear existing users and partnerships if the setup created them (optional, depends on test isolation needs)
+	// _, _ = env.DB.Exec("DELETE FROM partnerships")
+	// _, _ = env.DB.Exec("DELETE FROM users")
+
+	// --- Test Case: Successful Registration ---
+	t.Run("Success", func(t *testing.T) {
+		payload := auth.PartnerRegistrationRequest{
+			User1: auth.UserRegistrationDetails{Username: "alice", Password: "password123", FirstName: "Alice"},
+			User2: auth.UserRegistrationDetails{Username: "bob", Password: "password456", FirstName: "Bob"},
+		}
+		req := testutil.NewAuthenticatedRequest(t, http.MethodPost, "/v1/register/partners", "", payload) // No auth needed
+		rr := testutil.ExecuteRequest(t, env.Handler, req)
+
+		testutil.AssertStatusCode(t, rr, http.StatusCreated)
+		testutil.AssertBodyContains(t, rr, "Users registered and partnered successfully")
+
+		var respBody auth.PartnerRegistrationResponse
+		testutil.DecodeJSONResponse(t, rr, &respBody)
+
+		// Verify users exist in DB with correct details and hashed passwords
+		var dbUsername1, dbFirstName1, dbHash1 string
+		err := env.DB.QueryRow("SELECT username, first_name, password_hash FROM users WHERE id = ?", respBody.User1ID).Scan(&dbUsername1, &dbFirstName1, &dbHash1)
+		if err != nil {
+			t.Fatalf("Failed to query user 1 (ID: %d): %v", respBody.User1ID, err)
+		}
+		if dbUsername1 != "alice" || dbFirstName1 != "Alice" {
+			t.Errorf("User 1 DB mismatch: got user=%s, name=%s; want alice, Alice", dbUsername1, dbFirstName1)
+		}
+		if err := bcrypt.CompareHashAndPassword([]byte(dbHash1), []byte("password123")); err != nil {
+			t.Errorf("User 1 password hash mismatch: %v", err)
+		}
+
+		var dbUsername2, dbFirstName2, dbHash2 string
+		err = env.DB.QueryRow("SELECT username, first_name, password_hash FROM users WHERE id = ?", respBody.User2ID).Scan(&dbUsername2, &dbFirstName2, &dbHash2)
+		if err != nil {
+			t.Fatalf("Failed to query user 2 (ID: %d): %v", respBody.User2ID, err)
+		}
+		if dbUsername2 != "bob" || dbFirstName2 != "Bob" {
+			t.Errorf("User 2 DB mismatch: got user=%s, name=%s; want bob, Bob", dbUsername2, dbFirstName2)
+		}
+		if err := bcrypt.CompareHashAndPassword([]byte(dbHash2), []byte("password456")); err != nil {
+			t.Errorf("User 2 password hash mismatch: %v", err)
+		}
+
+		// Verify partnership exists
+		var pUser1, pUser2 int64
+		// Ensure consistent query order (user1_id < user2_id)
+		qUser1, qUser2 := respBody.User1ID, respBody.User2ID
+		if qUser1 > qUser2 {
+			qUser1, qUser2 = qUser2, qUser1 // Swap if needed
+		}
+		err = env.DB.QueryRow("SELECT user1_id, user2_id FROM partnerships WHERE user1_id = ? AND user2_id = ?", qUser1, qUser2).Scan(&pUser1, &pUser2)
+		if err != nil {
+			t.Fatalf("Failed to query partnership for users %d and %d: %v", respBody.User1ID, respBody.User2ID, err)
+		}
+		if pUser1 != qUser1 || pUser2 != qUser2 {
+			t.Errorf("Partnership DB mismatch: got %d, %d; want %d, %d", pUser1, pUser2, qUser1, qUser2)
+		}
+	})
+
+	// --- Test Cases: Bad Requests ---
+	t.Run("BadRequests", func(t *testing.T) {
+		testCases := []struct {
+			name         string
+			payload      auth.PartnerRegistrationRequest
+			expectedMsg  string
+			expectedCode int
+		}{
+			{"MissingUser1Username", auth.PartnerRegistrationRequest{User1: auth.UserRegistrationDetails{Password: "p", FirstName: "F"}, User2: auth.UserRegistrationDetails{Username: "u", Password: "p", FirstName: "F"}}, "All fields", http.StatusBadRequest},
+			{"MissingUser2Password", auth.PartnerRegistrationRequest{User1: auth.UserRegistrationDetails{Username: "u", Password: "p", FirstName: "F"}, User2: auth.UserRegistrationDetails{Username: "u2", FirstName: "F"}}, "All fields", http.StatusBadRequest},
+			{"SameUsernames", auth.PartnerRegistrationRequest{User1: auth.UserRegistrationDetails{Username: "same", Password: "p", FirstName: "F"}, User2: auth.UserRegistrationDetails{Username: "same", Password: "p2", FirstName: "F2"}}, "Usernames must be different", http.StatusBadRequest},
+			{"ShortPassword", auth.PartnerRegistrationRequest{User1: auth.UserRegistrationDetails{Username: "u1", Password: "short", FirstName: "F1"}, User2: auth.UserRegistrationDetails{Username: "u2", Password: "password", FirstName: "F2"}}, "Password must be at least 6 characters", http.StatusBadRequest},
+		}
+
+		for _, tc := range testCases {
+			t.Run(tc.name, func(t *testing.T) {
+				req := testutil.NewAuthenticatedRequest(t, http.MethodPost, "/v1/register/partners", "", tc.payload)
+				rr := testutil.ExecuteRequest(t, env.Handler, req)
+				testutil.AssertStatusCode(t, rr, tc.expectedCode)
+				testutil.AssertBodyContains(t, rr, tc.expectedMsg)
+			})
+		}
+	})
+
+	// --- Test Case: Username Conflict ---
+	t.Run("UsernameConflict", func(t *testing.T) {
+		// Use the seeded demo user from the initial setup
+		payload := auth.PartnerRegistrationRequest{
+			User1: auth.UserRegistrationDetails{Username: env.User1Name, Password: "password123", FirstName: "Conflict"}, // Use existing username
+			User2: auth.UserRegistrationDetails{Username: "newuser", Password: "password456", FirstName: "New"},
+		}
+		req := testutil.NewAuthenticatedRequest(t, http.MethodPost, "/v1/register/partners", "", payload)
+		rr := testutil.ExecuteRequest(t, env.Handler, req)
+
+		testutil.AssertStatusCode(t, rr, http.StatusConflict)
+		testutil.AssertBodyContains(t, rr, "already exist")
+	})
+
+}
+
 // TestDeleteAIJob tests the DELETE /v1/jobs/{job_id} endpoint.
 func TestDeleteAIJob(t *testing.T) {
 	env := testutil.SetupTestEnvironment(t)
@@ -98,14 +217,14 @@ func TestDeleteAIJob(t *testing.T) {
 	transportID := testutil.GetCategoryID(t, env.DB, "Transport")
 
 	// --- Setup Data ---
-	// Job 1 (User's job with spendings)
+	// Job 1 (User's job with spendings, shared with Partner)
 	jobIDUser := testutil.InsertAIJob(t, env.DB, env.UserID, &env.PartnerID, "User Job", 75.0, "finished", true, false, nil)
-	spending1_1 := testutil.InsertSpending(t, env.DB, env.UserID, &env.PartnerID, groceriesID, 50.0, "User Shared", false, &jobIDUser, nil)
-	spending1_2 := testutil.InsertSpending(t, env.DB, env.UserID, nil, transportID, 25.0, "User Alone", false, &jobIDUser, nil)
+	spending1_1 := testutil.InsertSpending(t, env.DB, env.UserID, &env.PartnerID, groceriesID, 50.0, "User Shared", false, &jobIDUser, nil) // Shared with partner
+	spending1_2 := testutil.InsertSpending(t, env.DB, env.UserID, nil, transportID, 25.0, "User Alone", false, &jobIDUser, nil)              // User alone
 
-	// Job 2 (Partner's job - for forbidden test)
+	// Job 2 (Partner's job - for forbidden test, shared with User)
 	jobIDPartner := testutil.InsertAIJob(t, env.DB, env.PartnerID, &env.UserID, "Partner Job", 100.0, "finished", true, false, nil)
-	_ = testutil.InsertSpending(t, env.DB, env.PartnerID, &env.UserID, groceriesID, 100.0, "Partner Shared", false, &jobIDPartner, nil)
+	_ = testutil.InsertSpending(t, env.DB, env.PartnerID, &env.UserID, groceriesID, 100.0, "Partner Shared", false, &jobIDPartner, nil) // Shared with user
 
 	// --- Test Case: Success ---
 	t.Run("Success", func(t *testing.T) {
@@ -366,19 +485,21 @@ func TestGetSpendings(t *testing.T) {
 	})
 
 	// --- Setup Data for Subsequent Tests ---
-	// Job 1: Shared groceries and alone transport
+	// Job 1: Shared groceries and alone transport (User paid)
 	job1ID := testutil.InsertAIJob(t, env.DB, env.UserID, &env.PartnerID, "Groceries and bus ticket", 75.0, "finished", true, false, nil)
-	spending1_1 := testutil.InsertSpending(t, env.DB, env.UserID, &env.PartnerID, groceriesID, 50.0, "Milk & Bread", false, &job1ID, nil) // Shared
-	spending1_2 := testutil.InsertSpending(t, env.DB, env.UserID, nil, transportID, 25.0, "Bus Ticket", false, &job1ID, nil)              // Alone
+	spending1_1 := testutil.InsertSpending(t, env.DB, env.UserID, &env.PartnerID, groceriesID, 50.0, "Milk & Bread", false, &job1ID, nil) // Shared with Partner
+	spending1_2 := testutil.InsertSpending(t, env.DB, env.UserID, nil, transportID, 25.0, "Bus Ticket", false, &job1ID, nil)              // User Alone
 
-	// Job 2: Paid by partner
+	// Job 2: Paid by partner (User submitted job, but partner paid - simulated via shared_user_takes_all=true)
+	// Note: The job buyer is still the user (env.UserID) as they submitted the prompt.
+	// The spending item indicates the partner paid via shared_user_takes_all=true.
 	job2ID := testutil.InsertAIJob(t, env.DB, env.UserID, &env.PartnerID, "Gift for me from Partner", 100.0, "finished", true, false, nil)
-	spending2_1 := testutil.InsertSpending(t, env.DB, env.UserID, &env.PartnerID, groceriesID, 100.0, "Gift", true, &job2ID, nil) // Paid by Partner
+	spending2_1 := testutil.InsertSpending(t, env.DB, env.UserID, &env.PartnerID, groceriesID, 100.0, "Gift", true, &job2ID, nil) // User is buyer, shared with partner, partner takes all cost
 
-	// Job 3: Ambiguous flag
+	// Job 3: Ambiguous flag (User paid, shared)
 	ambigReason := "Unclear item"
 	job3ID := testutil.InsertAIJob(t, env.DB, env.UserID, &env.PartnerID, "Mystery box", 20.0, "finished", true, true, &ambigReason)
-	spending3_1 := testutil.InsertSpending(t, env.DB, env.UserID, &env.PartnerID, groceriesID, 20.0, "Mystery", false, &job3ID, nil) // Shared
+	spending3_1 := testutil.InsertSpending(t, env.DB, env.UserID, &env.PartnerID, groceriesID, 20.0, "Mystery", false, &job3ID, nil) // Shared with Partner
 
 	// --- Test Case: Fetch Spendings ---
 	t.Run("FetchSpendings", func(t *testing.T) {
@@ -404,8 +525,9 @@ func TestGetSpendings(t *testing.T) {
 		if len(group3.Spendings) != 1 || group3.Spendings[0].ID != spending3_1 {
 			t.Errorf("Expected 1 spending item with ID %d in group 3, got %v", spending3_1, group3.Spendings)
 		}
-		if group3.Spendings[0].SharingStatus != "Shared with Partner" {
-			t.Errorf("Expected spending 3_1 status 'Shared with Partner', got '%s'", group3.Spendings[0].SharingStatus)
+		expectedStatus3 := fmt.Sprintf("Shared with %s", env.PartnerName)
+		if group3.Spendings[0].SharingStatus != expectedStatus3 {
+			t.Errorf("Expected spending 3_1 status '%s', got '%s'", expectedStatus3, group3.Spendings[0].SharingStatus)
 		}
 
 		// Basic checks on the second group (Job 2)
@@ -419,8 +541,9 @@ func TestGetSpendings(t *testing.T) {
 		if len(group2.Spendings) != 1 || group2.Spendings[0].ID != spending2_1 {
 			t.Errorf("Expected 1 spending item with ID %d in group 2, got %v", spending2_1, group2.Spendings)
 		}
-		if group2.Spendings[0].SharingStatus != "Paid by Partner" {
-			t.Errorf("Expected spending 2_1 status 'Paid by Partner', got '%s'", group2.Spendings[0].SharingStatus)
+		expectedStatus2 := fmt.Sprintf("Paid by %s", env.PartnerName)
+		if group2.Spendings[0].SharingStatus != expectedStatus2 {
+			t.Errorf("Expected spending 2_1 status '%s', got '%s'", expectedStatus2, group2.Spendings[0].SharingStatus)
 		}
 
 		// Basic checks on the third group (Job 1)
@@ -435,8 +558,9 @@ func TestGetSpendings(t *testing.T) {
 		if group1.Spendings[0].ID != spending1_1 || group1.Spendings[1].ID != spending1_2 {
 			t.Errorf("Expected spending IDs %d, %d in group 1, got %d, %d", spending1_1, spending1_2, group1.Spendings[0].ID, group1.Spendings[1].ID)
 		}
-		if group1.Spendings[0].SharingStatus != "Shared with Partner" {
-			t.Errorf("Expected spending 1_1 status 'Shared with Partner', got '%s'", group1.Spendings[0].SharingStatus)
+		expectedStatus1_1 := fmt.Sprintf("Shared with %s", env.PartnerName)
+		if group1.Spendings[0].SharingStatus != expectedStatus1_1 {
+			t.Errorf("Expected spending 1_1 status '%s', got '%s'", expectedStatus1_1, group1.Spendings[0].SharingStatus)
 		}
 		if group1.Spendings[1].SharingStatus != "Alone" {
 			t.Errorf("Expected spending 1_2 status 'Alone', got '%s'", group1.Spendings[1].SharingStatus)
@@ -464,14 +588,14 @@ func TestUpdateSpending(t *testing.T) {
 	shoppingID := testutil.GetCategoryID(t, env.DB, "Shopping")
 
 	// --- Setup Data ---
-	// Spending 1: Initially shared groceries
+	// Spending 1: Initially shared groceries (User paid, shared with Partner)
 	spendingIDShared := testutil.InsertSpending(t, env.DB, env.UserID, &env.PartnerID, groceriesID, 50.0, "Initial Shared", false, nil, nil)
-	// Spending 2: Initially alone transport
+	// Spending 2: Initially alone transport (User paid, alone)
 	spendingIDAlone := testutil.InsertSpending(t, env.DB, env.UserID, nil, transportID, 25.0, "Initial Alone", false, nil, nil)
-	// Spending 3: Initially paid by partner
-	_ = testutil.InsertSpending(t, env.DB, env.UserID, &env.PartnerID, shoppingID, 100.0, "Initial PaidByPartner", true, nil, nil)
-	// Spending 4: Belongs to partner (for forbidden test)
-	_ = testutil.InsertSpending(t, env.DB, env.PartnerID, &env.UserID, groceriesID, 30.0, "Partner's Spending", false, nil, nil)
+	// Spending 3: Initially paid by partner (User paid, shared with Partner, Partner takes all)
+	spendingIDPaidByPartner := testutil.InsertSpending(t, env.DB, env.UserID, &env.PartnerID, shoppingID, 100.0, "Initial PaidByPartner", true, nil, nil)
+	// Spending 4: Belongs to partner (Partner paid, shared with User) - for forbidden test
+	spendingIDPartners := testutil.InsertSpending(t, env.DB, env.PartnerID, &env.UserID, groceriesID, 30.0, "Partner's Spending", false, nil, nil)
 
 	// --- Test Cases ---
 	testCases := []struct {
@@ -540,7 +664,7 @@ func TestUpdateSpending(t *testing.T) {
 		},
 		{
 			name:       "SuccessUpdateToPaidByPartner",
-			spendingID: spendingIDAlone, // Use the one previously updated to shared
+			spendingID: spendingIDShared, // Use the initially shared one
 			payload: spendings.UpdateSpendingPayload{
 				Description:   "Updated to PaidByPartner",
 				CategoryName:  "Shopping",
@@ -575,7 +699,7 @@ func TestUpdateSpending(t *testing.T) {
 		},
 		{
 			name:       "ErrorForbidden",
-			spendingID: 4, // Belongs to partner
+			spendingID: spendingIDPartners, // Belongs to partner
 			payload: spendings.UpdateSpendingPayload{
 				Description:   "Attempt Forbidden Update",
 				CategoryName:  "Groceries",
@@ -666,8 +790,8 @@ func TestGetTransferStatus(t *testing.T) {
 		var resp transfer.TransferStatusResponse
 		testutil.DecodeJSONResponse(t, rr, &resp)
 
-		if resp.PartnerName != "Partner" {
-			t.Errorf("Expected partner name 'Partner', got '%s'", resp.PartnerName)
+		if resp.PartnerName != env.PartnerName {
+			t.Errorf("Expected partner name '%s', got '%s'", env.PartnerName, resp.PartnerName)
 		}
 		if resp.AmountOwed != 0.0 {
 			t.Errorf("Expected amount owed 0.0, got %f", resp.AmountOwed)
@@ -678,22 +802,22 @@ func TestGetTransferStatus(t *testing.T) {
 	})
 
 	// --- Setup Data ---
-	// 1. User paid 50, shared with partner -> Partner owes 25
+	// 1. User paid 50, shared with partner -> Partner owes User 25
 	_ = testutil.InsertSpending(t, env.DB, env.UserID, &env.PartnerID, groceriesID, 50.0, "Shared Groceries", false, nil, nil)
-	// 2. Partner paid 100, shared with user -> User owes 50
+	// 2. Partner paid 100, shared with user -> User owes Partner 50
 	_ = testutil.InsertSpending(t, env.DB, env.PartnerID, &env.UserID, shoppingID, 100.0, "Shared Shopping", false, nil, nil)
 	// 3. User paid 30, alone -> No effect on balance
 	_ = testutil.InsertSpending(t, env.DB, env.UserID, nil, groceriesID, 30.0, "Alone Groceries", false, nil, nil)
-	// 4. User paid 40, partner takes all -> Partner owes 40
+	// 4. User paid 40, partner takes all -> Partner owes User 40
 	_ = testutil.InsertSpending(t, env.DB, env.UserID, &env.PartnerID, shoppingID, 40.0, "Gift for Partner", true, nil, nil)
-	// 5. Partner paid 20, user takes all -> User owes 20
+	// 5. Partner paid 20, user takes all -> User owes Partner 20
 	_ = testutil.InsertSpending(t, env.DB, env.PartnerID, &env.UserID, groceriesID, 20.0, "Gift for User", true, nil, nil)
 	// 6. Settled spending (should be ignored)
 	settledTime := time.Now().Add(-time.Hour).UTC()
 	_ = testutil.InsertSpending(t, env.DB, env.UserID, &env.PartnerID, groceriesID, 200.0, "Settled Item", false, nil, &settledTime)
 
 	// Expected Balance:
-	// User Net = +25 (from 1) - 50 (from 2) + 40 (from 4) - 20 (from 5) = -5
+	// User Net = +25 (from 1) - 50 (from 2) + 40 (from 4) - 20 (from 5) = -5.0
 	// User owes Partner 5.0
 
 	// --- Test Case: Calculated Status ---
@@ -705,18 +829,18 @@ func TestGetTransferStatus(t *testing.T) {
 		var resp transfer.TransferStatusResponse
 		testutil.DecodeJSONResponse(t, rr, &resp)
 
-		if resp.PartnerName != "Partner" {
-			t.Errorf("Expected partner name 'Partner', got '%s'", resp.PartnerName)
+		if resp.PartnerName != env.PartnerName {
+			t.Errorf("Expected partner name '%s', got '%s'", env.PartnerName, resp.PartnerName)
 		}
 		// Use tolerance for float comparison
 		if math.Abs(resp.AmountOwed-5.0) > 0.001 {
 			t.Errorf("Expected amount owed 5.0, got %f", resp.AmountOwed)
 		}
-		if resp.OwedBy == nil || *resp.OwedBy != "Demo" {
-			t.Errorf("Expected OwedBy 'Demo', got %v", resp.OwedBy)
+		if resp.OwedBy == nil || *resp.OwedBy != env.User1Name {
+			t.Errorf("Expected OwedBy '%s', got %v", env.User1Name, resp.OwedBy)
 		}
-		if resp.OwedTo == nil || *resp.OwedTo != "Partner" {
-			t.Errorf("Expected OwedTo 'Partner', got %v", resp.OwedTo)
+		if resp.OwedTo == nil || *resp.OwedTo != env.PartnerName {
+			t.Errorf("Expected OwedTo '%s', got %v", env.PartnerName, resp.OwedTo)
 		}
 	})
 
@@ -740,10 +864,10 @@ func TestRecordTransfer(t *testing.T) {
 
 	// --- Setup Data ---
 	// Add some unsettled items involving the user and partner
-	spending1 := testutil.InsertSpending(t, env.DB, env.UserID, &env.PartnerID, groceriesID, 50.0, "Shared", false, nil, nil)
-	spending2 := testutil.InsertSpending(t, env.DB, env.PartnerID, &env.UserID, groceriesID, 100.0, "Shared by Partner", false, nil, nil)
+	spending1 := testutil.InsertSpending(t, env.DB, env.UserID, &env.PartnerID, groceriesID, 50.0, "Shared", false, nil, nil)           // User paid, shared with Partner
+	spending2 := testutil.InsertSpending(t, env.DB, env.PartnerID, &env.UserID, groceriesID, 100.0, "Shared by Partner", false, nil, nil) // Partner paid, shared with User
 	// Add an item not involving the partner (should not be settled)
-	spendingAlone := testutil.InsertSpending(t, env.DB, env.UserID, nil, groceriesID, 30.0, "Alone", false, nil, nil)
+	spendingAlone := testutil.InsertSpending(t, env.DB, env.UserID, nil, groceriesID, 30.0, "Alone", false, nil, nil) // User paid, alone
 
 	// --- Test Case: Successful Record ---
 	t.Run("Success", func(t *testing.T) {

@@ -4,9 +4,10 @@ import { LoginResponse } from './types';
 
 interface LoginFormProps {
   onLoginSuccess: (data: LoginResponse) => void;
+  onNavigateToRegister: () => void; // Callback to switch view to registration
 }
 
-function LoginForm({ onLoginSuccess }: LoginFormProps) {
+function LoginForm({ onLoginSuccess, onNavigateToRegister }: LoginFormProps) {
   const [username, setUsername] = useState('');
   const [password, setPassword] = useState('');
   const [isLoading, setIsLoading] = useState(false);
@@ -115,6 +116,19 @@ function LoginForm({ onLoginSuccess }: LoginFormProps) {
             {isDemoLoading ? 'Logging in as Demo...' : 'Login as Demo User'}
           </button>
         </div>
+
+        {/* Link to Registration */}
+        <div className="mt-4 text-center text-sm">
+            <span className="text-gray-600">Don't have an account? </span>
+            <button
+                type="button"
+                onClick={onNavigateToRegister}
+                className="font-medium text-indigo-600 hover:text-indigo-500"
+            >
+                Register Partners
+            </button>
+        </div>
+
         </div> {/* Close inner padding div */}
       </div>
     </div>

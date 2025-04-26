@@ -122,6 +122,9 @@ export async function submitAICategorization(payload: AICategorizationPayload): 
   // return data.job_id; // Example
 }
 
+
+// --- Auth API Functions ---
+
 // New function: Logs in the user
 export async function loginUser(payload: LoginPayload): Promise<LoginResponse> {
   const url = `${API_BASE_URL}/v1/login`;
@@ -153,6 +156,51 @@ export async function loginUser(payload: LoginPayload): Promise<LoginResponse> {
   }
   return data;
 }
+
+// New function: Registers two users as partners
+export async function registerPartners(payload: PartnerRegistrationPayload): Promise<PartnerRegistrationResponse> {
+    const url = `${API_BASE_URL}/v1/register/partners`;
+
+    const response = await fetch(url, { // Registration is public, no auth token needed
+        method: "POST",
+        headers: {
+            "Content-Type": "application/json",
+        },
+        body: JSON.stringify(payload),
+    });
+
+    if (!response.ok) {
+        // Try to parse error response from backend if possible
+        let errorBody = `Registration failed: ${response.statusText}`;
+        try {
+            const errData = await response.json();
+            errorBody = errData.message || errData.error || errorBody; // Adjust based on backend error format
+        } catch (e) {
+             try {
+                // If not JSON, try reading as text
+                const textError = await response.text();
+                if (textError) {
+                    errorBody += ` - ${textError}`;
+                }
+            } catch (textErr) {
+                // Ignore if reading text also fails
+            }
+        }
+        throw new Error(errorBody);
+    }
+
+    // Expecting 201 Created with JSON body on success
+    if (response.status !== 201) {
+         console.warn(`Unexpected status code after partner registration: ${response.status}`);
+         // Optionally throw error if status is not 201
+    }
+
+    const data: PartnerRegistrationResponse = await response.json();
+    return data;
+}
+
+
+// --- Spendings API Functions ---
 
 // Updated function: Fetches spendings grouped by transaction/AI job
 export async function fetchSpendings(): Promise<GroupedSpendingsResponse> {

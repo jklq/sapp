@@ -122,13 +122,19 @@ type TestEnv struct {
 	DB         *sql.DB
 	Handler    http.Handler
 	MockAPI    *MockModelAPI // Expose mock API for test-specific configuration
-	AuthToken  string        // Store the valid auth token
-	UserID     int64         // Store the primary test user ID
-	PartnerID  int64         // Store the partner user ID
+	DB         *sql.DB
+	Handler    http.Handler
+	MockAPI    *MockModelAPI // Expose mock API for test-specific configuration
+	AuthToken  string        // Store the valid auth token for User 1
+	UserID     int64         // Store the primary test user ID (User 1)
+	User1Name  string        // Store User 1's first name
+	PartnerID  int64         // Store the partner user ID (User 2)
+	PartnerName string       // Store User 2's first name
 	TearDownDB func()        // Function to close the DB connection
 }
 
 // SetupTestEnvironment initializes an in-memory DB, runs migrations,
+// creates two partnered users (User 1 and User 2),
 // sets up handlers with a mock API, and returns the handler and DB connection.
 func SetupTestEnvironment(t *testing.T) *TestEnv {
 	t.Helper() // Mark this as a test helper function
@@ -237,22 +243,46 @@ func SetupTestEnvironment(t *testing.T) *TestEnv {
 
 	slog.Info("Test environment setup complete.")
 
-	// Get the hardcoded demo user token and IDs from auth package (consider making these constants public or providing getters)
-	// Assuming auth.demoUserToken, auth.demoUserID, auth.partnerUserID are accessible or known.
-	// If they are not exported, duplicate them here or refactor auth package.
-	// Let's assume they are known for now:
+	// --- Retrieve Seeded User/Partner Info ---
+	// The schema now seeds user 1 ('Demo') and user 2 ('Partner') and links them.
+	// We retrieve their IDs and names to populate the TestEnv.
+	var userID int64
+	var userName string
+	err = db.QueryRow("SELECT id, first_name FROM users WHERE username = 'demo_user'").Scan(&userID, &userName)
+	if err != nil {
+		db.Close()
+		t.Fatalf("Failed to retrieve seeded demo user info: %v", err)
+	}
+
+	var partnerID int64
+	var partnerName string
+	// Use the new GetPartnerUserID function to find the partner
+	partnerID, partnerFound := auth.GetPartnerUserID(db, userID)
+	if !partnerFound {
+		db.Close()
+		t.Fatalf("Failed to find partner for seeded demo user (ID: %d) using GetPartnerUserID", userID)
+	}
+	// Get partner's name
+	err = db.QueryRow("SELECT first_name FROM users WHERE id = ?", partnerID).Scan(&partnerName)
+	if err != nil {
+		db.Close()
+		t.Fatalf("Failed to retrieve partner user's name (ID: %d): %v", partnerID, err)
+	}
+
+
+	// Use the static demo token associated with user 1 ('demo_user')
 	const demoUserToken = "demo-user-auth-token"
-	const demoUserID = int64(1)
-	const partnerUserID = int64(2)
 
 	return &TestEnv{
-		DB:         db,
-		Handler:    handler,
-		MockAPI:    mockAPI,
-		AuthToken:  demoUserToken,
-		UserID:     demoUserID,
-		PartnerID:  partnerUserID,
-		TearDownDB: func() { db.Close() },
+		DB:          db,
+		Handler:     handler,
+		MockAPI:     mockAPI,
+		AuthToken:   demoUserToken, // Token for User 1
+		UserID:      userID,        // User 1 ID
+		User1Name:   userName,      // User 1 Name
+		PartnerID:   partnerID,     // User 2 ID
+		PartnerName: partnerName,   // User 2 Name
+		TearDownDB:  func() { db.Close() },
 	}
 }
 
@@ -268,7 +298,8 @@ func GetCategoryID(t *testing.T, db *sql.DB, categoryName string) int64 {
 }
 
 // Helper function to insert a spending item for testing
-func InsertSpending(t *testing.T, db *sql.DB, buyerID int64, partnerID *int64, categoryID int64, amount float64, description string, sharedUserTakesAll bool, jobID *int64, settledAt *time.Time) int64 {
+// partnerID parameter now represents the ID of the user being shared *with*, if any.
+func InsertSpending(t *testing.T, db *sql.DB, buyerID int64, sharedWithID *int64, categoryID int64, amount float64, description string, sharedUserTakesAll bool, jobID *int64, settledAt *time.Time) int64 {
 	t.Helper()
 
 	tx, err := db.Begin()
@@ -290,7 +321,7 @@ func InsertSpending(t *testing.T, db *sql.DB, buyerID int64, partnerID *int64, c
 
 	// Insert into user_spendings
 	_, err = tx.Exec(`INSERT INTO user_spendings (spending_id, buyer, shared_with, shared_user_takes_all, settled_at) VALUES (?, ?, ?, ?, ?)`,
-		spendingID, buyerID, partnerID, sharedUserTakesAll, settledAt)
+		spendingID, buyerID, sharedWithID, sharedUserTakesAll, settledAt)
 	if err != nil {
 		t.Fatalf("Failed to insert into user_spendings table: %v", err)
 	}
@@ -312,12 +343,13 @@ func InsertSpending(t *testing.T, db *sql.DB, buyerID int64, partnerID *int64, c
 }
 
 // Helper function to insert an AI job for testing
-func InsertAIJob(t *testing.T, db *sql.DB, buyerID int64, partnerID *int64, prompt string, totalAmount float64, status string, isFinished bool, isAmbiguous bool, ambiguityReason *string) int64 {
+// partnerID parameter now represents the ID of the user being shared *with*, if any.
+func InsertAIJob(t *testing.T, db *sql.DB, buyerID int64, sharedWithID *int64, prompt string, totalAmount float64, status string, isFinished bool, isAmbiguous bool, ambiguityReason *string) int64 {
 	t.Helper()
 	res, err := db.Exec(`INSERT INTO ai_categorization_jobs
 		(buyer, shared_with, prompt, total_amount, status, is_finished, is_ambiguity_flagged, ambiguity_flag_reason, created_at, status_updated_at)
 		VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
-		buyerID, partnerID, prompt, totalAmount, status, isFinished, isAmbiguous, ambiguityReason, time.Now().UTC(), time.Now().UTC())
+		buyerID, sharedWithID, prompt, totalAmount, status, isFinished, isAmbiguous, ambiguityReason, time.Now().UTC(), time.Now().UTC())
 	if err != nil {
 		t.Fatalf("Failed to insert AI job: %v", err)
 	}

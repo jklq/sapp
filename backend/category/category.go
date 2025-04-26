@@ -47,7 +47,7 @@ type Person struct {
 type CategorizationParams struct {
 	TotalAmount float64
 	Buyer       Person
-	SharedWith  *Person // Potential partner, AI decides if used
+	SharedWith  *Person // Potential partner, AI decides if used. Populated by handler.
 	Prompt      string
 	tries       int
 }

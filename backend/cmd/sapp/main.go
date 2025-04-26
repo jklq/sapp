@@ -97,7 +97,8 @@ func main() {
 	mux := http.NewServeMux()
 
 	// --- Public Routes ---
-	mux.HandleFunc("POST /v1/login", auth.HandleLogin(db)) // Login is public
+	mux.HandleFunc("POST /v1/login", auth.HandleLogin(db))                             // Login is public
+	mux.HandleFunc("POST /v1/register/partners", auth.HandlePartnerRegistration(db)) // Partner registration is public
 
 	// --- Protected Routes ---
 	// Create handlers for protected routes

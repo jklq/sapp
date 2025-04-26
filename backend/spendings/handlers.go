@@ -448,10 +448,12 @@ func HandleUpdateSpending(db *sql.DB) http.HandlerFunc {
 
 		if payload.SharingStatus == StatusShared || payload.SharingStatus == StatusPaidByPartner {
 			// Need partner ID for these statuses
-			fetchedPartnerID, ok := auth.GetPartnerUserID(userID)
+			// Use the new GetPartnerUserID which queries the DB
+			fetchedPartnerID, ok := auth.GetPartnerUserID(tx, userID) // Pass transaction tx
 			if !ok {
 				// Check if the status requires a partner
 				if payload.SharingStatus == StatusShared || payload.SharingStatus == StatusPaidByPartner {
+					// GetPartnerUserID logs errors
 					slog.Warn("attempted to set sharing status requiring partner, but no partner configured", "url", r.URL, "user_id", userID, "spending_id", spendingID, "status", payload.SharingStatus)
 					http.Error(w, "Cannot set status to 'Shared' or 'Paid by Partner': No partner configured for your user.", http.StatusBadRequest)
 					return

@@ -35,11 +35,12 @@ func HandlePayRoute(db *sql.DB) http.HandlerFunc { // Return http.HandlerFunc di
 		case "alone":
 			shared_with_id = nil
 		case "shared":
-			// Get the hardcoded partner ID for the authenticated user
-			partnerID, partnerOk := auth.GetPartnerUserID(userID)
+			// Get the partner ID using the new function that queries the database
+			partnerID, partnerOk := auth.GetPartnerUserID(tx, userID) // Pass transaction tx
 			if !partnerOk {
-				slog.Error("could not determine partner user ID for sharing", "url", r.URL, "user_id", userID)
-				http.Error(w, "Cannot share: Partner not configured for this user.", http.StatusBadRequest)
+				// Check if GetPartnerUserID logged the error already
+				// slog.Error("could not determine partner user ID for sharing", "url", r.URL, "user_id", userID)
+				http.Error(w, "Cannot share: Partner not found or not configured for this user.", http.StatusBadRequest)
 				return
 			}
 			// Check if partner exists in DB (optional, but good practice)
