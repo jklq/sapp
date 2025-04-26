@@ -1,34 +1,74 @@
-import { Category, PayPayload } from "./types";
+import { Category, PayPayload, AICategorizationPayload, LoginPayload, LoginResponse } from "./types";
 
-// Define the base URL for your backend API
-// You might want to use environment variables for this in a real app
+// --- Token Management ---
+
+const AUTH_TOKEN_KEY = 'authToken';
+
+export function storeToken(token: string): void {
+  localStorage.setItem(AUTH_TOKEN_KEY, token);
+}
+
+export function getToken(): string | null {
+  return localStorage.getItem(AUTH_TOKEN_KEY);
+}
+
+export function removeToken(): void {
+  localStorage.removeItem(AUTH_TOKEN_KEY);
+}
+
+// --- API Base URL ---
 const API_BASE_URL = import.meta.env.VITE_API_URL || "http://localhost:3000";
 
+// --- Helper for authenticated requests ---
+async function fetchWithAuth(url: string, options: RequestInit = {}): Promise<Response> {
+  const token = getToken();
+  const headers = new Headers(options.headers || {});
+
+  if (token) {
+    headers.set('Authorization', `Bearer ${token}`);
+  }
+  // Ensure Content-Type is set for methods that have a body
+  if (options.body && !headers.has('Content-Type')) {
+      if (typeof options.body === 'string') {
+          // Assume JSON if it's a stringified object, otherwise default or let browser handle
+          try {
+              JSON.parse(options.body);
+              headers.set('Content-Type', 'application/json');
+          } catch (e) {
+              // Not JSON, maybe form data or plain text - don't set default
+          }
+      }
+      // If body is FormData, browser sets Content-Type automatically (multipart/form-data)
+      // If body is URLSearchParams, browser sets Content-Type automatically (application/x-www-form-urlencoded)
+  }
+
+
+  return fetch(url, {
+    ...options,
+    headers: headers,
+  });
+}
+
+
+// --- API Functions ---
+
 export async function fetchCategories(): Promise<Category[]> {
-  const response = await fetch(`${API_BASE_URL}/v1/categories`);
+  const response = await fetchWithAuth(`${API_BASE_URL}/v1/categories`);
   if (!response.ok) {
     throw new Error(`Failed to fetch categories: ${response.statusText}`);
   }
   return await response.json();
 }
 
-// Renamed: Submits a payment with a manually selected category
 export async function submitManualPayment(payload: PayPayload): Promise<void> {
-  // This function uses the existing backend endpoint which expects category in the URL
   const { shared_status, amount, category } = payload;
-  // Ensure category is provided for manual submission
   if (!category) {
+    throw new Error("Category is required for manual payment submission.");
     throw new Error("Category is required for manual payment submission.");
   }
   const url = `${API_BASE_URL}/v1/pay/${shared_status}/${amount}/${encodeURIComponent(category)}`;
 
-  const response = await fetch(url, {
-    method: "POST",
-    headers: {
-      // No Content-Type needed for POST without body
-    },
-    // No body needed for this specific endpoint based on backend/pay/pay.go
-  });
+  const response = await fetchWithAuth(url, { method: "POST" });
 
   if (!response.ok) {
     const errorBody = await response.text();
@@ -48,21 +88,13 @@ export async function submitManualPayment(payload: PayPayload): Promise<void> {
 }
 
 
-// New function: Submits data to trigger AI categorization
 export async function submitAICategorization(payload: AICategorizationPayload): Promise<void> {
-  // TODO: Define the actual backend endpoint for AI categorization.
-  // This endpoint should accept amount, prompt, and shared_status, likely in the request body.
-  // Example endpoint: POST /v1/categorize
-  const url = `${API_BASE_URL}/v1/categorize`; // Placeholder URL
+  const url = `${API_BASE_URL}/v1/categorize`;
 
-  // Assuming the backend endpoint for AI categorization expects a JSON body
-  const response = await fetch(url, {
+  const response = await fetchWithAuth(url, {
     method: "POST",
-    headers: {
-      "Content-Type": "application/json",
-      // Add authentication headers if needed
-    },
     body: JSON.stringify(payload),
+    // fetchWithAuth will set Content-Type: application/json if needed
   });
 
   if (!response.ok) {
@@ -83,4 +115,40 @@ export async function submitAICategorization(payload: AICategorizationPayload): 
   }
 
   // Handle response if needed (e.g., getting a job ID back)
+  // The backend currently returns the job_id in the body on 202
+  // You might want to parse and return this if the frontend needs it
+  // const data = await response.json();
+  // return data.job_id; // Example
+}
+
+// New function: Logs in the user
+export async function loginUser(payload: LoginPayload): Promise<LoginResponse> {
+  const url = `${API_BASE_URL}/v1/login`;
+
+  const response = await fetch(url, { // Login doesn't need auth token initially
+    method: "POST",
+    headers: {
+      "Content-Type": "application/json",
+    },
+    body: JSON.stringify(payload),
+  });
+
+  if (!response.ok) {
+    // Try to parse error response from backend if possible
+    let errorBody = `Login failed: ${response.statusText}`;
+    try {
+        const errData = await response.json();
+        errorBody = errData.message || errData.error || errorBody; // Adjust based on backend error format
+    } catch (e) {
+        // Ignore if response is not JSON
+    }
+    throw new Error(errorBody);
+  }
+
+  // Assuming the backend returns JSON with token, user_id, first_name
+  const data: LoginResponse = await response.json();
+  if (!data.token) {
+      throw new Error("Login successful, but no token received.");
+  }
+  return data;
 }

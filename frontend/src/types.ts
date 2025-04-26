@@ -21,3 +21,16 @@ export interface AICategorizationPayload {
   prompt: string;
   // Note: category is NOT included here as the AI determines it.
 }
+
+// Payload for the login request
+export interface LoginPayload {
+  username: string;
+  password: string;
+}
+
+// Response from the login endpoint
+export interface LoginResponse {
+  token: string;
+  user_id: number; // Assuming backend sends user_id
+  first_name: string; // Assuming backend sends first_name
+}
