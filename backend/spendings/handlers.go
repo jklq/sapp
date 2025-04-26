@@ -81,12 +81,11 @@ func HandleGetSpendings(db *sql.DB) http.HandlerFunc {
 			http.Error(w, "Internal server error", http.StatusInternalServerError)
 			return
 		}
-		defer jobRows.Close()
+		defer jobRows.Close() // Keep the defer for safety
 
 		transactionGroups := []TransactionGroup{}
 
-		// Prepare statement for fetching spendings for a specific job ID
-		// This avoids N+1 query problem inside the loop
+		// Define query string outside loop
 		spendingQuery := `
 			SELECT
 				s.id,
