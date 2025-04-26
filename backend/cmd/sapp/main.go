@@ -72,7 +72,21 @@ func main() {
 		numWorkers = 1 // Ensure at least one worker
 	}
 	slog.Info("Initializing AI categorization pool", "workers", numWorkers)
-	categorizationPool := category.NewCategorizingPool(db, numWorkers)
+
+	// --- Create the real ModelAPI implementation ---
+	openRouterAPIKey := os.Getenv("OPENROUTER_KEY")
+	// Note: Consider adding more robust configuration for model name
+	openRouterModel := "deepseek/deepseek-chat"
+	if openRouterAPIKey == "" {
+		slog.Warn("OPENROUTER_KEY environment variable not set. AI categorization will likely fail.")
+		// Depending on requirements, you might want to os.Exit(1) here
+		// or allow the app to run with a non-functional AI component.
+	}
+	modelAPI := category.NewOpenRouterAPI(openRouterAPIKey, openRouterModel)
+	// --- End ModelAPI creation ---
+
+	// Pass the ModelAPI implementation to the pool
+	categorizationPool := category.NewCategorizingPool(db, numWorkers, modelAPI)
 
 	// Start the pool workers in the background
 	go categorizationPool.StartPool()

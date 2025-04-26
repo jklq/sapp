@@ -77,9 +77,9 @@ func (p CategorizingPool) worker(jobCh <-chan Job, errCh chan<- error) {
 			continue
 		}
 
-		// Pass the db connection (p.db) to ProcessCategorizationJob
+		// Pass the db connection (p.db) and the pool's api (p.api) to ProcessCategorizationJob
 		// SharedMode is removed from CategorizationParams
-		result, err := ProcessCategorizationJob(p.db, CategorizationParams{
+		result, err := ProcessCategorizationJob(p.db, p.api, CategorizationParams{
 			TotalAmount: job.TotalAmount,
 			Buyer: Person{
 				Name: buyerName,

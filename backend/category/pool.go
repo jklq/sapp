@@ -28,10 +28,17 @@ type CategorizingPool struct {
 	db            *sql.DB
 	numWorkers    int
 	unhandledJobs chan Job
+	api           ModelAPI // Add ModelAPI dependency
 }
 
-func NewCategorizingPool(db *sql.DB, numWorkers int) CategorizingPool {
-	return CategorizingPool{db: db, numWorkers: numWorkers, unhandledJobs: make(chan Job, 100)}
+// NewCategorizingPool now accepts a ModelAPI implementation.
+func NewCategorizingPool(db *sql.DB, numWorkers int, api ModelAPI) CategorizingPool {
+	return CategorizingPool{
+		db:            db,
+		numWorkers:    numWorkers,
+		unhandledJobs: make(chan Job, 100),
+		api:           api, // Store the provided API
+	}
 }
 
 func (p CategorizingPool) AddJob(params CategorizationParams) (int64, error) {

@@ -53,13 +53,13 @@ type CategorizationParams struct {
 	tries       int
 }
 
-// ProcessCategorizationJob now requires the db connection to fetch categories for the prompt.
-func ProcessCategorizationJob(db *sql.DB, params CategorizationParams) (JobResult, error) {
+// ProcessCategorizationJob now requires the db connection and the ModelAPI implementation.
+func ProcessCategorizationJob(db *sql.DB, api ModelAPI, params CategorizationParams) (JobResult, error) {
 	if params.tries >= 3 {
 		return JobResult{}, fmt.Errorf("too many retries")
 	}
 	params.tries += 1
-	var api ModelAPI = NewOpenRouterAPI(os.Getenv("OPENROUTER_KEY"), "deepseek/deepseek-chat") //
+	// Use the provided api instance instead of creating one here.
 
 	// Pass the db connection to getPrompt
 	prompt, err := getPrompt(db, params)
@@ -97,24 +97,23 @@ func ProcessCategorizationJob(db *sql.DB, params CategorizationParams) (JobResul
 		}
 
 		if !isValidApportionMode {
-			slog.Warn("AI returned invalid apportion_mode", "spending_description", spending.Description, "invalid_mode", spending.ApportionMode)
-			return ProcessCategorizationJob(db, params) // Retry
+			slog.Warn("AI returned invalid apportion_mode, retrying", "spending_description", spending.Description, "invalid_mode", spending.ApportionMode)
+			return ProcessCategorizationJob(db, api, params) // Retry, passing api
 		}
 
 		// If there's no shared person, the mode MUST be 'alone'.
 		if params.SharedWith == nil && spending.ApportionMode != "alone" {
-			slog.Warn("AI returned non-'alone' apportion_mode when there is no shared person", "spending_description", spending.Description, "mode", spending.ApportionMode)
-			return ProcessCategorizationJob(db, params) // Retry
+			slog.Warn("AI returned non-'alone' apportion_mode when there is no shared person, retrying", "spending_description", spending.Description, "mode", spending.ApportionMode)
+			return ProcessCategorizationJob(db, api, params) // Retry, passing api
 		}
 
 		// Validation based on SharedMode hint is removed.
 		// The AI now decides apportionment based solely on the prompt.
 		// We still validate that 'other' is only used if a partner *exists*.
 		if spending.ApportionMode == "other" && params.SharedWith == nil {
-			slog.Warn("AI returned 'other' apportion_mode when there is no shared person configured", "spending_description", spending.Description)
-			return ProcessCategorizationJob(db, params) // Retry
+			slog.Warn("AI returned 'other' apportion_mode when there is no shared person configured, retrying", "spending_description", spending.Description)
+			return ProcessCategorizationJob(db, api, params) // Retry, passing api
 		}
-
 
 		countedTotal += spending.Amount
 	}
@@ -123,8 +122,8 @@ func ProcessCategorizationJob(db *sql.DB, params CategorizationParams) (JobResul
 	// Use a small tolerance for floating point comparisons
 	tolerance := 0.01 // e.g., 1 cent
 	if math.Abs(countedTotal-params.TotalAmount) > tolerance {
-		slog.Warn("spending amount and total amount did not match up", "counted_total", countedTotal, "actual_total", params.TotalAmount)
-		return ProcessCategorizationJob(db, params) // Retry with db connection
+		slog.Warn("spending amount and total amount did not match up, retrying", "counted_total", countedTotal, "actual_total", params.TotalAmount)
+		return ProcessCategorizationJob(db, api, params) // Retry, passing api and db connection
 	}
 
 	if job.AmbiguityFlagReason != "" {
