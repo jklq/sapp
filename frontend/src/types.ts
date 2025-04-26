@@ -13,3 +13,11 @@ export interface PayPayload {
   // For now, let's collect it in the UI.
   prompt: string;
 }
+
+// Payload specifically for triggering AI categorization
+export interface AICategorizationPayload {
+  shared_status: 'alone' | 'shared' | 'mix';
+  amount: number;
+  prompt: string;
+  // Note: category is NOT included here as the AI determines it.
+}

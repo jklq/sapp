@@ -12,22 +12,22 @@ export async function fetchCategories(): Promise<Category[]> {
   return await response.json();
 }
 
-export async function submitPayment(payload: PayPayload): Promise<void> {
-  // TODO: The backend /v1/pay endpoint currently only takes shared_status, amount, and category name in the URL path.
-  // It doesn't accept a request body or the 'prompt'.
-  // This needs reconciliation. For now, we'll call the endpoint as defined,
-  // but the 'prompt' won't be sent. The backend might need changes
-  // to accept the prompt and potentially trigger the AI categorization job.
-
+// Renamed: Submits a payment with a manually selected category
+export async function submitManualPayment(payload: PayPayload): Promise<void> {
+  // This function uses the existing backend endpoint which expects category in the URL
   const { shared_status, amount, category } = payload;
-  const url = `${API_BASE_URL}/v1/pay/${shared_status}/${amount}/${category}`;
+  // Ensure category is provided for manual submission
+  if (!category) {
+    throw new Error("Category is required for manual payment submission.");
+  }
+  const url = `${API_BASE_URL}/v1/pay/${shared_status}/${amount}/${encodeURIComponent(category)}`;
 
   const response = await fetch(url, {
     method: "POST",
     headers: {
       // No Content-Type needed for POST without body
     },
-    // body: JSON.stringify(payload) // If the backend expected a body
+    // No body needed for this specific endpoint based on backend/pay/pay.go
   });
 
   if (!response.ok) {
@@ -44,5 +44,40 @@ export async function submitPayment(payload: PayPayload): Promise<void> {
     // Optionally throw an error or handle differently
   }
 
-  // No content expected on success based on backend code
+  // No content expected on success (201 Created) based on backend code
+}
+
+
+// New function: Submits data to trigger AI categorization
+export async function submitAICategorization(payload: AICategorizationPayload): Promise<void> {
+  // TODO: Define the actual backend endpoint for AI categorization.
+  // This endpoint should accept amount, prompt, and shared_status, likely in the request body.
+  // Example endpoint: POST /v1/categorize
+  const url = `${API_BASE_URL}/v1/categorize`; // Placeholder URL
+
+  // Assuming the backend endpoint for AI categorization expects a JSON body
+  const response = await fetch(url, {
+    method: "POST",
+    headers: {
+      "Content-Type": "application/json",
+      // Add authentication headers if needed
+    },
+    body: JSON.stringify(payload),
+  });
+
+  if (!response.ok) {
+    const errorBody = await response.text();
+    throw new Error(
+      `Failed to submit for AI categorization: ${response.statusText} - ${errorBody}`
+    );
+  }
+
+   // Check if the response status indicates success (e.g., 202 Accepted if it's an async job)
+   if (response.status !== 201 && response.status !== 202) { // Adjust expected status codes as needed
+    const responseBody = await response.text();
+    console.warn(`Unexpected status code from AI categorization endpoint: ${response.status}`, responseBody);
+    // Optionally throw an error or handle differently
+  }
+
+  // Handle response if needed (e.g., getting a job ID back)
 }
