@@ -11,6 +11,7 @@ packages:
   - rsync
   - go
   - nodejs-current # Add nodejs and npm
+  - npm
 tasks:
   - mirror-to-github: |
       cd ~/"${REPO}"
