@@ -72,11 +72,14 @@ export async function submitAICategorization(payload: AICategorizationPayload): 
     );
   }
 
-   // Check if the response status indicates success (e.g., 202 Accepted if it's an async job)
-   if (response.status !== 201 && response.status !== 202) { // Adjust expected status codes as needed
+   // Check if the response status indicates success (202 Accepted for async job submission)
+   if (response.status !== 202) {
     const responseBody = await response.text();
     console.warn(`Unexpected status code from AI categorization endpoint: ${response.status}`, responseBody);
-    // Optionally throw an error or handle differently
+    // Optionally throw an error or handle differently based on other success codes if needed
+    throw new Error(
+        `AI categorization submission failed with status: ${response.status} - ${responseBody}`
+    );
   }
 
   // Handle response if needed (e.g., getting a job ID back)
