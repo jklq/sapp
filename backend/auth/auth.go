@@ -2,13 +2,11 @@ package auth
 
 import (
 	"context"
-	"context"
 	"database/sql"
 	"encoding/json"
 	"log/slog"
 	"net/http"
 	"strconv" // Import strconv
-	"strings"
 
 	"golang.org/x/crypto/bcrypt"
 )
@@ -16,6 +14,7 @@ import (
 // Simple static token for demo purposes
 const demoUserToken = "demo-user-auth-token"
 const demoUserID = int64(1)
+
 // const partnerUserID = int64(2) // REMOVED: Partner ID is now dynamic via partnerships table
 
 type contextKey string
@@ -30,8 +29,8 @@ type LoginRequest struct {
 
 // LoginResponse defines the structure for the login response body
 type LoginResponse struct {
-	Token string `json:"token"`
-	UserID int64 `json:"user_id"`
+	Token     string `json:"token"`
+	UserID    int64  `json:"user_id"`
 	FirstName string `json:"first_name"`
 }
 
@@ -143,6 +142,7 @@ func AuthMiddleware(next http.Handler) http.Handler {
 		next.ServeHTTP(w, r.WithContext(ctx))
 	})
 }
+
 // --- End INSECURE ---
 
 // GetUserIDFromContext retrieves the user ID stored in the request context.
