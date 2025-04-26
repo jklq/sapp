@@ -93,18 +93,9 @@ func HandleLogin(db *sql.DB) http.HandlerFunc {
 			return
 		}
 
-		// --- IMPORTANT DEMO LIMITATION ---
-		// For this simplified demo, only allow the specific demo user (ID 1) to log in via this handler
-		// to receive the static demo token. This prevents other users (like the partner or newly
-		// registered users) from using the demo token. A real auth system would generate unique tokens.
-		if userID != demoUserID {
-			slog.Warn("Login attempt denied: user is not the allowed demo user for static token", "username", req.Username, "attempted_user_id", userID)
-			http.Error(w, "Login not allowed for this user", http.StatusForbidden) // More specific error than Unauthorized
-			return
-		}
-		// --- END DEMO LIMITATION ---
-
-		// Password matches - return the static token for the demo user
+		// --- TODO: Replace static token with proper JWT generation ---
+		// Password matches - return the static token for the demo user (for now)
+		// This allows any authenticated user to log in, but they all get the same token.
 		slog.Info("User logged in successfully", "username", req.Username, "userID", userID, "firstName", firstName)
 		w.Header().Set("Content-Type", "application/json")
 		json.NewEncoder(w).Encode(LoginResponse{

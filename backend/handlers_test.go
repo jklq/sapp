@@ -122,9 +122,20 @@ func TestLogin(t *testing.T) {
 			env.Handler,
 			reqPartner,
 		)
-		// Partner user exists but isn't ID 1, so login handler should forbid access with the static token logic
-		testutil.AssertStatusCode(t, rrPartner, http.StatusForbidden)
-		testutil.AssertBodyContains(t, rrPartner, "Login not allowed")
+		// Partner user should now be able to log in successfully and receive the demo token
+		testutil.AssertStatusCode(t, rrPartner, http.StatusOK)
+		// Decode and check the response body for the partner user
+		var respBodyPartner auth.LoginResponse
+		testutil.DecodeJSONResponse(t, rrPartner, &respBodyPartner)
+		if respBodyPartner.Token != env.AuthToken { // Should still get the demo token
+			t.Errorf("Partner login returned unexpected token: got %v want %v", respBodyPartner.Token, env.AuthToken)
+		}
+		if respBodyPartner.UserID != env.PartnerID { // Should get the partner's actual ID
+			t.Errorf("Partner login returned unexpected user ID: got %v want %v", respBodyPartner.UserID, env.PartnerID)
+		}
+		if respBodyPartner.FirstName != env.PartnerName { // Should get the partner's name
+			t.Errorf("Partner login returned unexpected first name: got %v want %v", respBodyPartner.FirstName, env.PartnerName)
+		}
 	})
 
 	// --- Test Case: Missing Username ---
