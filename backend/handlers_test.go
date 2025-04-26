@@ -29,7 +29,7 @@ func TestLogin(t *testing.T) {
 	t.Run("Success", func(t *testing.T) {
 		loginPayload := auth.LoginRequest{
 			Username: "demo_user", // Use the actual username for login
-			Password: "password", // Use the correct password seeded in schema.sql
+			Password: "password",  // Use the correct password seeded in schema.sql
 		}
 		req := testutil.NewAuthenticatedRequest(
 			t,
@@ -161,8 +161,7 @@ func TestPartnerRegistration(t *testing.T) {
 	// --- Pre-computation for Conflict Test ---
 	// Get the username of the user seeded by SetupTestEnvironment for the conflict test later.
 	// We need this *before* potentially deleting users for the Success test.
-	seededUsername := env.User1Name
-
+	_ = env.User1Name
 
 	// --- Test Case: Successful Registration ---
 	t.Run("Success", func(t *testing.T) {
