@@ -138,8 +138,14 @@ func GetUserIDFromContext(ctx context.Context) (int64, bool) {
 	return userID, ok
 }
 
+// Querier defines an interface with the QueryRow method, satisfied by *sql.DB and *sql.Tx.
+type Querier interface {
+	QueryRow(query string, args ...interface{}) *sql.Row
+}
+
 // GetPartnerUserID finds the partner ID for a given user ID by querying the partnerships table.
-func GetPartnerUserID(db *sql.DB, requestingUserID int64) (int64, bool) {
+// It accepts a Querier interface, which can be either *sql.DB or *sql.Tx.
+func GetPartnerUserID(q Querier, requestingUserID int64) (int64, bool) {
 	var partnerID int64
 
 	// Query based on the user being either user1_id or user2_id
@@ -150,7 +156,8 @@ func GetPartnerUserID(db *sql.DB, requestingUserID int64) (int64, bool) {
 		UNION
 		SELECT user1_id FROM partnerships WHERE user2_id = ?
 	`
-	err := db.QueryRow(query, requestingUserID, requestingUserID).Scan(&partnerID)
+	// Use the Querier interface 'q' to execute the query
+	err := q.QueryRow(query, requestingUserID, requestingUserID).Scan(&partnerID)
 
 	if err != nil {
 		if err == sql.ErrNoRows {
