@@ -169,3 +169,34 @@ export async function fetchSpendings(): Promise<GroupedSpendingsResponse> {
     console.log("Fetched Grouped Spendings:", data); // Debug log
     return data;
 }
+
+// New function: Updates a specific spending item
+export async function updateSpendingItem(spendingId: number, payload: UpdateSpendingPayload): Promise<void> {
+    const url = `${API_BASE_URL}/v1/spendings/${spendingId}`;
+
+    const response = await fetchWithAuth(url, {
+        method: "PUT",
+        body: JSON.stringify(payload),
+        // fetchWithAuth will set Content-Type: application/json
+    });
+
+    if (!response.ok) {
+        const errorBody = await response.text();
+        let errorMessage = `Failed to update spending item: ${response.statusText}`;
+        try {
+            // Try to parse backend error message
+            const errData = JSON.parse(errorBody);
+            errorMessage = errData.message || errData.error || errorMessage;
+        } catch (e) {
+            // Use text if not JSON
+            errorMessage += ` - ${errorBody}`;
+        }
+        throw new Error(errorMessage);
+    }
+
+    // Expecting 200 OK with no body on success
+    if (response.status !== 200) {
+        console.warn(`Unexpected status code after updating spending item: ${response.status}`);
+        // Optionally handle other success codes if the backend changes
+    }
+}

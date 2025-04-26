@@ -77,3 +77,15 @@ export interface TransactionGroup {
 
 // Type for the response from the updated /v1/spendings endpoint
 export type GroupedSpendingsResponse = TransactionGroup[];
+
+// --- Types for Editing Spendings ---
+
+// Represents the possible sharing states a user can select when editing
+export type EditableSharingStatus = 'Alone' | 'Shared' | 'Paid by Partner';
+
+// Payload for updating a spending item (excluding amount for now)
+export interface UpdateSpendingPayload {
+  description: string;
+  category_name: string;
+  sharing_status: EditableSharingStatus;
+}

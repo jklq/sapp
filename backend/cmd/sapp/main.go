@@ -89,13 +89,15 @@ func main() {
 	payHandler := http.HandlerFunc(pay.HandlePayRoute(db))
 	getCategoriesHandler := http.HandlerFunc(category.HandleGetCategories(db))
 	categorizeHandler := http.HandlerFunc(category.HandleAICategorize(db, categorizationPool))
-	getSpendingsHandler := http.HandlerFunc(spendings.HandleGetSpendings(db)) // Create handler for getting spendings
+	getSpendingsHandler := http.HandlerFunc(spendings.HandleGetSpendings(db))     // Create handler for getting spendings
+	updateSpendingHandler := http.HandlerFunc(spendings.HandleUpdateSpending(db)) // Create handler for updating spendings
 
 	// Apply AuthMiddleware to protected handlers
 	mux.Handle("POST /v1/pay/{shared_status}/{amount}/{category}", applyMiddleware(payHandler, auth.AuthMiddleware))
 	mux.Handle("GET /v1/categories", applyMiddleware(getCategoriesHandler, auth.AuthMiddleware))
 	mux.Handle("POST /v1/categorize", applyMiddleware(categorizeHandler, auth.AuthMiddleware))
-	mux.Handle("GET /v1/spendings", applyMiddleware(getSpendingsHandler, auth.AuthMiddleware)) // Add the new route
+	mux.Handle("GET /v1/spendings", applyMiddleware(getSpendingsHandler, auth.AuthMiddleware))
+	mux.Handle("PUT /v1/spendings/{spending_id}", applyMiddleware(updateSpendingHandler, auth.AuthMiddleware)) // Add route for updating
 
 	// CORS handler - Apply CORS *after* routing but *before* auth potentially
 	// Or apply CORS as the outermost layer if auth doesn't rely on headers modified by CORS
