@@ -122,9 +122,6 @@ type TestEnv struct {
 	DB         *sql.DB
 	Handler    http.Handler
 	MockAPI    *MockModelAPI // Expose mock API for test-specific configuration
-	DB         *sql.DB
-	Handler    http.Handler
-	MockAPI    *MockModelAPI // Expose mock API for test-specific configuration
 	AuthToken  string        // Store the valid auth token for User 1
 	UserID     int64         // Store the primary test user ID (User 1)
 	User1Name  string        // Store User 1's first name
