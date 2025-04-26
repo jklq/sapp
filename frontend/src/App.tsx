@@ -224,11 +224,50 @@ function App() {
             </div>
           )}
 
-          {/* Shared Status Radio (Common) */}
-          <div>
-            <span className="block text-sm font-medium text-gray-700 mb-1">Shared Status</span>
-            <div className="flex items-center space-x-4">
-              <label className="inline-flex items-center">
+          {/* Shared Status Radio (Only for Manual Mode) */}
+          {mode === 'manual' && (
+            <div>
+              <span className="block text-sm font-medium text-gray-700 mb-1">Shared Status</span>
+              <div className="flex items-center space-x-4">
+                <label className="inline-flex items-center">
+                  <input
+                    type="radio"
+                    name="sharedStatus"
+                    value="alone"
+                    checked={sharedStatus === 'alone'}
+                    onChange={() => setSharedStatus('alone')}
+                    className="form-radio h-4 w-4 text-indigo-600"
+                  />
+                  <span className="ml-2 text-sm text-gray-700">Alone</span>
+                </label>
+                <label className="inline-flex items-center">
+                  <input
+                    type="radio"
+                    name="sharedStatus"
+                    value="shared"
+                    checked={sharedStatus === 'shared'}
+                    onChange={() => setSharedStatus('shared')}
+                    className="form-radio h-4 w-4 text-indigo-600"
+                  />
+                  <span className="ml-2 text-sm text-gray-700">Shared</span>
+                </label>
+                 {/* Add 'mix' if/when backend supports it properly via pay endpoint */}
+                 {/*
+                 <label className="inline-flex items-center">
+                   <input
+                     type="radio"
+                     name="sharedStatus"
+                     value="mix"
+                     checked={sharedStatus === 'mix'}
+                     onChange={() => setSharedStatus('mix')}
+                     className="form-radio h-4 w-4 text-indigo-600"
+                   />
+                   <span className="ml-2 text-sm text-gray-700">Mix</span>
+                 </label>
+                 */}
+              </div>
+            </div>
+          )}
                 <input
                   type="radio"
                   name="sharedStatus"
@@ -237,35 +276,6 @@ function App() {
                   onChange={() => setSharedStatus('alone')}
                   className="form-radio h-4 w-4 text-indigo-600"
                 />
-                <span className="ml-2 text-sm text-gray-700">Alone</span>
-              </label>
-              <label className="inline-flex items-center">
-                <input
-                  type="radio"
-                  name="sharedStatus"
-                  value="shared"
-                  checked={sharedStatus === 'shared'}
-                  onChange={() => setSharedStatus('shared')}
-                  className="form-radio h-4 w-4 text-indigo-600"
-                />
-                <span className="ml-2 text-sm text-gray-700">Shared</span>
-              </label>
-               {/* Add 'mix' if/when backend supports it properly via pay endpoint */}
-               {/*
-               <label className="inline-flex items-center">
-                 <input
-                   type="radio"
-                   name="sharedStatus"
-                   value="mix"
-                   checked={sharedStatus === 'mix'}
-                   onChange={() => setSharedStatus('mix')}
-                   className="form-radio h-4 w-4 text-indigo-600"
-                 />
-                 <span className="ml-2 text-sm text-gray-700">Mix</span>
-               </label>
-               */}
-            </div>
-          </div>
 
           {/* Submit Button (Common) */}
           <div>
