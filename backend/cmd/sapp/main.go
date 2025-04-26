@@ -33,6 +33,9 @@ func applyMiddleware(h http.Handler, middleware ...func(http.Handler) http.Handl
 }
 
 func main() {
+	// Load .env file. Ignore error if it doesn't exist (e.g., in production where env vars are set directly)
+	_ = godotenv.Load() // Load environment variables from .env file
+
 	// Setup logging
 	logHandler := slog.NewTextHandler(os.Stderr, nil)
 	logger := slog.New(logHandler)
