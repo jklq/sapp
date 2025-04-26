@@ -11,6 +11,7 @@ import (
 	"net/http/httptest"
 	"os"
 	"path/filepath"
+	"strconv" // Import strconv
 	"testing"
 	"time"
 
@@ -122,7 +123,7 @@ type TestEnv struct {
 	DB         *sql.DB
 	Handler    http.Handler
 	MockAPI    *MockModelAPI // Expose mock API for test-specific configuration
-	AuthToken  string        // Store the valid auth token for User 1
+	AuthToken  string        // Store the auth token (user ID string) for User 1
 	UserID     int64         // Store the primary test user ID (User 1)
 	User1Name  string        // Store User 1's first name
 	PartnerID  int64         // Store the partner user ID (User 2)
@@ -267,18 +268,19 @@ func SetupTestEnvironment(t *testing.T) *TestEnv {
 		t.Fatalf("Failed to retrieve partner user's name (ID: %d): %v", partnerID, err)
 	}
 
-
-	// Use the static demo token associated with user 1 ('demo_user')
-	const demoUserToken = "demo-user-auth-token"
+	// --- INSECURE: Use UserID string as token for Dev ---
+	// TODO: Replace with actual token generation/retrieval when JWT is implemented
+	userTokenString := strconv.FormatInt(userID, 10)
+	// --- End INSECURE ---
 
 	return &TestEnv{
 		DB:          db,
 		Handler:     handler,
 		MockAPI:     mockAPI,
-		AuthToken:   demoUserToken, // Token for User 1
-		UserID:      userID,        // User 1 ID
-		User1Name:   userName,      // User 1 Name
-		PartnerID:   partnerID,     // User 2 ID
+		AuthToken:   userTokenString, // User 1's ID string as token
+		UserID:      userID,          // User 1 ID
+		User1Name:   userName,        // User 1 Name
+		PartnerID:   partnerID,       // User 2 ID
 		PartnerName: partnerName,   // User 2 Name
 		TearDownDB:  func() { db.Close() },
 	}
@@ -378,7 +380,10 @@ func NewAuthenticatedRequest(t *testing.T, method, path, token string, body inte
 		req.Header.Set("Content-Type", "application/json")
 	}
 	if token != "" {
-		req.Header.Set("Authorization", "Bearer "+token)
+		// --- INSECURE: Sending UserID as raw token for Dev ---
+		// TODO: Update when JWT is implemented
+		req.Header.Set("Authorization", token) // Send raw token (user ID string)
+		// --- End INSECURE ---
 	}
 	return req
 }

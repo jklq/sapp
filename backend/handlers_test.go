@@ -9,6 +9,7 @@ import (
 	"io"
 	"math"
 	"net/url"
+	"strconv" // Import strconv
 	"strings"
 	"time"
 
@@ -49,8 +50,10 @@ func TestLogin(t *testing.T) {
 		var respBody auth.LoginResponse
 		testutil.DecodeJSONResponse(t, rr, &respBody)
 
-		if respBody.Token != env.AuthToken {
-			t.Errorf("handler returned unexpected token: got %v want %v", respBody.Token, env.AuthToken)
+		// Expect user ID string as token
+		expectedToken := strconv.FormatInt(env.UserID, 10)
+		if respBody.Token != expectedToken {
+			t.Errorf("handler returned unexpected token: got %v want %v", respBody.Token, expectedToken)
 		}
 		if respBody.UserID != env.UserID {
 			t.Errorf("handler returned unexpected user ID: got %v want %v", respBody.UserID, env.UserID)
@@ -127,8 +130,11 @@ func TestLogin(t *testing.T) {
 		// Decode and check the response body for the partner user
 		var respBodyPartner auth.LoginResponse
 		testutil.DecodeJSONResponse(t, rrPartner, &respBodyPartner)
-		if respBodyPartner.Token != env.AuthToken { // Should still get the demo token
-			t.Errorf("Partner login returned unexpected token: got %v want %v", respBodyPartner.Token, env.AuthToken)
+
+		// Expect partner ID string as token
+		expectedPartnerToken := strconv.FormatInt(env.PartnerID, 10)
+		if respBodyPartner.Token != expectedPartnerToken {
+			t.Errorf("Partner login returned unexpected token: got %v want %v", respBodyPartner.Token, expectedPartnerToken)
 		}
 		if respBodyPartner.UserID != env.PartnerID { // Should get the partner's actual ID
 			t.Errorf("Partner login returned unexpected user ID: got %v want %v", respBodyPartner.UserID, env.PartnerID)
@@ -326,6 +332,7 @@ func TestDeleteAIJob(t *testing.T) {
 		}
 
 		url := fmt.Sprintf("/v1/jobs/%d", jobIDUser)
+		// Use env.AuthToken which is now the user ID string
 		req := testutil.NewAuthenticatedRequest(t, http.MethodDelete, url, env.AuthToken, nil)
 		rr := testutil.ExecuteRequest(t, env.Handler, req)
 
@@ -343,6 +350,7 @@ func TestDeleteAIJob(t *testing.T) {
 	// --- Test Case: Not Found ---
 	t.Run("NotFound", func(t *testing.T) {
 		url := "/v1/jobs/99999" // Non-existent job ID
+		// Use env.AuthToken which is now the user ID string
 		req := testutil.NewAuthenticatedRequest(t, http.MethodDelete, url, env.AuthToken, nil)
 		rr := testutil.ExecuteRequest(t, env.Handler, req)
 
@@ -353,6 +361,7 @@ func TestDeleteAIJob(t *testing.T) {
 	// --- Test Case: Forbidden ---
 	t.Run("Forbidden", func(t *testing.T) {
 		url := fmt.Sprintf("/v1/jobs/%d", jobIDPartner) // Job belongs to partner
+		// Use env.AuthToken which is now the user ID string (User 1)
 		req := testutil.NewAuthenticatedRequest(t, http.MethodDelete, url, env.AuthToken, nil)
 		rr := testutil.ExecuteRequest(t, env.Handler, req)
 
@@ -373,10 +382,11 @@ func TestDeleteAIJob(t *testing.T) {
 		jobIDUserReinsert := testutil.InsertAIJob(t, env.DB, env.UserID, &env.PartnerID, "User Job Reinsert", 10.0, "finished", true, false, nil)
 
 		url := fmt.Sprintf("/v1/jobs/%d", jobIDUserReinsert)
-		req := testutil.NewAuthenticatedRequest(t, http.MethodDelete, url, "invalid-token", nil) // Invalid token
+		// Use an invalid user ID string as the token
+		req := testutil.NewAuthenticatedRequest(t, http.MethodDelete, url, "invalid-user-id-string", nil)
 		rr := testutil.ExecuteRequest(t, env.Handler, req)
 
-		testutil.AssertStatusCode(t, rr, http.StatusUnauthorized)
+		testutil.AssertStatusCode(t, rr, http.StatusUnauthorized) // Middleware should reject non-integer token
 
 		// Verify job was NOT deleted
 		var jobCount int
@@ -389,6 +399,7 @@ func TestDeleteAIJob(t *testing.T) {
 	// --- Test Case: Invalid Job ID Format ---
 	t.Run("InvalidJobIDFormat", func(t *testing.T) {
 		url := "/v1/jobs/abc" // Invalid format
+		// Use env.AuthToken which is now the user ID string
 		req := testutil.NewAuthenticatedRequest(t, http.MethodDelete, url, env.AuthToken, nil)
 		rr := testutil.ExecuteRequest(t, env.Handler, req)
 
@@ -404,7 +415,8 @@ func TestGetCategories(t *testing.T) {
 
 	// --- Test Case: Success ---
 	t.Run("Success", func(t *testing.T) {
-		req := testutil.NewAuthenticatedRequest(t, http.MethodGet, "/v1/categories", env.AuthToken, nil) // Use valid token
+		// Use env.AuthToken which is now the user ID string
+		req := testutil.NewAuthenticatedRequest(t, http.MethodGet, "/v1/categories", env.AuthToken, nil)
 		rr := testutil.ExecuteRequest(t, env.Handler, req)
 
 		testutil.AssertStatusCode(t, rr, http.StatusOK)
@@ -441,10 +453,11 @@ func TestGetCategories(t *testing.T) {
 
 	// --- Test Case: Unauthorized (Invalid Token) ---
 	t.Run("UnauthorizedInvalidToken", func(t *testing.T) {
-		req := testutil.NewAuthenticatedRequest(t, http.MethodGet, "/v1/categories", "invalid-token", nil) // Invalid token
+		// Use an invalid user ID string as the token
+		req := testutil.NewAuthenticatedRequest(t, http.MethodGet, "/v1/categories", "invalid-user-id-string", nil)
 		rr := testutil.ExecuteRequest(t, env.Handler, req)
 
-		testutil.AssertStatusCode(t, rr, http.StatusUnauthorized)
+		testutil.AssertStatusCode(t, rr, http.StatusUnauthorized) // Middleware should reject non-integer token
 		testutil.AssertBodyContains(t, rr, "Invalid token")
 	})
 }
@@ -460,6 +473,7 @@ func TestAICategorize(t *testing.T) {
 			"amount": 123.45,
 			"prompt": "Groceries from Rema",
 		}
+		// Use env.AuthToken which is now the user ID string
 		req := testutil.NewAuthenticatedRequest(t, http.MethodPost, "/v1/categorize", env.AuthToken, payload)
 		rr := testutil.ExecuteRequest(t, env.Handler, req)
 
@@ -533,8 +547,9 @@ func TestAICategorize(t *testing.T) {
 					// Create request with invalid body manually
 					req = testutil.NewAuthenticatedRequest(t, http.MethodPost, "/v1/categorize", env.AuthToken, nil) // body=nil is fine
 					req.Body = io.NopCloser(strings.NewReader("{invalid json"))                                      // Set invalid body
-					req.Header.Set("Content-Type", "application/json")                                               // Still need content type
+					req.Header.Set("Content-Type", "application/json") // Still need content type
 				} else {
+					// Use env.AuthToken which is now the user ID string
 					req = testutil.NewAuthenticatedRequest(t, http.MethodPost, "/v1/categorize", env.AuthToken, tc.payload)
 				}
 				rr := testutil.ExecuteRequest(t, env.Handler, req)
@@ -550,9 +565,10 @@ func TestAICategorize(t *testing.T) {
 			"amount": 100.0,
 			"prompt": "test",
 		}
-		req := testutil.NewAuthenticatedRequest(t, http.MethodPost, "/v1/categorize", "invalid-token", payload)
+		// Use an invalid user ID string as the token
+		req := testutil.NewAuthenticatedRequest(t, http.MethodPost, "/v1/categorize", "invalid-user-id-string", payload)
 		rr := testutil.ExecuteRequest(t, env.Handler, req)
-		testutil.AssertStatusCode(t, rr, http.StatusUnauthorized)
+		testutil.AssertStatusCode(t, rr, http.StatusUnauthorized) // Middleware should reject non-integer token
 	})
 }
 
@@ -566,6 +582,7 @@ func TestGetSpendings(t *testing.T) {
 
 	// --- Test Case: No Spendings ---
 	t.Run("NoSpendings", func(t *testing.T) {
+		// Use env.AuthToken which is now the user ID string
 		req := testutil.NewAuthenticatedRequest(t, http.MethodGet, "/v1/spendings", env.AuthToken, nil)
 		rr := testutil.ExecuteRequest(t, env.Handler, req)
 		testutil.AssertStatusCode(t, rr, http.StatusOK)
@@ -591,6 +608,7 @@ func TestGetSpendings(t *testing.T) {
 
 	// --- Test Case: Fetch Spendings ---
 	t.Run("FetchSpendings", func(t *testing.T) {
+		// Use env.AuthToken which is now the user ID string
 		req := testutil.NewAuthenticatedRequest(t, http.MethodGet, "/v1/spendings", env.AuthToken, nil)
 		rr := testutil.ExecuteRequest(t, env.Handler, req)
 		testutil.AssertStatusCode(t, rr, http.StatusOK)
@@ -660,9 +678,10 @@ func TestGetSpendings(t *testing.T) {
 
 	// --- Test Case: Unauthorized ---
 	t.Run("Unauthorized", func(t *testing.T) {
-		req := testutil.NewAuthenticatedRequest(t, http.MethodGet, "/v1/spendings", "invalid-token", nil)
+		// Use an invalid user ID string as the token
+		req := testutil.NewAuthenticatedRequest(t, http.MethodGet, "/v1/spendings", "invalid-user-id-string", nil)
 		rr := testutil.ExecuteRequest(t, env.Handler, req)
-		testutil.AssertStatusCode(t, rr, http.StatusUnauthorized)
+		testutil.AssertStatusCode(t, rr, http.StatusUnauthorized) // Middleware should reject non-integer token
 	})
 }
 
@@ -834,6 +853,7 @@ func TestUpdateSpending(t *testing.T) {
 	for _, tc := range testCases {
 		t.Run(tc.name, func(t *testing.T) {
 			url := fmt.Sprintf("/v1/spendings/%d", tc.spendingID)
+			// Use env.AuthToken which is now the user ID string
 			req := testutil.NewAuthenticatedRequest(t, http.MethodPut, url, env.AuthToken, tc.payload)
 			rr := testutil.ExecuteRequest(t, env.Handler, req)
 
@@ -855,9 +875,10 @@ func TestUpdateSpending(t *testing.T) {
 			CategoryName:  "Groceries",
 			SharingStatus: spendings.StatusAlone,
 		}
-		req := testutil.NewAuthenticatedRequest(t, http.MethodPut, url, "invalid-token", payload)
+		// Use an invalid user ID string as the token
+		req := testutil.NewAuthenticatedRequest(t, http.MethodPut, url, "invalid-user-id-string", payload)
 		rr := testutil.ExecuteRequest(t, env.Handler, req)
-		testutil.AssertStatusCode(t, rr, http.StatusUnauthorized)
+		testutil.AssertStatusCode(t, rr, http.StatusUnauthorized) // Middleware should reject non-integer token
 	})
 }
 
@@ -871,6 +892,7 @@ func TestGetTransferStatus(t *testing.T) {
 
 	// --- Test Case: Initial Status (No Spendings) ---
 	t.Run("InitialStatus", func(t *testing.T) {
+		// Use env.AuthToken which is now the user ID string
 		req := testutil.NewAuthenticatedRequest(t, http.MethodGet, "/v1/transfer/status", env.AuthToken, nil)
 		rr := testutil.ExecuteRequest(t, env.Handler, req)
 		testutil.AssertStatusCode(t, rr, http.StatusOK)
@@ -910,6 +932,7 @@ func TestGetTransferStatus(t *testing.T) {
 
 	// --- Test Case: Calculated Status ---
 	t.Run("CalculatedStatus", func(t *testing.T) {
+		// Use env.AuthToken which is now the user ID string
 		req := testutil.NewAuthenticatedRequest(t, http.MethodGet, "/v1/transfer/status", env.AuthToken, nil)
 		rr := testutil.ExecuteRequest(t, env.Handler, req)
 		testutil.AssertStatusCode(t, rr, http.StatusOK)
@@ -934,9 +957,10 @@ func TestGetTransferStatus(t *testing.T) {
 
 	// --- Test Case: Unauthorized ---
 	t.Run("Unauthorized", func(t *testing.T) {
-		req := testutil.NewAuthenticatedRequest(t, http.MethodGet, "/v1/transfer/status", "invalid-token", nil)
+		// Use an invalid user ID string as the token
+		req := testutil.NewAuthenticatedRequest(t, http.MethodGet, "/v1/transfer/status", "invalid-user-id-string", nil)
 		rr := testutil.ExecuteRequest(t, env.Handler, req)
-		testutil.AssertStatusCode(t, rr, http.StatusUnauthorized)
+		testutil.AssertStatusCode(t, rr, http.StatusUnauthorized) // Middleware should reject non-integer token
 	})
 
 	// Note: Testing the "No partner configured" case requires modifying the test setup or auth logic,
@@ -959,6 +983,7 @@ func TestRecordTransfer(t *testing.T) {
 
 	// --- Test Case: Successful Record ---
 	t.Run("Success", func(t *testing.T) {
+		// Use env.AuthToken which is now the user ID string
 		req := testutil.NewAuthenticatedRequest(t, http.MethodPost, "/v1/transfer/record", env.AuthToken, nil)
 		rr := testutil.ExecuteRequest(t, env.Handler, req)
 		testutil.AssertStatusCode(t, rr, http.StatusOK)
@@ -992,6 +1017,7 @@ func TestRecordTransfer(t *testing.T) {
 		}
 
 		// Verify status is now settled
+		// Use env.AuthToken which is now the user ID string
 		reqStatus := testutil.NewAuthenticatedRequest(t, http.MethodGet, "/v1/transfer/status", env.AuthToken, nil)
 		rrStatus := testutil.ExecuteRequest(t, env.Handler, reqStatus)
 		testutil.AssertStatusCode(t, rrStatus, http.StatusOK)
@@ -1011,6 +1037,7 @@ func TestRecordTransfer(t *testing.T) {
 		// testutil.AssertStatusCode(t, rr1, http.StatusOK)
 
 		// Record again
+		// Use env.AuthToken which is now the user ID string
 		req2 := testutil.NewAuthenticatedRequest(t, http.MethodPost, "/v1/transfer/record", env.AuthToken, nil)
 		rr2 := testutil.ExecuteRequest(t, env.Handler, req2)
 		testutil.AssertStatusCode(t, rr2, http.StatusOK)
@@ -1029,9 +1056,10 @@ func TestRecordTransfer(t *testing.T) {
 
 	// --- Test Case: Unauthorized ---
 	t.Run("Unauthorized", func(t *testing.T) {
-		req := testutil.NewAuthenticatedRequest(t, http.MethodPost, "/v1/transfer/record", "invalid-token", nil)
+		// Use an invalid user ID string as the token
+		req := testutil.NewAuthenticatedRequest(t, http.MethodPost, "/v1/transfer/record", "invalid-user-id-string", nil)
 		rr := testutil.ExecuteRequest(t, env.Handler, req)
-		testutil.AssertStatusCode(t, rr, http.StatusUnauthorized)
+		testutil.AssertStatusCode(t, rr, http.StatusUnauthorized) // Middleware should reject non-integer token
 	})
 
 	// Note: Testing the "No partner configured" case requires modifying the test setup or auth logic.
@@ -1164,6 +1192,7 @@ func TestPay(t *testing.T) {
 			// URL encode category name just in case
 			encodedCategory := url.PathEscape(tc.category)
 			url := fmt.Sprintf("/v1/pay/%s/%s/%s", tc.sharedStatus, tc.amount, encodedCategory)
+			// Use env.AuthToken which is now the user ID string
 			req := testutil.NewAuthenticatedRequest(t, http.MethodPost, url, env.AuthToken, nil) // No body needed
 			rr := testutil.ExecuteRequest(t, env.Handler, req)
 
@@ -1180,8 +1209,9 @@ func TestPay(t *testing.T) {
 	// --- Test Case: Unauthorized ---
 	t.Run("Unauthorized", func(t *testing.T) {
 		url := "/v1/pay/alone/50/Shopping"
-		req := testutil.NewAuthenticatedRequest(t, http.MethodPost, url, "invalid-token", nil)
+		// Use an invalid user ID string as the token
+		req := testutil.NewAuthenticatedRequest(t, http.MethodPost, url, "invalid-user-id-string", nil)
 		rr := testutil.ExecuteRequest(t, env.Handler, req)
-		testutil.AssertStatusCode(t, rr, http.StatusUnauthorized)
+		testutil.AssertStatusCode(t, rr, http.StatusUnauthorized) // Middleware should reject non-integer token
 	})
 }

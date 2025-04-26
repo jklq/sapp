@@ -2,10 +2,12 @@ package auth
 
 import (
 	"context"
+	"context"
 	"database/sql"
 	"encoding/json"
 	"log/slog"
 	"net/http"
+	"strconv" // Import strconv
 	"strings"
 
 	"golang.org/x/crypto/bcrypt"
@@ -97,41 +99,51 @@ func HandleLogin(db *sql.DB) http.HandlerFunc {
 		// Password matches - return the static token for the demo user (for now)
 		// This allows any authenticated user to log in, but they all get the same token.
 		slog.Info("User logged in successfully", "username", req.Username, "userID", userID, "firstName", firstName)
+
+		// --- INSECURE: Returning UserID as Token for Dev ---
+		// TODO: Replace with proper JWT generation
+		tokenString := strconv.FormatInt(userID, 10)
+		// --- End INSECURE ---
+
 		w.Header().Set("Content-Type", "application/json")
 		json.NewEncoder(w).Encode(LoginResponse{
-			Token: demoUserToken,
-			UserID: userID,
+			Token:     tokenString, // Return user ID string as token
+			UserID:    userID,
 			FirstName: firstName,
 		})
 	}
 }
 
-// Middleware checks for the static demo token
+// --- INSECURE: Middleware expects UserID as Token for Dev ---
+// TODO: Replace with proper JWT validation
 func AuthMiddleware(next http.Handler) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		authHeader := r.Header.Get("Authorization")
-		if authHeader == "" {
-			http.Error(w, "Authorization header required", http.StatusUnauthorized)
+		tokenString := r.Header.Get("Authorization") // Expect raw user ID string
+		if tokenString == "" {
+			http.Error(w, "Authorization header required (expecting user ID)", http.StatusUnauthorized)
 			return
 		}
 
-		parts := strings.Split(authHeader, " ")
-		if len(parts) != 2 || strings.ToLower(parts[0]) != "bearer" {
-			http.Error(w, "Authorization header format must be Bearer {token}", http.StatusUnauthorized)
+		// Attempt to parse the token string as a user ID
+		userID, err := strconv.ParseInt(tokenString, 10, 64)
+		if err != nil {
+			slog.Warn("Invalid Authorization header format: expected user ID", "token", tokenString, "err", err)
+			http.Error(w, "Invalid authorization token format", http.StatusUnauthorized)
 			return
 		}
 
-		token := parts[1]
-		if token != demoUserToken {
-			http.Error(w, "Invalid token", http.StatusUnauthorized)
-			return
-		}
+		// Optional: Verify user ID exists in DB? Might be overkill for this temporary fix.
+		// var exists int
+		// err = db.QueryRow("SELECT 1 FROM users WHERE id = ?", userID).Scan(&exists)
+		// if err != nil { ... handle error or sql.ErrNoRows ... }
 
-		// Add user ID to context for downstream handlers
-		ctx := context.WithValue(r.Context(), userContextKey, demoUserID)
+		// Add the parsed user ID to context
+		slog.Debug("AuthMiddleware: User identified", "userID", userID)
+		ctx := context.WithValue(r.Context(), userContextKey, userID)
 		next.ServeHTTP(w, r.WithContext(ctx))
 	})
 }
+// --- End INSECURE ---
 
 // GetUserIDFromContext retrieves the user ID stored in the request context.
 // Returns 0 and false if the user ID is not found or not an int64.
