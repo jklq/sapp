@@ -1,5 +1,5 @@
 import { useState, useEffect, useCallback } from 'react'; // Removed Fragment
-import { fetchSpendings, fetchCategories, updateSpendingItem } from './api'; // Added fetchCategories, updateSpendingItem
+import { fetchSpendings, fetchCategories, updateSpendingItem, deleteAIJob } from './api'; // Added fetchCategories, updateSpendingItem, deleteAIJob
 import { SpendingItem, GroupedSpendingsResponse, Category, UpdateSpendingPayload, EditableSharingStatus } from './types'; // Removed TransactionGroup, Import new types
 
 interface SpendingsListProps {
