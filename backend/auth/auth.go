@@ -64,17 +64,18 @@ func HandleLogin(db *sql.DB) http.HandlerFunc {
 			return
 		}
 
+		slog.Info("Attempting password comparison", "username", req.Username, "userID", userID)
 		// Compare the provided password with the stored hash
 		err = bcrypt.CompareHashAndPassword([]byte(storedHash), []byte(req.Password))
 		if err != nil {
 			// Password doesn't match
-			slog.Warn("Login attempt failed: invalid password", "username", req.Username)
+			slog.Warn("Login attempt failed: invalid password", "username", req.Username, "err", err) // Log the bcrypt error
 			http.Error(w, "Invalid credentials", http.StatusUnauthorized)
 			return
 		}
 
 		// Password matches - return the static token for the demo user
-		slog.Info("User logged in successfully", "username", req.Username, "userID", userID)
+		slog.Info("User logged in successfully", "username", req.Username, "userID", userID, "firstName", firstName)
 		w.Header().Set("Content-Type", "application/json")
 		json.NewEncoder(w).Encode(LoginResponse{
 			Token: demoUserToken,
