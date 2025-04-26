@@ -28,9 +28,9 @@ func TestLogin(t *testing.T) {
 	// --- Test Case: Successful Login ---
 	t.Run("Success", func(t *testing.T) {
 		loginPayload := auth.LoginRequest{
-			Username: "demo_user",
+			//Username: "demo_user",
 			Username: env.User1Name, // Use the name from the test env setup
-			Password: "password",   // Use the correct password seeded in schema.sql
+			Password: "password",    // Use the correct password seeded in schema.sql
 		}
 		req := testutil.NewAuthenticatedRequest(t, http.MethodPost, "/v1/login", "", loginPayload) // No token needed for login
 		rr := testutil.ExecuteRequest(t, env.Handler, req)
@@ -220,7 +220,7 @@ func TestDeleteAIJob(t *testing.T) {
 	// Job 1 (User's job with spendings, shared with Partner)
 	jobIDUser := testutil.InsertAIJob(t, env.DB, env.UserID, &env.PartnerID, "User Job", 75.0, "finished", true, false, nil)
 	spending1_1 := testutil.InsertSpending(t, env.DB, env.UserID, &env.PartnerID, groceriesID, 50.0, "User Shared", false, &jobIDUser, nil) // Shared with partner
-	spending1_2 := testutil.InsertSpending(t, env.DB, env.UserID, nil, transportID, 25.0, "User Alone", false, &jobIDUser, nil)              // User alone
+	spending1_2 := testutil.InsertSpending(t, env.DB, env.UserID, nil, transportID, 25.0, "User Alone", false, &jobIDUser, nil)             // User alone
 
 	// Job 2 (Partner's job - for forbidden test, shared with User)
 	jobIDPartner := testutil.InsertAIJob(t, env.DB, env.PartnerID, &env.UserID, "Partner Job", 100.0, "finished", true, false, nil)
@@ -593,7 +593,7 @@ func TestUpdateSpending(t *testing.T) {
 	// Spending 2: Initially alone transport (User paid, alone)
 	spendingIDAlone := testutil.InsertSpending(t, env.DB, env.UserID, nil, transportID, 25.0, "Initial Alone", false, nil, nil)
 	// Spending 3: Initially paid by partner (User paid, shared with Partner, Partner takes all)
-	spendingIDPaidByPartner := testutil.InsertSpending(t, env.DB, env.UserID, &env.PartnerID, shoppingID, 100.0, "Initial PaidByPartner", true, nil, nil)
+	_ = testutil.InsertSpending(t, env.DB, env.UserID, &env.PartnerID, shoppingID, 100.0, "Initial PaidByPartner", true, nil, nil)
 	// Spending 4: Belongs to partner (Partner paid, shared with User) - for forbidden test
 	spendingIDPartners := testutil.InsertSpending(t, env.DB, env.PartnerID, &env.UserID, groceriesID, 30.0, "Partner's Spending", false, nil, nil)
 
@@ -864,7 +864,7 @@ func TestRecordTransfer(t *testing.T) {
 
 	// --- Setup Data ---
 	// Add some unsettled items involving the user and partner
-	spending1 := testutil.InsertSpending(t, env.DB, env.UserID, &env.PartnerID, groceriesID, 50.0, "Shared", false, nil, nil)           // User paid, shared with Partner
+	spending1 := testutil.InsertSpending(t, env.DB, env.UserID, &env.PartnerID, groceriesID, 50.0, "Shared", false, nil, nil)             // User paid, shared with Partner
 	spending2 := testutil.InsertSpending(t, env.DB, env.PartnerID, &env.UserID, groceriesID, 100.0, "Shared by Partner", false, nil, nil) // Partner paid, shared with User
 	// Add an item not involving the partner (should not be settled)
 	spendingAlone := testutil.InsertSpending(t, env.DB, env.UserID, nil, groceriesID, 30.0, "Alone", false, nil, nil) // User paid, alone
