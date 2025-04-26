@@ -1,8 +1,13 @@
 import { useState, useEffect } from 'react';
 import { getToken, storeToken, removeToken } from './api';
+import { useState, useEffect } from 'react';
+import { getToken, storeToken, removeToken } from './api';
 import { LoginResponse } from './types';
-import LoginForm from './LoginForm'; // Import the new Login form
-import LogSpendingForm from './LogSpendingForm'; // Import the refactored spending form
+import LoginForm from './LoginForm';
+import LogSpendingForm from './LogSpendingForm';
+import SpendingsList from './SpendingsList'; // Import the new SpendingsList component
+
+type View = 'login' | 'logSpending' | 'viewSpendings';
 
 interface UserInfo {
   userId: number;
@@ -11,11 +16,15 @@ interface UserInfo {
 
 function App() {
   // Authentication state
+  // Authentication state
   const [authToken, setAuthToken] = useState<string | null>(getToken());
-  const [userInfo, setUserInfo] = useState<UserInfo | null>(null); // Store user info
-  const [isLoadingAuth, setIsLoadingAuth] = useState<boolean>(true); // Check initial auth status
+  const [userInfo, setUserInfo] = useState<UserInfo | null>(null);
+  const [isLoadingAuth, setIsLoadingAuth] = useState<boolean>(true);
 
-  // Effect to check token validity or fetch user info on load if token exists
+  // View state (determines which component to show after login)
+  const [currentView, setCurrentView] = useState<View>('logSpending'); // Default view after login
+
+  // Effect to check token validity or fetch user info on load
   useEffect(() => {
     const currentToken = getToken();
     if (currentToken) {
@@ -44,36 +53,60 @@ function App() {
     setUserInfo(null);
     // Optionally remove user info from localStorage
     // localStorage.removeItem('userInfo');
+    setCurrentView('logSpending'); // Reset view on logout
   };
 
-  if (isLoadingAuth) {
-    // Optional: Show a loading spinner while checking auth
-    return <div className="min-h-screen bg-gray-100 flex items-center justify-center">Loading...</div>;
-  }
+  // Determine which component to render based on auth and view state
+  const renderContent = () => {
+    if (isLoadingAuth) {
+      return <div className="min-h-screen bg-gray-100 flex items-center justify-center">Loading...</div>;
+    }
 
-  return (
-    <div className="min-h-screen bg-gray-100 flex flex-col items-center justify-center p-4">
-      {authToken ? (
-        // User is logged in
-        <>
-          <div className="w-full max-w-md mb-4 flex justify-between items-center">
-             {/* Display user info if available */}
-             {userInfo && <span className="text-gray-600 text-sm">Welcome, {userInfo.firstName}!</span>}
-             {/* Simple Logout Button */}
+    if (!authToken) {
+      return <LoginForm onLoginSuccess={handleLoginSuccess} />;
+    }
+
+    // User is logged in, show header and selected view
+    return (
+      <>
+        <div className="w-full max-w-4xl mb-4 flex justify-between items-center"> {/* Adjusted width */}
+          <div>
+            {userInfo && <span className="text-gray-600 text-sm mr-4">Welcome, {userInfo.firstName}!</span>}
+            {/* Navigation Links/Buttons */}
             <button
-              onClick={handleLogout}
-              className="text-sm text-indigo-600 hover:text-indigo-800"
+              onClick={() => setCurrentView('logSpending')}
+              className={`text-sm mr-3 ${currentView === 'logSpending' ? 'text-indigo-700 font-semibold' : 'text-indigo-600 hover:text-indigo-800'}`}
+              disabled={currentView === 'logSpending'}
             >
-              Logout
+              Log Spending
+            </button>
+            <button
+              onClick={() => setCurrentView('viewSpendings')}
+              className={`text-sm ${currentView === 'viewSpendings' ? 'text-indigo-700 font-semibold' : 'text-indigo-600 hover:text-indigo-800'}`}
+              disabled={currentView === 'viewSpendings'}
+            >
+              View History
             </button>
           </div>
-          {/* Render the main application form */}
-          <LogSpendingForm />
-        </>
-      ) : (
-        // User is not logged in, show Login Form
-        <LoginForm onLoginSuccess={handleLoginSuccess} />
-      )}
+          <button
+            onClick={handleLogout}
+            className="text-sm text-red-600 hover:text-red-800"
+          >
+            Logout
+          </button>
+        </div>
+
+        {/* Render the selected view */}
+        {currentView === 'logSpending' && <LogSpendingForm />}
+        {currentView === 'viewSpendings' && <SpendingsList onBack={() => setCurrentView('logSpending')} />}
+      </>
+    );
+  };
+
+
+  return (
+    <div className="min-h-screen bg-gray-100 flex flex-col items-center pt-8 px-4"> {/* Adjusted padding */}
+      {renderContent()}
     </div>
   );
 }

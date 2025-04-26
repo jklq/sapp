@@ -154,3 +154,17 @@ export async function loginUser(payload: LoginPayload): Promise<LoginResponse> {
   }
   return data;
 }
+
+// New function: Fetches detailed spending list for the logged-in user
+export async function fetchSpendings(): Promise<SpendingDetail[]> {
+    const url = `${API_BASE_URL}/v1/spendings`;
+    const response = await fetchWithAuth(url); // GET request by default
+
+    if (!response.ok) {
+        const errorBody = await response.text();
+        throw new Error(`Failed to fetch spendings: ${response.statusText} - ${errorBody}`);
+    }
+
+    const data: SpendingDetail[] = await response.json();
+    return data;
+}

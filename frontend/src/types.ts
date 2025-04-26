@@ -34,3 +34,16 @@ export interface LoginResponse {
   user_id: number; // Assuming backend sends user_id
   first_name: string; // Assuming backend sends first_name
 }
+
+// Structure for detailed spending info fetched from the backend
+export interface SpendingDetail {
+  id: number;
+  amount: number;
+  description: string;
+  category_name: string;
+  created_at: string; // ISO date string
+  buyer_name: string;
+  partner_name: string | null; // Can be null if not shared or partner name missing
+  shared_user_takes_all: boolean;
+  sharing_status: string; // Derived status: "Alone", "Shared with X", "Paid by X"
+}

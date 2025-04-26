@@ -8,10 +8,11 @@ import (
 	"os"
 	"runtime" // Import runtime package
 
-	"git.sr.ht/~relay/sapp-backend/auth" // Import auth package
+	"git.sr.ht/~relay/sapp-backend/auth"
 	"git.sr.ht/~relay/sapp-backend/category"
 	"git.sr.ht/~relay/sapp-backend/pay"
-	"github.com/joho/godotenv" // Import godotenv
+	"git.sr.ht/~relay/sapp-backend/spendings" // Import the new spendings package
+	"github.com/joho/godotenv"
 	"github.com/rs/cors"
 	_ "modernc.org/sqlite"
 )
@@ -88,11 +89,13 @@ func main() {
 	payHandler := http.HandlerFunc(pay.HandlePayRoute(db))
 	getCategoriesHandler := http.HandlerFunc(category.HandleGetCategories(db))
 	categorizeHandler := http.HandlerFunc(category.HandleAICategorize(db, categorizationPool))
+	getSpendingsHandler := http.HandlerFunc(spendings.HandleGetSpendings(db)) // Create handler for getting spendings
 
 	// Apply AuthMiddleware to protected handlers
 	mux.Handle("POST /v1/pay/{shared_status}/{amount}/{category}", applyMiddleware(payHandler, auth.AuthMiddleware))
 	mux.Handle("GET /v1/categories", applyMiddleware(getCategoriesHandler, auth.AuthMiddleware))
 	mux.Handle("POST /v1/categorize", applyMiddleware(categorizeHandler, auth.AuthMiddleware))
+	mux.Handle("GET /v1/spendings", applyMiddleware(getSpendingsHandler, auth.AuthMiddleware)) // Add the new route
 
 	// CORS handler - Apply CORS *after* routing but *before* auth potentially
 	// Or apply CORS as the outermost layer if auth doesn't rely on headers modified by CORS
