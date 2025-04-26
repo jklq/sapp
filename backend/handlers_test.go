@@ -458,7 +458,7 @@ func TestGetCategories(t *testing.T) {
 		rr := testutil.ExecuteRequest(t, env.Handler, req)
 
 		testutil.AssertStatusCode(t, rr, http.StatusUnauthorized) // Middleware should reject non-integer token
-		testutil.AssertBodyContains(t, rr, "Invalid token")
+		testutil.AssertBodyContains(t, rr, "Invalid authorization token format") // Expect new error message
 	})
 }
 
