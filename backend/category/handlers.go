@@ -2,7 +2,7 @@ package category
 
 import (
 	"database/sql"
-	"database/sql"
+
 	"encoding/json"
 	"errors" // Import errors
 	"log/slog"
@@ -141,8 +141,8 @@ func HandleAICategorize(db *sql.DB, pool CategorizingPoolStrategy) http.HandlerF
 		params := CategorizationParams{
 			TotalAmount: payload.Amount,
 			SharedMode:  payload.SharedStatus, // Pass the original status ('alone' or 'shared')
-			Buyer:       buyer,              // Use authenticated buyer object
-			SharedWith:  sharedWith,         // Use determined sharedWith object (or nil)
+			Buyer:       buyer,                // Use authenticated buyer object
+			SharedWith:  sharedWith,           // Use determined sharedWith object (or nil)
 			Prompt:      payload.Prompt,
 			// 'tries' is handled internally by ProcessCategorizationJob
 		}
