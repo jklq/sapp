@@ -69,6 +69,7 @@ export interface TransactionGroup {
   prompt: string;
   total_amount: number;
   job_created_at: string; // ISO date string for the job creation
+  buyer_name: string; // Added: Name of the user who submitted the job
   is_ambiguity_flagged: boolean;
   ambiguity_flag_reason: string | null;
   spendings: SpendingItem[]; // The list of individual spendings for this job
