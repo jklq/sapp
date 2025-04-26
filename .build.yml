@@ -1,7 +1,7 @@
 image: alpine/edge
 secrets:
   - 4a75e973-8e90-4667-a7da-a58ca05dad38
-  - 65859560-db27-4197-9ad3-5bc094dbd214 # change this (github)
+  - 65859560-db27-4197-9ad3-5bc094dbd214
 sources:
   - git@git.sr.ht:~relay/sapp
 environment:
