@@ -5,9 +5,6 @@ import (
 	"fmt"
 	"log/slog"
 	"net/http"
-	"fmt"
-	"log/slog"
-	"net/http"
 	"os"
 	"runtime" // Import runtime package
 
@@ -25,7 +22,6 @@ func loggingMiddleware(next http.Handler) http.Handler {
 		next.ServeHTTP(w, r)
 	})
 }
-
 
 // Helper function to apply middleware
 func applyMiddleware(h http.Handler, middleware ...func(http.Handler) http.Handler) http.Handler {
@@ -94,7 +90,6 @@ func main() {
 	mux.Handle("GET /v1/categories", applyMiddleware(getCategoriesHandler, auth.AuthMiddleware))
 	mux.Handle("POST /v1/categorize", applyMiddleware(categorizeHandler, auth.AuthMiddleware))
 
-
 	// CORS handler - Apply CORS *after* routing but *before* auth potentially
 	// Or apply CORS as the outermost layer if auth doesn't rely on headers modified by CORS
 	corsHandler := cors.New(cors.Options{
@@ -104,7 +99,6 @@ func main() {
 	})
 	// Apply CORS first, then logging, then the mux router
 	handler := corsHandler.Handler(loggingMiddleware(mux))
-
 
 	// Server configuration
 	port := os.Getenv("PORT")
