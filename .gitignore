@@ -5,3 +5,4 @@ _build
 *.sqlite3
 *.sqlite
 .aider*
+.env
