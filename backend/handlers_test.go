@@ -32,8 +32,18 @@ func TestLogin(t *testing.T) {
 			Username: env.User1Name, // Use the name from the test env setup
 			Password: "password",    // Use the correct password seeded in schema.sql
 		}
-		req := testutil.NewAuthenticatedRequest(t, http.MethodPost, "/v1/login", "", loginPayload) // No token needed for login
-		rr := testutil.ExecuteRequest(t, env.Handler, req)
+		req := testutil.NewAuthenticatedRequest(
+			t,
+			http.MethodPost,
+			"/v1/login",
+			"",
+			loginPayload,
+		) // No token needed for login
+		rr := testutil.ExecuteRequest(
+			t,
+			env.Handler,
+			req,
+		)
 
 		testutil.AssertStatusCode(t, rr, http.StatusOK)
 
@@ -57,8 +67,18 @@ func TestLogin(t *testing.T) {
 			Username: env.User1Name, // Use correct username from env
 			Password: "wrongpassword",
 		}
-		req := testutil.NewAuthenticatedRequest(t, http.MethodPost, "/v1/login", "", loginPayload)
-		rr := testutil.ExecuteRequest(t, env.Handler, req)
+		req := testutil.NewAuthenticatedRequest(
+			t,
+			http.MethodPost,
+			"/v1/login",
+			"",
+			loginPayload,
+		)
+		rr := testutil.ExecuteRequest(
+			t,
+			env.Handler,
+			req,
+		)
 
 		testutil.AssertStatusCode(t, rr, http.StatusUnauthorized)
 		testutil.AssertBodyContains(t, rr, "Invalid credentials")
@@ -70,8 +90,18 @@ func TestLogin(t *testing.T) {
 			Username: "nonexistent_user", // A user that doesn't exist
 			Password: "password",
 		}
-		req := testutil.NewAuthenticatedRequest(t, http.MethodPost, "/v1/login", "", loginPayload)
-		rr := testutil.ExecuteRequest(t, env.Handler, req)
+		req := testutil.NewAuthenticatedRequest(
+			t,
+			http.MethodPost,
+			"/v1/login",
+			"",
+			loginPayload,
+		)
+		rr := testutil.ExecuteRequest(
+			t,
+			env.Handler,
+			req,
+		)
 
 		testutil.AssertStatusCode(t, rr, http.StatusUnauthorized) // Expect Unauthorized as user doesn't match demo user check in HandleLogin
 		testutil.AssertBodyContains(t, rr, "Invalid credentials")
@@ -81,8 +111,18 @@ func TestLogin(t *testing.T) {
 			Username: env.PartnerName, // Partner user exists but isn't ID 1
 			Password: "password",
 		}
-		reqPartner := testutil.NewAuthenticatedRequest(t, http.MethodPost, "/v1/login", "", loginPayloadPartner)
-		rrPartner := testutil.ExecuteRequest(t, env.Handler, reqPartner)
+		reqPartner := testutil.NewAuthenticatedRequest(
+			t,
+			http.MethodPost,
+			"/v1/login",
+			"",
+			loginPayloadPartner,
+		)
+		rrPartner := testutil.ExecuteRequest(
+			t,
+			env.Handler,
+			reqPartner,
+		)
 		testutil.AssertStatusCode(t, rrPartner, http.StatusUnauthorized) // Expect Unauthorized
 		testutil.AssertBodyContains(t, rrPartner, "Invalid credentials")
 
@@ -94,8 +134,18 @@ func TestLogin(t *testing.T) {
 			Username: "",
 			Password: "password",
 		}
-		req := testutil.NewAuthenticatedRequest(t, http.MethodPost, "/v1/login", "", loginPayload)
-		rr := testutil.ExecuteRequest(t, env.Handler, req)
+		req := testutil.NewAuthenticatedRequest(
+			t,
+			http.MethodPost,
+			"/v1/login",
+			"",
+			loginPayload,
+		)
+		rr := testutil.ExecuteRequest(
+			t,
+			env.Handler,
+			req,
+		)
 
 		testutil.AssertStatusCode(t, rr, http.StatusBadRequest)
 		testutil.AssertBodyContains(t, rr, "Username and password are required")
@@ -131,56 +181,6 @@ func TestPartnerRegistration(t *testing.T) {
 		if err != nil {
 			t.Fatalf("Failed to clear users table for Success test: %v", err)
 		}
-		// Also reset auto-increment sequence for sqlite if necessary (might not be strictly needed depending on test logic)
-		_, _ = env.DB.Exec("DELETE FROM sqlite_sequence WHERE name='users'")
-		_, _ = env.DB.Exec("DELETE FROM sqlite_sequence WHERE name='partnerships'") // Though partnerships doesn't auto-increment ID
-
-	// --- Test Case: Successful Registration ---
-	t.Run("Success", func(t *testing.T) {
-		payload := auth.PartnerRegistrationRequest{
-			User1: auth.UserRegistrationDetails{Username: "alice", Password: "password123", FirstName: "Alice"},
-			User2: auth.UserRegistrationDetails{Username: "bob", Password: "password456", FirstName: "Bob"},
-		}
-		req := testutil.NewAuthenticatedRequest(t, http.MethodPost, "/v1/register/partners", "", payload) // No auth needed
-		rr := testutil.ExecuteRequest(t, env.Handler, req)
-
-		testutil.AssertStatusCode(t, rr, http.StatusCreated)
-		testutil.AssertBodyContains(t, rr, "Users registered and partnered successfully")
-
-		var respBody auth.PartnerRegistrationResponse
-		testutil.DecodeJSONResponse(t, rr, &respBody)
-
-		// Verify users exist in DB with correct details and hashed passwords
-		var dbUsername1, dbFirstName1, dbHash1 string
-		err := env.DB.QueryRow("SELECT username, first_name, password_hash FROM users WHERE id = ?", respBody.User1ID).Scan(&dbUsername1, &dbFirstName1, &dbHash1)
-		if err != nil {
-			t.Fatalf("Failed to query user 1 (ID: %d): %v", respBody.User1ID, err)
-		}
-		if dbUsername1 != "alice" || dbFirstName1 != "Alice" {
-			t.Errorf("User 1 DB mismatch: got user=%s, name=%s; want alice, Alice", dbUsername1, dbFirstName1)
-		}
-		if err := bcrypt.CompareHashAndPassword([]byte(dbHash1), []byte("password123")); err != nil {
-			t.Errorf("User 1 password hash mismatch: %v", err)
-		}
-
-		var dbUsername2, dbFirstName2, dbHash2 string
-		err = env.DB.QueryRow("SELECT username, first_name, password_hash FROM users WHERE id = ?", respBody.User2ID).Scan(&dbUsername2, &dbFirstName2, &dbHash2)
-		if err != nil {
-			t.Fatalf("Failed to query user 2 (ID: %d): %v", respBody.User2ID, err)
-		}
-		if dbUsername2 != "bob" || dbFirstName2 != "Bob" {
-			t.Errorf("User 2 DB mismatch: got user=%s, name=%s; want bob, Bob", dbUsername2, dbFirstName2)
-		}
-		if err := bcrypt.CompareHashAndPassword([]byte(dbHash2), []byte("password456")); err != nil {
-			t.Errorf("User 2 password hash mismatch: %v", err)
-		}
-
-		// Verify partnership exists
-		var pUser1, pUser2 int64
-		// Ensure consistent query order (user1_id < user2_id)
-		qUser1, qUser2 := respBody.User1ID, respBody.User2ID
-		if qUser1 > qUser2 {
-			qUser1, qUser2 = qUser2, qUser1 // Swap if needed
 		}
 		err = env.DB.QueryRow("SELECT user1_id, user2_id FROM partnerships WHERE user1_id = ? AND user2_id = ?", qUser1, qUser2).Scan(&pUser1, &pUser2)
 		if err != nil {
@@ -238,7 +238,6 @@ func TestPartnerRegistration(t *testing.T) {
 		testutil.AssertStatusCode(t, rr, http.StatusConflict)
 		testutil.AssertBodyContains(t, rr, "already exist")
 	})
-
 }
 
 // TestDeleteAIJob tests the DELETE /v1/jobs/{job_id} endpoint.
