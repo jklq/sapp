@@ -89,3 +89,13 @@ export interface UpdateSpendingPayload {
   category_name: string;
   sharing_status: EditableSharingStatus;
 }
+
+// --- Types for Transfer Page ---
+
+// Response from the GET /v1/transfer/status endpoint
+export interface TransferStatusResponse {
+  partner_name: string;
+  amount_owed: number; // Always positive, indicates the magnitude of the debt
+  owed_by: string | null; // Name of the person who owes (null if settled)
+  owed_to: string | null; // Name of the person who is owed (null if settled)
+}

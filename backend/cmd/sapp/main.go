@@ -9,9 +9,11 @@ import (
 	"runtime" // Import runtime package
 
 	"git.sr.ht/~relay/sapp-backend/auth"
+	"git.sr.ht/~relay/sapp-backend/auth"
 	"git.sr.ht/~relay/sapp-backend/category"
 	"git.sr.ht/~relay/sapp-backend/pay"
-	"git.sr.ht/~relay/sapp-backend/spendings" // Import the new spendings package
+	"git.sr.ht/~relay/sapp-backend/spendings" // Import the spendings package
+	"git.sr.ht/~relay/sapp-backend/transfer"  // Import the new transfer package
 	"github.com/joho/godotenv"
 	"github.com/rs/cors"
 	_ "modernc.org/sqlite"
@@ -89,15 +91,19 @@ func main() {
 	payHandler := http.HandlerFunc(pay.HandlePayRoute(db))
 	getCategoriesHandler := http.HandlerFunc(category.HandleGetCategories(db))
 	categorizeHandler := http.HandlerFunc(category.HandleAICategorize(db, categorizationPool))
-	getSpendingsHandler := http.HandlerFunc(spendings.HandleGetSpendings(db))     // Create handler for getting spendings
-	updateSpendingHandler := http.HandlerFunc(spendings.HandleUpdateSpending(db)) // Create handler for updating spendings
+	getSpendingsHandler := http.HandlerFunc(spendings.HandleGetSpendings(db))
+	updateSpendingHandler := http.HandlerFunc(spendings.HandleUpdateSpending(db))
+	getTransferStatusHandler := http.HandlerFunc(transfer.HandleGetTransferStatus(db)) // Create handler for transfer status
+	recordTransferHandler := http.HandlerFunc(transfer.HandleRecordTransfer(db))       // Create handler for recording transfer
 
 	// Apply AuthMiddleware to protected handlers
 	mux.Handle("POST /v1/pay/{shared_status}/{amount}/{category}", applyMiddleware(payHandler, auth.AuthMiddleware))
 	mux.Handle("GET /v1/categories", applyMiddleware(getCategoriesHandler, auth.AuthMiddleware))
 	mux.Handle("POST /v1/categorize", applyMiddleware(categorizeHandler, auth.AuthMiddleware))
 	mux.Handle("GET /v1/spendings", applyMiddleware(getSpendingsHandler, auth.AuthMiddleware))
-	mux.Handle("PUT /v1/spendings/{spending_id}", applyMiddleware(updateSpendingHandler, auth.AuthMiddleware)) // Add route for updating
+	mux.Handle("PUT /v1/spendings/{spending_id}", applyMiddleware(updateSpendingHandler, auth.AuthMiddleware))
+	mux.Handle("GET /v1/transfer/status", applyMiddleware(getTransferStatusHandler, auth.AuthMiddleware)) // Add route for transfer status
+	mux.Handle("POST /v1/transfer/record", applyMiddleware(recordTransferHandler, auth.AuthMiddleware))   // Add route for recording transfer
 
 	// CORS handler - Apply CORS *after* routing but *before* auth potentially
 	// Or apply CORS as the outermost layer if auth doesn't rely on headers modified by CORS

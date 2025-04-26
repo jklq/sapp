@@ -3,9 +3,10 @@ import { getToken, storeToken, removeToken } from './api';
 import { LoginResponse } from './types';
 import LoginForm from './LoginForm';
 import LogSpendingForm from './LogSpendingForm';
-import SpendingsList from './SpendingsList'; // Import the new SpendingsList component
+import SpendingsList from './SpendingsList';
+import TransferPage from './TransferPage'; // Import the new TransferPage component
 
-type View = 'login' | 'logSpending' | 'viewSpendings';
+type View = 'login' | 'logSpending' | 'viewSpendings' | 'transfer'; // Add 'transfer' view
 
 interface UserInfo {
   userId: number;
@@ -85,6 +86,13 @@ function App() {
             >
               View History
             </button>
+             <button
+              onClick={() => setCurrentView('transfer')}
+              className={`text-sm ml-3 ${currentView === 'transfer' ? 'text-indigo-700 font-semibold' : 'text-indigo-600 hover:text-indigo-800'}`}
+              disabled={currentView === 'transfer'}
+            >
+              Transfer Status
+            </button>
           </div>
           <button
             onClick={handleLogout}
@@ -97,6 +105,7 @@ function App() {
         {/* Render the selected view */}
         {currentView === 'logSpending' && <LogSpendingForm />}
         {currentView === 'viewSpendings' && <SpendingsList onBack={() => setCurrentView('logSpending')} />}
+        {currentView === 'transfer' && <TransferPage onBack={() => setCurrentView('logSpending')} />}
       </>
     );
   };

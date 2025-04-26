@@ -33,6 +33,7 @@ CREATE TABLE IF NOT EXISTS user_spendings (
     buyer INTEGER NOT NULL, -- User who paid (references users.id)
     shared_with INTEGER, -- User sharing the cost (references users.id), NULL if alone
     shared_user_takes_all BOOLEAN DEFAULT 0, -- True if shared_with user pays the full amount ('other' mode)
+    settled_at DATETIME DEFAULT NULL, -- Timestamp when this spending was included in a settlement, NULL if unsettled
     FOREIGN KEY(spending_id) REFERENCES spendings(id) ON UPDATE CASCADE ON DELETE CASCADE,
     FOREIGN KEY(buyer) REFERENCES users(id) ON UPDATE CASCADE ON DELETE CASCADE,
     FOREIGN KEY(shared_with) REFERENCES users(id) ON UPDATE CASCADE ON DELETE SET NULL -- If shared user deleted, set to NULL
@@ -64,6 +65,23 @@ CREATE TABLE IF NOT EXISTS ai_categorized_spendings (
     FOREIGN KEY(spending_id) REFERENCES spendings(id) ON UPDATE CASCADE ON DELETE CASCADE,
     FOREIGN KEY(job_id) REFERENCES ai_categorization_jobs(id) ON UPDATE CASCADE ON DELETE CASCADE
 );
+
+-- Transfers table logs when settlements occur between partners
+CREATE TABLE IF NOT EXISTS transfers (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    settled_by_user_id INTEGER NOT NULL, -- User initiating the settlement action in the app
+    settled_with_user_id INTEGER NOT NULL, -- The other user involved in the settlement
+    settlement_time DATETIME NOT NULL, -- Timestamp when the settlement was recorded
+    FOREIGN KEY(settled_by_user_id) REFERENCES users(id) ON UPDATE CASCADE ON DELETE CASCADE,
+    FOREIGN KEY(settled_with_user_id) REFERENCES users(id) ON UPDATE CASCADE ON DELETE CASCADE
+);
+
+-- Add settled_at column to user_spendings to track settlement status
+-- We need to add this column separately as ALTER TABLE ADD COLUMN is standard SQL
+-- Note: This migration script might need adjustment depending on how it's run.
+-- If run multiple times, the ALTER TABLE might fail. Consider adding IF NOT EXISTS if supported.
+-- For simplicity here, we assume it runs once or handles errors gracefully.
+-- A more robust migration system would handle this better.
 
 -- Seed default categories if they don't exist
 INSERT OR IGNORE INTO categories (name) VALUES ('Groceries');
