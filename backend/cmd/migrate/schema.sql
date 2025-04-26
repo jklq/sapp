@@ -79,6 +79,6 @@ INSERT OR IGNORE INTO categories (name) VALUES ('Other');
 -- Seed demo users (Password for demo_user is "password")
 -- Use https://www.browserling.com/bcrypt or similar to generate hashes if needed.
 -- Hash for "password": $2a$10$XXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXX (Replace X with actual hash)
--- IMPORTANT: Replace the placeholder hash below with a real bcrypt hash for "password"
-INSERT OR IGNORE INTO users (id, username, password_hash, first_name) VALUES (1, 'demo_user', '$2a$10$If1kDxkQLSTXp5hJzTVkjuvhXNlwszEc7zTHxQp/V3xNlUZJwZz0m', 'Demo');
-INSERT OR IGNORE INTO users (id, username, password_hash, first_name) VALUES (2, 'partner_user', 'dummy_hash_partner', 'Partner'); -- Partner doesn't need to log in for this demo
+-- Hash for "password" generated with cost 10:
+INSERT OR IGNORE INTO users (id, username, password_hash, first_name) VALUES (1, 'demo_user', '$2a$10$GIXA.URc4y533w04c.k3A.tHlIsjZnkXj84Wa3Q4oXszkgXHJVfRK', 'Demo');
+INSERT OR IGNORE INTO users (id, username, password_hash, first_name) VALUES (2, 'partner_user', '$2a$10$dummyhashplaceholderpartner.', 'Partner'); -- Partner doesn't need to log in for this demo
