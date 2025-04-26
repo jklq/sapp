@@ -27,6 +27,7 @@ tasks:
       echo "Installing frontend dependencies..."
       npm ci # Use ci for faster, deterministic installs in CI
       echo "Building frontend..."
+      export VITE_API_URL=https://sappi.angeltvedt.net # Set production API URL
       npm run build # Standard Vite build command
       echo "Uploading frontend build..."
       # Sync the contents of the 'dist' directory
