@@ -78,6 +78,7 @@ func HandleAICategorize(db *sql.DB, pool CategorizingPoolStrategy) http.HandlerF
 			SharedStatus string  `json:"shared_status"` // Matches AICategorizationPayload in frontend/types.ts (should be 'alone' or 'shared')
 			Amount       float64 `json:"amount"`
 			Prompt       string  `json:"prompt"`
+		} // <-- Add missing closing brace here
 
 		if err := json.NewDecoder(r.Body).Decode(&payload); err != nil {
 			slog.Error("failed to decode AI categorization request body", "url", r.URL, "user_id", userID, "err", err)
