@@ -18,6 +18,15 @@ import (
 	_ "modernc.org/sqlite"
 )
 
+// Logging middleware
+func loggingMiddleware(next http.Handler) http.Handler {
+	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		slog.Info("Received request", "method", r.Method, "path", r.URL.Path)
+		next.ServeHTTP(w, r)
+	})
+}
+
+
 // Helper function to apply middleware
 func applyMiddleware(h http.Handler, middleware ...func(http.Handler) http.Handler) http.Handler {
 	for i := len(middleware) - 1; i >= 0; i-- {
@@ -93,7 +102,9 @@ func main() {
 		AllowedMethods: []string{"GET", "POST", "PUT", "DELETE", "OPTIONS"},
 		AllowedHeaders: []string{"Authorization", "Content-Type"}, // Ensure Authorization is allowed
 	})
-	handler := corsHandler.Handler(mux)
+	// Apply CORS first, then logging, then the mux router
+	handler := corsHandler.Handler(loggingMiddleware(mux))
+
 
 	// Server configuration
 	port := os.Getenv("PORT")
