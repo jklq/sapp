@@ -208,6 +208,7 @@ func SetupTestEnvironment(t *testing.T) *TestEnv {
 
 	// --- Public Routes ---
 	mux.HandleFunc("POST /v1/login", auth.HandleLogin(db))
+	mux.HandleFunc("POST /v1/register/partners", auth.HandlePartnerRegistration(db)) // Register partner registration handler
 
 	// --- Protected Routes ---
 	payHandler := http.HandlerFunc(pay.HandlePayRoute(db))

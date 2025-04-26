@@ -107,7 +107,7 @@ func TestLogin(t *testing.T) {
 
 		// Also test with the partner user - login handler only allows demo_user (ID 1)
 		loginPayloadPartner := auth.LoginRequest{
-			Username: env.PartnerName, // Partner user exists but isn't ID 1
+			Username: "partner_user", // Use the correct username seeded in schema.sql
 			Password: "password",
 		}
 		reqPartner := testutil.NewAuthenticatedRequest(
