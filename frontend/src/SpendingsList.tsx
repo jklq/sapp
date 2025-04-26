@@ -23,6 +23,9 @@ function SpendingsList({ onBack }: SpendingsListProps) {
     const [editFormData, setEditFormData] = useState<UpdateSpendingPayload | null>(null);
     const [isSaving, setIsSaving] = useState<boolean>(false);
 
+    // Expansion state
+    const [expandedGroupIds, setExpandedGroupIds] = useState<Set<number>>(new Set());
+
     // Fetch spendings and categories
     const loadData = useCallback(() => {
         setIsLoading(true);
@@ -129,6 +132,19 @@ function SpendingsList({ onBack }: SpendingsListProps) {
         }
     };
 
+    // Toggle group expansion
+    const toggleGroupExpansion = (jobId: number) => {
+        setExpandedGroupIds(prev => {
+            const newSet = new Set(prev);
+            if (newSet.has(jobId)) {
+                newSet.delete(jobId);
+            } else {
+                newSet.add(jobId);
+            }
+            return newSet;
+        });
+    };
+
     // --- Render Logic ---
 
     // Helper to render either display row or edit form - now responsive
@@ -194,7 +210,7 @@ function SpendingsList({ onBack }: SpendingsListProps) {
                             <option value="Paid by Partner">Paid by Partner</option>
                         </select>
                     </div>
-                    {/* Actions (Save/Cancel) (Align right on mobile too) */}
+                    {/* Actions (Save/Cancel) - Moved below other fields on mobile */}
                     <div className="px-4 py-3 md:table-cell md:whitespace-nowrap text-right text-sm font-medium space-x-2">
                         <button
                             onClick={handleSaveEdit}
@@ -244,7 +260,7 @@ function SpendingsList({ onBack }: SpendingsListProps) {
                             {item.sharing_status}
                         </span>
                     </div>
-                    {/* Action (Edit Button) (Align right) */}
+                    {/* Action (Edit Button) - Moved below other fields on mobile */}
                     <div className="px-4 py-3 md:table-cell md:whitespace-nowrap text-right text-sm font-medium">
                         <button
                             onClick={() => handleEditClick(item)}
@@ -289,11 +305,14 @@ function SpendingsList({ onBack }: SpendingsListProps) {
                 <div className="space-y-6">
                     {transactionGroups.map((group) => (
                         <div key={group.job_id} className="border border-gray-200 rounded-lg shadow-sm overflow-hidden">
-                            {/* Transaction Group Header */}
-                            <div className="bg-gray-50 p-3 border-b border-gray-200">
-                                <div className="flex justify-between items-start flex-wrap gap-2"> {/* Align items-start */}
-                                    <div className="flex-1 min-w-0"> {/* Allow shrinking */}
-                                        {/* Make prompt wrap instead of truncate */}
+                            {/* Transaction Group Header - Make clickable */}
+                            <div
+                                className="bg-gray-50 p-3 border-b border-gray-200 cursor-pointer hover:bg-gray-100"
+                                onClick={() => toggleGroupExpansion(group.job_id)}
+                            >
+                                <div className="flex justify-between items-center flex-wrap gap-2"> {/* Use items-center */}
+                                    {/* Left side: Prompt, Date, Buyer, Total */}
+                                    <div className="flex-1 min-w-0 mr-2"> {/* Allow shrinking, add margin */}
                                         <p className="text-sm font-medium text-indigo-600 break-words" title={group.prompt}>
                                             Prompt: <span className="text-gray-700 font-normal">{group.prompt}</span>
                                         </p>
@@ -301,24 +320,30 @@ function SpendingsList({ onBack }: SpendingsListProps) {
                                             {formatDate(group.job_created_at)} by <span className="font-medium">{group.buyer_name}</span> - Total: {formatCurrency(group.total_amount)}
                                         </p>
                                     </div>
-                                    {group.is_ambiguity_flagged && (
-                                        <div className="flex-shrink-0 ml-4">
+                                    {/* Right side: Ambiguity flag and Expander Icon */}
+                                    <div className="flex items-center flex-shrink-0">
+                                        {group.is_ambiguity_flagged && (
                                             <span
-                                                className="px-2 py-1 inline-flex text-xs leading-4 font-semibold rounded-full bg-yellow-100 text-yellow-800 cursor-help"
+                                                className="mr-2 px-2 py-1 inline-flex text-xs leading-4 font-semibold rounded-full bg-yellow-100 text-yellow-800 cursor-help"
                                                 title={`Ambiguity Reason: ${group.ambiguity_flag_reason || 'No reason provided'}`}
+                                                onClick={(e) => e.stopPropagation()} // Prevent title click from toggling group
                                             >
                                                 ⚠️ Ambiguous
                                             </span>
-                                        </div>
-                                    )}
+                                        )}
+                                        {/* Expander Icon */}
+                                        <span className="text-gray-500 text-lg">
+                                            {expandedGroupIds.has(group.job_id) ? '▲' : '▼'}
+                                        </span>
+                                    </div>
                                 </div>
                             </div>
 
-                            {/* Spending Items Container (Responsive: Table on md+, Cards below) */}
-                            {/* No overflow-x needed now */}
-                            <div>
-                                {/* Table structure for medium screens and up */}
-                                <table className="min-w-full hidden md:table">
+                            {/* Spending Items Container (Conditional Rendering) */}
+                            {expandedGroupIds.has(group.job_id) && (
+                                <div className="bg-white"> {/* Add bg-white for contrast */}
+                                    {/* Table structure for medium screens and up */}
+                                    <table className="min-w-full hidden md:table">
                                     {/* Table Head (Hidden on mobile) */}
                                     <thead className="bg-white hidden md:table-header-group">
                                         <tr>
@@ -340,13 +365,14 @@ function SpendingsList({ onBack }: SpendingsListProps) {
                                     </tbody>
                                 </table>
                                 {/* Card/List structure for mobile (rendered via helper) */}
-                                <div className="md:hidden">
+                                <div className="md:hidden divide-y divide-gray-100"> {/* Add divider for mobile cards */}
                                      {group.spendings.map(renderSpendingItemRow)}
                                      {group.spendings.length === 0 && (
                                         <div className="px-4 py-3 text-center text-sm text-gray-500 italic">No spending items generated for this job.</div>
                                      )}
                                 </div>
                             </div>
+                            )} {/* End conditional rendering for expanded group */}
                         </div>
                     ))}
                 </div>
