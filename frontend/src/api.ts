@@ -155,8 +155,8 @@ export async function loginUser(payload: LoginPayload): Promise<LoginResponse> {
   return data;
 }
 
-// New function: Fetches detailed spending list for the logged-in user
-export async function fetchSpendings(): Promise<SpendingDetail[]> {
+// Updated function: Fetches spendings grouped by transaction/AI job
+export async function fetchSpendings(): Promise<GroupedSpendingsResponse> {
     const url = `${API_BASE_URL}/v1/spendings`;
     const response = await fetchWithAuth(url); // GET request by default
 
@@ -165,6 +165,7 @@ export async function fetchSpendings(): Promise<SpendingDetail[]> {
         throw new Error(`Failed to fetch spendings: ${response.statusText} - ${errorBody}`);
     }
 
-    const data: SpendingDetail[] = await response.json();
+    const data: GroupedSpendingsResponse = await response.json();
+    console.log("Fetched Grouped Spendings:", data); // Debug log
     return data;
 }

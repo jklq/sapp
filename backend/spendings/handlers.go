@@ -33,104 +33,158 @@ func HandleGetSpendings(db *sql.DB) http.HandlerFunc {
 			return
 		}
 
-		// Query to fetch spendings involving the user, either as buyer or shared_with partner
-		// We join necessary tables to get names and sharing details.
-		// We need to fetch spendings where the user is the buyer OR the shared_with partner.
-		query := `
-            SELECT
-                s.id,
-                s.amount,
-                s.description,
-                c.name AS category_name,
-                s.created_at,
-                u_buyer.first_name AS buyer_name,
-                u_partner.first_name AS partner_name, -- Use COALESCE or handle NULL in Scan
-                us.shared_user_takes_all,
-				us.buyer, -- Include buyer ID to determine context
-				us.shared_with -- Include shared_with ID to determine context
-            FROM spendings s
-            JOIN user_spendings us ON s.id = us.spending_id
-            JOIN categories c ON s.category = c.id
-            JOIN users u_buyer ON us.buyer = u_buyer.id
-            LEFT JOIN users u_partner ON us.shared_with = u_partner.id -- LEFT JOIN for partner
-            WHERE us.buyer = ? OR us.shared_with = ?
-            ORDER BY s.created_at DESC;
-        `
-
-		rows, err := db.Query(query, userID, userID)
+		// 1. Fetch AI Categorization Jobs initiated by the user
+		jobQuery := `
+			SELECT
+				j.id, j.prompt, j.total_amount, j.created_at, j.is_ambiguity_flagged, j.ambiguity_flag_reason
+			FROM ai_categorization_jobs j
+			WHERE j.buyer = ?
+			ORDER BY j.created_at DESC;
+		`
+		jobRows, err := db.Query(jobQuery, userID)
 		if err != nil {
-			slog.Error("failed to query spendings", "url", r.URL, "user_id", userID, "err", err)
+			slog.Error("failed to query AI categorization jobs", "url", r.URL, "user_id", userID, "err", err)
 			http.Error(w, "Internal server error", http.StatusInternalServerError)
 			return
 		}
-		defer rows.Close()
+		defer jobRows.Close()
 
-		spendings := []SpendingDetail{}
-		for rows.Next() {
-			var detail SpendingDetail
-			var partnerName sql.NullString // Use sql.NullString for nullable partner name
-			var buyerID int64
-			var sharedWithID sql.NullInt64 // Use sql.NullInt64 for nullable shared_with ID
+		transactionGroups := []TransactionGroup{}
 
-			if err := rows.Scan(
-				&detail.ID,
-				&detail.Amount,
-				&detail.Description,
-				&detail.CategoryName,
-				&detail.CreatedAt,
-				&detail.BuyerName,
-				&partnerName, // Scan into sql.NullString
-				&detail.SharedUserTakesAll,
-				&buyerID,
-				&sharedWithID,
+		// Prepare statement for fetching spendings for a specific job ID
+		// This avoids N+1 query problem inside the loop
+		spendingQuery := `
+			SELECT
+				s.id,
+				s.amount,
+				s.description,
+				c.name AS category_name,
+				u_buyer.first_name AS buyer_name,
+				u_partner.first_name AS partner_name,
+				us.shared_user_takes_all,
+				us.shared_with -- Include shared_with ID to determine sharing status
+			FROM spendings s
+			JOIN ai_categorized_spendings acs ON s.id = acs.spending_id
+			JOIN user_spendings us ON s.id = us.spending_id
+			JOIN categories c ON s.category = c.id
+			JOIN users u_buyer ON us.buyer = u_buyer.id -- Buyer of the specific spending (should match job buyer)
+			LEFT JOIN users u_partner ON us.shared_with = u_partner.id
+			WHERE acs.job_id = ?
+			ORDER BY s.id ASC; -- Order spendings within a job consistently
+		`
+		spendingStmt, err := db.Prepare(spendingQuery)
+		if err != nil {
+			slog.Error("failed to prepare spending query statement", "url", r.URL, "user_id", userID, "err", err)
+			http.Error(w, "Internal server error", http.StatusInternalServerError)
+			return
+		}
+		defer spendingStmt.Close()
+
+		// 2. Iterate through jobs and fetch associated spendings
+		for jobRows.Next() {
+			var group TransactionGroup
+			var ambiguityReason sql.NullString // Use sql.NullString for nullable reason
+
+			if err := jobRows.Scan(
+				&group.JobID,
+				&group.Prompt,
+				&group.TotalAmount,
+				&group.JobCreatedAt,
+				&group.IsAmbiguityFlagged,
+				&ambiguityReason,
 			); err != nil {
-				slog.Error("failed to scan spending row", "url", r.URL, "user_id", userID, "err", err)
+				slog.Error("failed to scan AI job row", "url", r.URL, "user_id", userID, "err", err)
+				// Log and continue to next job? Or fail request? Let's fail for now.
 				http.Error(w, "Internal server error", http.StatusInternalServerError)
-				return // Important to return here to avoid processing partial data
+				return
 			}
 
-			// Set partner name if valid
-			if partnerName.Valid {
-				detail.PartnerName = &partnerName.String
+			if ambiguityReason.Valid {
+				group.AmbiguityFlagReason = &ambiguityReason.String
 			} else {
-				detail.PartnerName = nil
+				group.AmbiguityFlagReason = nil
 			}
 
-			// Determine Sharing Status based on scanned data
-			if !sharedWithID.Valid {
-				detail.SharingStatus = "Alone" // No partner involved
-			} else if detail.SharedUserTakesAll {
-				// Partner exists and takes all cost
-				if detail.PartnerName != nil {
-					detail.SharingStatus = "Paid by " + *detail.PartnerName
-				} else {
-					detail.SharingStatus = "Paid by Partner" // Fallback if name is missing
-				}
-			} else {
-				// Partner exists and cost is shared
-				if detail.PartnerName != nil {
-					detail.SharingStatus = "Shared with " + *detail.PartnerName
-				} else {
-					detail.SharingStatus = "Shared" // Fallback if name is missing
-				}
+			// Fetch spendings for this job ID
+			spendingRows, err := spendingStmt.Query(group.JobID)
+			if err != nil {
+				slog.Error("failed to query spendings for job", "url", r.URL, "user_id", userID, "job_id", group.JobID, "err", err)
+				http.Error(w, "Internal server error", http.StatusInternalServerError)
+				return
 			}
 
+			group.Spendings = []SpendingItem{} // Initialize slice
+			for spendingRows.Next() {
+				var item SpendingItem
+				var partnerName sql.NullString
+				var sharedWithID sql.NullInt64
 
-			spendings = append(spendings, detail)
-		}
+				if err := spendingRows.Scan(
+					&item.ID,
+					&item.Amount,
+					&item.Description,
+					&item.CategoryName,
+					&item.BuyerName, // This should be the same as the job buyer, but we fetch it per spending item
+					&partnerName,
+					&item.SharedUserTakesAll,
+					&sharedWithID,
+				); err != nil {
+					slog.Error("failed to scan spending item row", "url", r.URL, "user_id", userID, "job_id", group.JobID, "err", err)
+					spendingRows.Close() // Close inner rows before returning
+					http.Error(w, "Internal server error", http.StatusInternalServerError)
+					return
+				}
 
-		// Check for errors from iterating over rows.
-		if err := rows.Err(); err != nil {
-			slog.Error("error iterating spending rows", "url", r.URL, "user_id", userID, "err", err)
+				// Set partner name
+				if partnerName.Valid {
+					item.PartnerName = &partnerName.String
+				} else {
+					item.PartnerName = nil
+				}
+
+				// Determine Sharing Status for the item
+				if !sharedWithID.Valid {
+					item.SharingStatus = "Alone"
+				} else if item.SharedUserTakesAll {
+					if item.PartnerName != nil {
+						item.SharingStatus = "Paid by " + *item.PartnerName
+					} else {
+						item.SharingStatus = "Paid by Partner"
+					}
+				} else {
+					if item.PartnerName != nil {
+						item.SharingStatus = "Shared with " + *item.PartnerName
+					} else {
+						item.SharingStatus = "Shared"
+					}
+				}
+				group.Spendings = append(group.Spendings, item)
+			}
+			spendingRows.Close() // Close inner rows after loop
+
+			// Check for errors during spending iteration
+			if err := spendingRows.Err(); err != nil {
+				slog.Error("error iterating spending item rows", "url", r.URL, "user_id", userID, "job_id", group.JobID, "err", err)
+				http.Error(w, "Internal server error", http.StatusInternalServerError)
+				return
+			}
+
+			transactionGroups = append(transactionGroups, group)
+		} // End of jobRows loop
+
+		// Check for errors from iterating over job rows.
+		if err := jobRows.Err(); err != nil {
+			slog.Error("error iterating AI job rows", "url", r.URL, "user_id", userID, "err", err)
 			http.Error(w, "Internal server error", http.StatusInternalServerError)
 			return
 		}
+
+		// TODO: Query and append manual spendings separately if needed
 
 		w.Header().Set("Content-Type", "application/json")
-		if err := json.NewEncoder(w).Encode(spendings); err != nil {
-			slog.Error("failed to encode spendings to JSON", "url", r.URL, "user_id", userID, "err", err)
+		if err := json.NewEncoder(w).Encode(transactionGroups); err != nil {
+			slog.Error("failed to encode transaction groups to JSON", "url", r.URL, "user_id", userID, "err", err)
 			// Avoid writing header again if already written
-			// http.Error(w, "Internal server error", http.StatusInternalServerError)
 		}
 	}
 }

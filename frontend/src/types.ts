@@ -47,3 +47,32 @@ export interface SpendingDetail {
   shared_user_takes_all: boolean;
   sharing_status: string; // Derived status: "Alone", "Shared with X", "Paid by X"
 }
+
+
+// --- Types for Grouped Spending View ---
+
+// Represents a single spending item within a transaction group
+export interface SpendingItem {
+  id: number;
+  amount: number;
+  description: string;
+  category_name: string;
+  buyer_name: string; // Person who paid for the original transaction
+  partner_name: string | null;
+  shared_user_takes_all: boolean;
+  sharing_status: string; // Derived: "Alone", "Shared with X", "Paid by X"
+}
+
+// Represents a group of spendings originating from one AI job/transaction
+export interface TransactionGroup {
+  job_id: number;
+  prompt: string;
+  total_amount: number;
+  job_created_at: string; // ISO date string for the job creation
+  is_ambiguity_flagged: boolean;
+  ambiguity_flag_reason: string | null;
+  spendings: SpendingItem[]; // The list of individual spendings for this job
+}
+
+// Type for the response from the updated /v1/spendings endpoint
+export type GroupedSpendingsResponse = TransactionGroup[];
