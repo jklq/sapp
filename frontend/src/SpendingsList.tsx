@@ -78,7 +78,7 @@ function SpendingsList({ onBack }: SpendingsListProps) {
                                             Prompt: <span className="text-gray-700 font-normal">{group.prompt}</span>
                                         </p>
                                         <p className="text-xs text-gray-500">
-                                            {formatDate(group.job_created_at)} - Total: {formatCurrency(group.total_amount)}
+                                            {formatDate(group.job_created_at)} by <span className="font-medium">{group.buyer_name}</span> - Total: {formatCurrency(group.total_amount)}
                                         </p>
                                     </div>
                                     {group.is_ambiguity_flagged && (

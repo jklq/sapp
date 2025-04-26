@@ -28,6 +28,7 @@ type TransactionGroup struct {
 	Prompt              string         `json:"prompt"`
 	TotalAmount         float64        `json:"total_amount"`
 	JobCreatedAt        time.Time      `json:"job_created_at"`
+	BuyerName           string         `json:"buyer_name"` // Added: Name of the user who submitted the job
 	IsAmbiguityFlagged  bool           `json:"is_ambiguity_flagged"`
 	AmbiguityFlagReason *string        `json:"ambiguity_flag_reason"` // Pointer to handle NULL/empty
 	Spendings           []SpendingItem `json:"spendings"`
@@ -44,11 +45,12 @@ func HandleGetSpendings(db *sql.DB) http.HandlerFunc {
 			return
 		}
 
-		// 1. Fetch AI Categorization Jobs initiated by the user
+		// 1. Fetch AI Categorization Jobs initiated by the user, joining users table for buyer name
 		jobQuery := `
 			SELECT
-				j.id, j.prompt, j.total_amount, j.created_at, j.is_ambiguity_flagged, j.ambiguity_flag_reason
+				j.id, j.prompt, j.total_amount, j.created_at, j.is_ambiguity_flagged, j.ambiguity_flag_reason, u.first_name AS buyer_name
 			FROM ai_categorization_jobs j
+			JOIN users u ON j.buyer = u.id
 			WHERE j.buyer = ?
 			ORDER BY j.created_at DESC;
 		`
@@ -103,6 +105,7 @@ func HandleGetSpendings(db *sql.DB) http.HandlerFunc {
 				&group.JobCreatedAt,
 				&group.IsAmbiguityFlagged,
 				&ambiguityReason,
+				&group.BuyerName, // Scan the buyer's name
 			); err != nil {
 				slog.Error("failed to scan AI job row", "url", r.URL, "user_id", userID, "err", err)
 				// Log and continue to next job? Or fail request? Let's fail for now.
