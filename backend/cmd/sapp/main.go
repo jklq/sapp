@@ -11,6 +11,7 @@ import (
 	"git.sr.ht/~relay/sapp-backend/auth" // Import auth package
 	"git.sr.ht/~relay/sapp-backend/category"
 	"git.sr.ht/~relay/sapp-backend/pay"
+	"github.com/joho/godotenv" // Import godotenv
 	"github.com/rs/cors"
 	_ "modernc.org/sqlite"
 )

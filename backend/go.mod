@@ -3,6 +3,7 @@ module git.sr.ht/~relay/sapp-backend
 go 1.23.0
 
 require (
+	github.com/joho/godotenv v1.5.1 // Add godotenv
 	github.com/rs/cors v1.11.1
 	golang.org/x/crypto v0.37.0
 	modernc.org/sqlite v1.35.0
