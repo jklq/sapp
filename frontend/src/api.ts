@@ -64,7 +64,6 @@ export async function submitManualPayment(payload: PayPayload): Promise<void> {
   const { shared_status, amount, category } = payload;
   if (!category) {
     throw new Error("Category is required for manual payment submission.");
-    throw new Error("Category is required for manual payment submission.");
   }
   const url = `${API_BASE_URL}/v1/pay/${shared_status}/${amount}/${encodeURIComponent(category)}`;
 
