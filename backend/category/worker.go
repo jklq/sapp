@@ -1,6 +1,7 @@
 package category
 
 import (
+	"fmt" // Import fmt for error formatting
 	"log/slog"
 	"time"
 )
@@ -77,7 +78,8 @@ func (p CategorizingPool) worker(jobCh <-chan Job, errCh chan<- error) {
 			continue
 		}
 
-		result, err := ProcessCategorizationJob(CategorizationParams{
+		// Pass the db connection (p.db) to ProcessCategorizationJob
+		result, err := ProcessCategorizationJob(p.db, CategorizationParams{
 			TotalAmount: job.TotalAmount,
 			SharedMode:  job.SharedMode,
 			Buyer: Person{

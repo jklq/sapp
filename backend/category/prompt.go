@@ -1,13 +1,15 @@
 package category
 
 import (
+	"database/sql"
 	"fmt"
 )
 
 const preambleString string = "Du skal nå kategorisere et kjøp ut ifra en liste med kategorier og en beskrivelse på kjøpet. Dette er ET kjøp på EN butikk."
 
-func getPrompt(params CategorizationParams) (string, error) {
-	rows, err := params.DB.Query("SELECT name, ai_notes FROM categories")
+// getPrompt now requires the db connection explicitly.
+func getPrompt(db *sql.DB, params CategorizationParams) (string, error) {
+	rows, err := db.Query("SELECT name, ai_notes FROM categories")
 
 	if err != nil {
 		return "", err

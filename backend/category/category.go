@@ -1,7 +1,6 @@
 package category
 
 import (
-	"database/sql"
 	"encoding/json"
 	"fmt"
 	"log/slog"
@@ -53,15 +52,16 @@ type CategorizationParams struct {
 	tries       int
 }
 
-func ProcessCategorizationJob(params CategorizationParams) (JobResult, error) {
+// ProcessCategorizationJob now requires the db connection to fetch categories for the prompt.
+func ProcessCategorizationJob(db *sql.DB, params CategorizationParams) (JobResult, error) {
 	if params.tries >= 3 {
 		return JobResult{}, fmt.Errorf("too many retries")
 	}
 	params.tries += 1
-
 	var api ModelAPI = NewOpenRouterAPI(os.Getenv("OPENROUTER_KEY"), "deepseek/deepseek-chat") //
 
-	prompt, err := getPrompt(params)
+	// Pass the db connection to getPrompt
+	prompt, err := getPrompt(db, params)
 	if err != nil {
 		return JobResult{}, err
 	}
@@ -97,13 +97,13 @@ func ProcessCategorizationJob(params CategorizationParams) (JobResult, error) {
 
 		if !isValidApportionMode {
 			slog.Warn("AI returned invalid apportion_mode", "spending_description", spending.Description, "invalid_mode", spending.ApportionMode)
-			return ProcessCategorizationJob(params) // Retry
+			return ProcessCategorizationJob(db, params) // Retry
 		}
 
 		// If there's no shared person, the mode MUST be 'alone'.
 		if params.SharedWith == nil && spending.ApportionMode != "alone" {
 			slog.Warn("AI returned non-'alone' apportion_mode when there is no shared person", "spending_description", spending.Description, "mode", spending.ApportionMode)
-			return ProcessCategorizationJob(params) // Retry
+			return ProcessCategorizationJob(db, params) // Retry
 		}
 
 		// If there IS a shared person, the mode cannot be 'other' if the initial hint was 'alone'.
@@ -112,9 +112,8 @@ func ProcessCategorizationJob(params CategorizationParams) (JobResult, error) {
 		// Allow 'alone', 'shared', or 'other' if hint was 'shared' or 'mix'.
 		if params.SharedWith != nil && params.SharedMode == "alone" && spending.ApportionMode == "other" {
 			slog.Warn("AI returned 'other' apportion_mode when initial hint was 'alone'", "spending_description", spending.Description)
-			return ProcessCategorizationJob(params) // Retry
+			return ProcessCategorizationJob(db, params) // Retry
 		}
-
 
 		countedTotal += spending.Amount
 	}
@@ -124,7 +123,7 @@ func ProcessCategorizationJob(params CategorizationParams) (JobResult, error) {
 	tolerance := 0.01 // e.g., 1 cent
 	if math.Abs(countedTotal-params.TotalAmount) > tolerance {
 		slog.Warn("spending amount and total amount did not match up", "counted_total", countedTotal, "actual_total", params.TotalAmount)
-		return ProcessCategorizationJob(params)
+		return ProcessCategorizationJob(db, params) // Retry with db connection
 	}
 
 	if job.AmbiguityFlagReason != "" {
