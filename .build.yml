@@ -10,6 +10,7 @@ environment:
 packages:
   - rsync
   - go
+  - nodejs-current # Add nodejs and npm
 tasks:
   - mirror-to-github: |
       cd ~/"${REPO}"
@@ -20,10 +21,16 @@ tasks:
       chmod +x tailwindcss-linux-x64-musl
       mkdir ~/tailwind/
       mv tailwindcss-linux-x64-musl ~/tailwind/tailwindcss
-      export PATH=~/tailwind:$PATH
+      # export PATH=~/tailwind:$PATH # Removed Tailwind setup, assuming managed by npm
       cd ~/"${REPO}"/frontend
-      SERVER_URL=https://sappi.angeltvedt.net go run .
-      rsync -e 'ssh -i ~/.ssh/4a75e973-8e90-4667-a7da-a58ca05dad38 -o StrictHostKeyChecking=no' -a --delete ./_build/ root@relay5.com:/var/spool/apps/sapp/
+      # SERVER_URL=https://sappi.angeltvedt.net go run . # Removed Go SSG build
+      echo "Installing frontend dependencies..."
+      npm ci # Use ci for faster, deterministic installs in CI
+      echo "Building frontend..."
+      npm run build # Standard Vite build command
+      echo "Uploading frontend build..."
+      # Sync the contents of the 'dist' directory
+      rsync -e 'ssh -i ~/.ssh/4a75e973-8e90-4667-a7da-a58ca05dad38 -o StrictHostKeyChecking=no' -a --delete ./dist/ root@relay5.com:/var/spool/apps/sapp/
   - upload-backend: |
       cd ~/"${REPO}"/backend
       GOOS=linux GOARCH=arm64 go build -o ./sapp ./cmd/sapp
