@@ -147,6 +147,9 @@ func HandleGetSpendings(db *sql.DB) http.HandlerFunc {
 				http.Error(w, "Internal server error", http.StatusInternalServerError)
 				return
 			}
+			// Ensure spendingRows is closed after the inner loop finishes
+			// Do NOT defer here, as it's inside the outer jobRows loop.
+			defer spendingRows.Close() // Close rows associated with this specific job
 
 			group.Spendings = []SpendingItem{} // Initialize slice
 			for spendingRows.Next() {
@@ -195,10 +198,10 @@ func HandleGetSpendings(db *sql.DB) http.HandlerFunc {
 				}
 				group.Spendings = append(group.Spendings, item)
 			}
-			spendingRows.Close() // Close inner rows after loop
+			// spendingRows.Close() // Moved to defer right after spendingStmt.Query
 
 			// Check for errors during spending iteration
-			if err := spendingRows.Err(); err != nil {
+			if err := spendingRows.Err(); err != nil { // spendingRows.Err() checks for errors after the loop
 				slog.Error("error iterating spending item rows", "url", r.URL, "user_id", userID, "job_id", group.JobID, "err", err)
 				http.Error(w, "Internal server error", http.StatusInternalServerError)
 				return
