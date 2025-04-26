@@ -11,7 +11,6 @@ import (
 	"net/http/httptest"
 	"os"
 	"path/filepath"
-	"runtime"
 	"testing"
 	"time"
 
@@ -99,7 +98,6 @@ func runMigrations(db *sql.DB, schemaPath string) error {
 		schemaPath = altPath // Use the found path for logging
 		slog.Info("Found schema at alternative path", "schema", schemaPath)
 	}
-
 
 	tx, err := db.Begin()
 	if err != nil {
