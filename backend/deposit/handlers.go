@@ -148,19 +148,13 @@ func HandleGetDeposits(db *sql.DB) http.HandlerFunc {
 				return
 			}
 			// Parse the date string (assuming format 'YYYY-MM-DD HH:MM:SS' from DB)
-			// Adjust format if DB stores it differently
+			// Parse the date string (expecting format 'YYYY-MM-DD HH:MM:SS' from DB)
 			parsedDate, parseErr := time.Parse("2006-01-02 15:04:05", depositDateStr)
 			if parseErr != nil {
-				// Fallback or log error - maybe try just date?
-				parsedDate, parseErr = time.Parse("2006-01-02", depositDateStr)
-				if parseErr != nil {
-					slog.Error("failed to parse deposit date from DB", "url", r.URL, "user_id", userID, "date_string", depositDateStr, "err", parseErr)
-					// Handle error - maybe skip this deposit or return default time?
-					// For now, let's use zero time
-					d.DepositDate = time.Time{}
-				} else {
-					d.DepositDate = parsedDate
-				}
+				// Log the specific error and the string that failed parsing
+				slog.Error("failed to parse deposit date from DB", "url", r.URL, "user_id", userID, "date_string", depositDateStr, "expected_format", "2006-01-02 15:04:05", "err", parseErr)
+				// Assign zero time on error, as the date is unusable
+				d.DepositDate = time.Time{}
 			} else {
 				d.DepositDate = parsedDate
 			}
