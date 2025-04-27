@@ -5,17 +5,11 @@ import (
 	"encoding/json"
 	"log/slog"
 	"net/http"
-	"time"
-
-	"database/sql"
-	"encoding/json"
-	"errors"
-	"fmt"
-	"log/slog"
-	"net/http"
 	"strconv"
 	"strings" // Import strings package
 	"time"
+	"errors"
+	"fmt"
 
 	"git.sr.ht/~relay/sapp-backend/auth" // Import auth package
 	"git.sr.ht/~relay/sapp-backend/types" // Import shared types
