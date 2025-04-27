@@ -214,7 +214,8 @@ func SetupTestEnvironment(t *testing.T) *TestEnv {
 	// --- Protected Routes ---
 	payHandler := http.HandlerFunc(pay.HandlePayRoute(db))
 	getCategoriesHandler := http.HandlerFunc(category.HandleGetCategories(db))
-	categorizeHandler := http.HandlerFunc(category.HandleAICategorize(db, categorizationPool)) // Use pool with mock API
+	// Pass pointer to categorizationPool to satisfy the interface
+	categorizeHandler := http.HandlerFunc(category.HandleAICategorize(db, &categorizationPool)) // Use pool with mock API
 	getHistoryHandler := http.HandlerFunc(spendings.HandleGetHistory(db))                      // Use spendings handler
 	updateSpendingHandler := http.HandlerFunc(spendings.HandleUpdateSpending(db))
 	getTransferStatusHandler := http.HandlerFunc(transfer.HandleGetTransferStatus(db))

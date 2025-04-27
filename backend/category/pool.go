@@ -104,9 +104,18 @@ func (p *CategorizingPool) AddJob(params CategorizationParams, spendingDate *tim
 	return jobId, nil
 }
 
-func (p CategorizingPool) GetStatus(id int64) (Job, error) {
+// StartPool launches the worker goroutines.
+func (p *CategorizingPool) StartPool() {
+	for i := 1; i <= p.numWorkers; i++ {
+		go p.worker(i)
+	}
+	slog.Info("Categorization pool workers started", "count", p.numWorkers)
+}
+
+func (p *CategorizingPool) GetStatus(id int64) (Job, error) {
 	var jobStatus Job
 
+	// Use p.db directly as receiver is now a pointer
 	row := p.db.QueryRow("SELECT id, status, is_finished FROM ai_categorization_jobs WHERE id = ?", id)
 
 	if err := row.Scan(&jobStatus.Id, &jobStatus.Status, &jobStatus.IsFinished); err != nil {
