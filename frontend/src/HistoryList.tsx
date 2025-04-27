@@ -235,14 +235,66 @@ function HistoryList({ onBack, onNavigateToEditDeposit }: HistoryListProps) {
         const isRecurring = item.is_recurring ?? false; // From the template
         const recurrencePeriod = item.recurrence_period;
         const isDeleting = deletingDepositId === depositId;
+        const disableActions = isDeleting || deletingJobId !== null || editingItemId !== null;
 
         return (
             <div key={key} className="border border-green-200 bg-green-50 rounded-lg shadow-sm overflow-hidden p-3">
-                 <div className="flex justify-between items-center flex-wrap gap-2">
+                {/* Mobile View (Stacked) */}
+                <div className="md:hidden space-y-2">
+                    {/* Icon & Description */}
+                    <div className="flex items-center space-x-3">
+                        <svg xmlns="http://www.w3.org/2000/svg" className="h-6 w-6 text-green-600 flex-shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                            <path strokeLinecap="round" strokeLinejoin="round" d="M17 9V7a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2m2 4h10a2 2 0 002-2v-6a2 2 0 00-2-2H9a2 2 0 00-2 2v6a2 2 0 002 2zm7-5l-3 3m0 0l-3-3m3 3V8" />
+                        </svg>
+                        <p className="text-sm font-medium text-green-800 break-words">
+                            Deposit: <span className="text-gray-700 font-normal">{description}</span>
+                        </p>
+                    </div>
+                    {/* Date & Recurring Info */}
+                    <div>
+                        <span className="text-xs font-medium text-gray-500 uppercase">Date</span>
+                        <p className="text-sm text-gray-600">
+                            {formatDate(item.date, { hour: undefined, minute: undefined })}
+                            {isRecurring && <span className="ml-2 text-xs italic">({recurrencePeriod || 'Recurring'})</span>}
+                        </p>
+                    </div>
+                    {/* Amount */}
+                    <div>
+                        <span className="text-xs font-medium text-gray-500 uppercase">Amount</span>
+                        <p className="text-lg font-semibold text-green-700">
+                            +{formatCurrency(amount)}
+                        </p>
+                    </div>
+                    {/* Actions */}
+                    <div className="flex justify-end items-center space-x-2 pt-1">
+                        <button
+                            onClick={() => handleEditDepositClick(depositId)}
+                            disabled={disableActions}
+                            className="text-indigo-600 hover:text-indigo-800 disabled:opacity-50 disabled:cursor-not-allowed p-1 rounded focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:ring-offset-1"
+                            title="Edit this deposit template"
+                        >
+                            <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                                <path strokeLinecap="round" strokeLinejoin="round" d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" />
+                            </svg>
+                        </button>
+                        <button
+                            onClick={() => handleDeleteDepositClick(depositId, isRecurring)}
+                            disabled={disableActions}
+                            className="text-red-600 hover:text-red-800 disabled:opacity-50 disabled:cursor-not-allowed p-1 rounded focus:outline-none focus:ring-2 focus:ring-red-500 focus:ring-offset-1"
+                            title={isRecurring ? "Delete recurring deposit template" : "Delete this deposit"}
+                        >
+                            <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                                <path strokeLinecap="round" strokeLinejoin="round" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
+                            </svg>
+                            {isDeleting && <span className="ml-1 text-xs">(Deleting...)</span>}
+                        </button>
+                    </div>
+                </div>
+
+                {/* Desktop View (Flex) */}
+                <div className="hidden md:flex justify-between items-center flex-wrap gap-2">
                     {/* Left side: Icon, Description, Date */}
                     <div className="flex items-center space-x-3 flex-1 min-w-0 mr-2">
-                         {/* Deposit Icon */}
-                         {/* Deposit Icon */}
                         <svg xmlns="http://www.w3.org/2000/svg" className="h-6 w-6 text-green-600 flex-shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
                             <path strokeLinecap="round" strokeLinejoin="round" d="M17 9V7a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2m2 4h10a2 2 0 002-2v-6a2 2 0 00-2-2H9a2 2 0 00-2 2v6a2 2 0 002 2zm7-5l-3 3m0 0l-3-3m3 3V8" />
                         </svg>
@@ -251,22 +303,19 @@ function HistoryList({ onBack, onNavigateToEditDeposit }: HistoryListProps) {
                                 Deposit: <span className="text-gray-700 font-normal">{description}</span>
                             </p>
                             <p className="text-xs text-gray-500">
-                                {formatDate(item.date, { hour: undefined, minute: undefined })} {/* Show only date of this occurrence */}
-                                {/* Indicate if it's part of a recurring series */}
+                                {formatDate(item.date, { hour: undefined, minute: undefined })}
                                 {isRecurring && <span className="ml-2 text-xs italic">({recurrencePeriod || 'Recurring'})</span>}
                             </p>
                         </div>
                     </div>
                     {/* Right side: Amount & Actions */}
                     <div className="flex items-center space-x-2 flex-shrink-0">
-                        {/* Amount */}
                         <p className="text-lg font-semibold text-green-700">
                             +{formatCurrency(amount)}
                         </p>
-                        {/* Edit Button */}
                         <button
                             onClick={() => handleEditDepositClick(depositId)}
-                            disabled={isDeleting || deletingJobId !== null || editingItemId !== null} // Disable if any delete/edit is happening
+                            disabled={disableActions}
                             className="text-indigo-600 hover:text-indigo-800 disabled:opacity-50 disabled:cursor-not-allowed p-1 rounded focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:ring-offset-1"
                             title="Edit this deposit template"
                         >
@@ -274,10 +323,9 @@ function HistoryList({ onBack, onNavigateToEditDeposit }: HistoryListProps) {
                                 <path strokeLinecap="round" strokeLinejoin="round" d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" />
                             </svg>
                         </button>
-                        {/* Delete Button */}
                         <button
                             onClick={() => handleDeleteDepositClick(depositId, isRecurring)}
-                            disabled={isDeleting || deletingJobId !== null || editingItemId !== null} // Disable if any delete/edit is happening
+                            disabled={disableActions}
                             className="text-red-600 hover:text-red-800 disabled:opacity-50 disabled:cursor-not-allowed p-1 rounded focus:outline-none focus:ring-2 focus:ring-red-500 focus:ring-offset-1"
                             title={isRecurring ? "Delete recurring deposit template" : "Delete this deposit"}
                         >
