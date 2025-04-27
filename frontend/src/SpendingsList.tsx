@@ -1,7 +1,8 @@
 import { useState, useEffect, useCallback } from 'react'; // Removed useMemo
 import { fetchHistory, fetchCategories, updateSpendingItem, deleteAIJob } from './api'; // Use fetchHistory
 // Import HistoryListItem from types
-import { SpendingItem, TransactionGroup, Category, UpdateSpendingPayload, EditableSharingStatus, HistoryResponse, DepositItem, HistoryListItem } from './types';
+// Removed unused TransactionGroup import again
+import { SpendingItem, Category, UpdateSpendingPayload, EditableSharingStatus, HistoryResponse, DepositItem, HistoryListItem } from './types';
 
 interface HistoryListProps { // Renamed props interface
     onBack: () => void;
