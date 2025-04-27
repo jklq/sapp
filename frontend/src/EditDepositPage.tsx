@@ -48,13 +48,16 @@ function EditDepositPage({ depositId, onBack }: EditDepositPageProps) {
         fetchDepositById(depositId)
             .then(data => {
                 setOriginalDeposit(data);
-                // Pre-fill form fields
+                // Pre-fill form fields using the fetched data
+                const formattedDepositDate = formatDateForInput(data.date);
+                const formattedEndDate = formatDateForInput(data.end_date);
+
                 setAmount(data.amount.toString());
                 setDescription(data.description);
-                setDepositDate(formatDateForInput(data.date)); // Use helper
+                setDepositDate(formattedDepositDate); // Set the formatted date
                 setIsRecurring(data.is_recurring);
                 setRecurrencePeriod(data.recurrence_period || 'monthly');
-                setEndDate(formatDateForInput(data.end_date)); // Use helper
+                setEndDate(formattedEndDate); // Set the formatted date
             })
             .catch(err => {
                 console.error("Failed to load deposit details:", err);
