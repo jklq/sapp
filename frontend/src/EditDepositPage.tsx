@@ -36,7 +36,7 @@ function EditDepositPage({ depositId, onBack }: EditDepositPageProps) {
     // Form field states (initialize empty, fetch data in useEffect)
     const [amount, setAmount] = useState<string>('');
     const [description, setDescription] = useState<string>('');
-    const [depositDate, setDepositDate] = useState<string>(''); // YYYY-MM-DD - Initialize empty, will be set by fetch
+    // Removed depositDate state
     const [isRecurring, setIsRecurring] = useState<boolean>(false);
     const [recurrencePeriod, setRecurrencePeriod] = useState<string>('monthly');
     const [endDate, setEndDate] = useState<string>(''); // YYYY-MM-DD or empty
@@ -101,7 +101,7 @@ function EditDepositPage({ depositId, onBack }: EditDepositPageProps) {
 
                 setAmount(data.amount.toString());
                 setDescription(data.description);
-                setDepositDate(formattedDepositDate); // Set the formatted date
+                // Removed setDepositDate call
                 setIsRecurring(data.is_recurring);
                 setRecurrencePeriod(data.recurrence_period || 'monthly');
                 setEndDate(formattedEndDate); // Set the formatted date
@@ -136,19 +136,16 @@ function EditDepositPage({ depositId, onBack }: EditDepositPageProps) {
             setIsSaving(false);
             return;
         }
-        if (!depositDate) {
-            setError('Please select a deposit date.');
-            setIsSaving(false);
-            return;
-        }
+        // Removed depositDate validation
         if (isRecurring && !recurrencePeriod) {
             setError('Please select the recurrence period for recurring deposits.');
             setIsSaving(false);
             return;
         }
-        // Validate end date is not before deposit date if both are set
-        if (endDate && depositDate && endDate < depositDate) {
-            setError('End date cannot be before the deposit start date.');
+        // Validate end date is not before original deposit date if both are set
+        const originalDepositDateStr = originalDeposit ? formatDateForInput(originalDeposit.date) : null;
+        if (endDate && originalDepositDateStr && endDate < originalDepositDateStr) {
+            setError('End date cannot be before the original deposit start date.');
             setIsSaving(false);
             return;
         }
@@ -159,7 +156,7 @@ function EditDepositPage({ depositId, onBack }: EditDepositPageProps) {
         const payload: UpdateDepositPayload = {
             amount: numericAmount,
             description: description.trim(),
-            deposit_date: depositDate,
+            // Removed deposit_date from payload
             is_recurring: isRecurring,
             // Send period only if recurring, otherwise send null to clear it
             recurrence_period: isRecurring ? recurrencePeriod : null,
@@ -258,18 +255,16 @@ function EditDepositPage({ depositId, onBack }: EditDepositPageProps) {
                         />
                     </div>
 
-                    {/* Deposit Date Input (Start Date) */}
+                    {/* Deposit Date Display (Static) */}
                     <div>
-                        <label htmlFor="deposit-date" className="block text-sm font-medium text-gray-700">
+                        <label className="block text-sm font-medium text-gray-700">
                             {isRecurring ? 'Start Date' : 'Deposit Date'}
                         </label>
-                        {/* Ensure value passed to date input is always a string */}
-                        <input
-                            type="date" id="deposit-date" value={depositDate || ''}
-                            onChange={(e) => setDepositDate(e.target.value)} required
-                            className="mt-1 block w-full input-style"
-                        />
+                        <p className="mt-1 block w-full input-style bg-gray-100 text-gray-500 cursor-not-allowed">
+                            {originalDeposit ? formatDateForInput(originalDeposit.date) : 'N/A'}
+                        </p>
                     </div>
+
 
                     {/* Recurring Checkbox */}
                     <div className="flex items-start">
@@ -311,7 +306,8 @@ function EditDepositPage({ depositId, onBack }: EditDepositPageProps) {
                                 type="date" id="end-date" value={endDate}
                                 onChange={(e) => setEndDate(e.target.value)}
                                 className="mt-1 block w-full input-style"
-                                min={depositDate} // Prevent end date before start date
+                                // Set min based on original deposit date
+                                min={originalDeposit ? formatDateForInput(originalDeposit.date) : undefined}
                             />
                              <p className="text-xs text-gray-500 mt-1">Leave blank for indefinite recurrence.</p>
                              {/* "End Now" Button */}
