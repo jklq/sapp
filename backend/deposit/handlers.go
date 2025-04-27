@@ -89,12 +89,13 @@ func HandleAddDeposit(db *sql.DB) http.HandlerFunc {
 				return
 			}
 		} else {
-			payload.RecurrencePeriod = nil // Ensure period is NULL if not recurring
-			return
+			// If not recurring, ensure period is NULL. No need to return here.
+			payload.RecurrencePeriod = nil
 		}
-		if !payload.IsRecurring {
-			payload.RecurrencePeriod = nil // Ensure period is NULL if not recurring
-		}
+		// The following block is now redundant due to the else block above.
+		// if !payload.IsRecurring {
+		// 	payload.RecurrencePeriod = nil // Ensure period is NULL if not recurring
+		// }
 
 		// 3. Insert into database
 		tx, err := db.Begin()

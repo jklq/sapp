@@ -118,7 +118,7 @@ func TestAddDeposit(t *testing.T) {
 				IsRecurring: false,
 			},
 			expectedStatus: http.StatusBadRequest,
-			expectedBody:   "Invalid date format",
+			expectedBody:   "Bad Request: invalid date format", // More specific error check
 		},
 		{
 			name: "ErrorMissingRecurrencePeriod",
