@@ -118,3 +118,34 @@ export interface PartnerRegistrationResponse {
   user1_id: number;
   user2_id: number;
 }
+
+// --- Types for Deposits ---
+
+// Represents a deposit item fetched from the backend history endpoint
+export interface DepositItem {
+  id: number;
+  type: 'deposit'; // Identifier
+  amount: number;
+  description: string;
+  date: string; // ISO date string
+  is_recurring: boolean;
+  recurrence_period: string | null;
+  created_at: string; // ISO date string
+}
+
+// Payload for adding a new deposit
+export interface AddDepositPayload {
+  amount: number;
+  description: string;
+  deposit_date: string; // Format: "YYYY-MM-DD"
+  is_recurring: boolean;
+  recurrence_period?: string | null; // Optional, required if is_recurring is true
+}
+
+// --- Type for Combined History ---
+
+// Response from the GET /v1/history endpoint
+export interface HistoryResponse {
+  spending_groups: TransactionGroup[];
+  deposits: DepositItem[];
+}

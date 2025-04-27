@@ -1,4 +1,4 @@
-import { Category, PayPayload, AICategorizationPayload, LoginPayload, LoginResponse, GroupedSpendingsResponse, UpdateSpendingPayload, TransferStatusResponse, PartnerRegistrationPayload, PartnerRegistrationResponse } from "./types";
+import { Category, PayPayload, AICategorizationPayload, LoginPayload, LoginResponse, GroupedSpendingsResponse, UpdateSpendingPayload, TransferStatusResponse, PartnerRegistrationPayload, PartnerRegistrationResponse, AddDepositPayload, HistoryResponse, DepositItem } from "./types"; // Added AddDepositPayload, HistoryResponse, DepositItem
 
 // --- Token Management ---
 
@@ -200,20 +200,53 @@ export async function registerPartners(payload: PartnerRegistrationPayload): Pro
 }
 
 
-// --- Spendings API Functions ---
+// --- Deposit API Functions ---
 
-// Updated function: Fetches spendings grouped by transaction/AI job
-export async function fetchSpendings(): Promise<GroupedSpendingsResponse> {
-    const url = `${API_BASE_URL}/v1/spendings`;
+// Adds a new deposit record
+export async function addDeposit(payload: AddDepositPayload): Promise<{ message: string; deposit_id: number }> {
+    const url = `${API_BASE_URL}/v1/deposits`;
+    const response = await fetchWithAuth(url, {
+        method: "POST",
+        body: JSON.stringify(payload),
+        // fetchWithAuth will set Content-Type: application/json
+    });
+
+    if (!response.ok) {
+        const errorBody = await response.text();
+        let errorMessage = `Failed to add deposit: ${response.statusText}`;
+        try {
+            const errData = JSON.parse(errorBody);
+            errorMessage = errData.message || errData.error || errorMessage;
+        } catch (e) {
+            errorMessage += ` - ${errorBody}`;
+        }
+        throw new Error(errorMessage);
+    }
+
+    // Expecting 201 Created with JSON body on success
+    if (response.status !== 201) {
+        console.warn(`Unexpected status code after adding deposit: ${response.status}`);
+    }
+
+    const data: { message: string; deposit_id: number } = await response.json();
+    return data;
+}
+
+
+// --- History API Functions ---
+
+// Fetches combined history (spending groups and deposits)
+export async function fetchHistory(): Promise<HistoryResponse> {
+    const url = `${API_BASE_URL}/v1/history`; // Updated endpoint
     const response = await fetchWithAuth(url); // GET request by default
 
     if (!response.ok) {
         const errorBody = await response.text();
-        throw new Error(`Failed to fetch spendings: ${response.statusText} - ${errorBody}`);
+        throw new Error(`Failed to fetch history: ${response.statusText} - ${errorBody}`);
     }
 
-    const data: GroupedSpendingsResponse = await response.json();
-    console.log("Fetched Grouped Spendings:", data); // Debug log
+    const data: HistoryResponse = await response.json();
+    console.log("Fetched History:", data); // Debug log
     return data;
 }
 

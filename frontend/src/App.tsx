@@ -3,11 +3,12 @@ import { getToken, storeToken, removeToken } from './api';
 import { LoginResponse } from './types';
 import LoginForm from './LoginForm';
 import LogSpendingForm from './LogSpendingForm';
-import SpendingsList from './SpendingsList';
+import HistoryList from './HistoryList'; // Renamed import
 import TransferPage from './TransferPage';
-import PartnerRegistrationForm from './PartnerRegistrationForm'; // Import the registration form
+import PartnerRegistrationForm from './PartnerRegistrationForm';
+import AddDepositForm from './AddDepositForm'; // Import the new deposit form
 
-type View = 'login' | 'register' | 'logSpending' | 'viewSpendings' | 'transfer'; // Add 'register' view
+type View = 'login' | 'register' | 'logSpending' | 'addDeposit' | 'viewHistory' | 'transfer'; // Added 'addDeposit', renamed 'viewSpendings' to 'viewHistory'
 
 interface UserInfo {
   userId: number;
@@ -97,13 +98,13 @@ function App() {
       // Add padding-bottom to prevent content being hidden by fixed bottom nav (pb-20 is example, adjust as needed)
       <div className="w-full max-w-4xl p-4 flex flex-col items-center pb-20">
 
-        {/* Render the selected view - these components now manage their own internal padding */}
-        {/* The flex container above will center these components horizontally */}
+        {/* Render the selected view */}
         {currentView === 'logSpending' && <LogSpendingForm />}
-        {currentView === 'viewSpendings' && <SpendingsList onBack={() => setCurrentView('logSpending')} />}
+        {currentView === 'addDeposit' && <AddDepositForm />} {/* Render AddDepositForm */}
+        {currentView === 'viewHistory' && <HistoryList onBack={() => setCurrentView('logSpending')} />} {/* Use HistoryList */}
         {currentView === 'transfer' && <TransferPage onBack={() => setCurrentView('logSpending')} />}
 
-        {/* Bottom Navigation Bar (Moved Header) */}
+        {/* Bottom Navigation Bar */}
         {/* Fixed positioning, background, border-top, rounded-top */}
         <header className="fixed bottom-0 left-0 right-0 w-full bg-white border-t border-gray-200 rounded-t-lg p-3 z-50 max-w-4xl mx-auto">
           <div className="flex justify-between items-center">
@@ -132,15 +133,33 @@ function App() {
                 <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5 mb-1 md:mb-0 md:mr-1" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
                   <path strokeLinecap="round" strokeLinejoin="round" d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" />
                 </svg>
-                <span className="text-xs md:text-sm">Log</span>
+                <span className="text-xs md:text-sm">Log Spend</span> {/* Clarified label */}
+              </button>
+
+               {/* Add Deposit */}
+               <button
+                onClick={() => setCurrentView('addDeposit')}
+                disabled={currentView === 'addDeposit'}
+                className={`flex flex-col md:flex-row items-center p-2 rounded-md transition-colors duration-150 ${
+                  currentView === 'addDeposit'
+                    ? 'bg-green-100 text-green-700' // Use green theme for deposit
+                    : 'text-gray-500 hover:bg-gray-100 hover:text-gray-700'
+                }`}
+                aria-label="Add Deposit"
+              >
+                {/* Icon: Plus Circle */}
+                 <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5 mb-1 md:mb-0 md:mr-1" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                   <path strokeLinecap="round" strokeLinejoin="round" d="M12 9v3m0 0v3m0-3h3m-3 0H9m12 0a9 9 0 11-18 0 9 9 0 0118 0z" />
+                 </svg>
+                <span className="text-xs md:text-sm">Add Deposit</span>
               </button>
 
               {/* View History */}
               <button
-                onClick={() => setCurrentView('viewSpendings')}
-                disabled={currentView === 'viewSpendings'}
+                onClick={() => setCurrentView('viewHistory')} // Use new view state name
+                disabled={currentView === 'viewHistory'} // Use new view state name
                 className={`flex flex-col md:flex-row items-center p-2 rounded-md transition-colors duration-150 ${
-                  currentView === 'viewSpendings'
+                  currentView === 'viewHistory' // Use new view state name
                     ? 'bg-indigo-100 text-indigo-700'
                     : 'text-gray-500 hover:bg-gray-100 hover:text-gray-700'
                 }`}

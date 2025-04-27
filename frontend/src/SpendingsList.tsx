@@ -1,20 +1,23 @@
-import { useState, useEffect, useCallback } from 'react'; // Removed Fragment
-import { fetchSpendings, fetchCategories, updateSpendingItem, deleteAIJob } from './api'; // Added fetchCategories, updateSpendingItem, deleteAIJob
-import { SpendingItem, GroupedSpendingsResponse, Category, UpdateSpendingPayload, EditableSharingStatus } from './types'; // Removed TransactionGroup, Import new types
+import { useState, useEffect, useCallback, useMemo } from 'react';
+import { fetchHistory, fetchCategories, updateSpendingItem, deleteAIJob } from './api'; // Use fetchHistory
+import { SpendingItem, TransactionGroup, Category, UpdateSpendingPayload, EditableSharingStatus, HistoryResponse, DepositItem } from './types'; // Import HistoryResponse, DepositItem
 
-interface SpendingsListProps {
+interface HistoryListProps { // Renamed props interface
     onBack: () => void;
 }
 
-function SpendingsList({ onBack }: SpendingsListProps) {
-    // State now holds an array of TransactionGroup
+// Combine spending groups and deposits into a single list with type and date for sorting
+type HistoryListItem = (TransactionGroup & { itemType: 'spending_group'; sortDate: Date }) | (DepositItem & { itemType: 'deposit'; sortDate: Date });
+
+
+function HistoryList({ onBack }: HistoryListProps) { // Renamed component
     // Data states
-    const [transactionGroups, setTransactionGroups] = useState<GroupedSpendingsResponse>([]);
-    const [categories, setCategories] = useState<Category[]>([]);
+    const [historyData, setHistoryData] = useState<HistoryResponse | null>(null); // Store the raw response
+    const [categories, setCategories] = useState<Category[]>([]); // Still needed for editing spendings
 
     // UI states
     const [isLoading, setIsLoading] = useState<boolean>(true);
-    const [isFetchingCategories, setIsFetchingCategories] = useState<boolean>(true);
+    const [isFetchingCategories, setIsFetchingCategories] = useState<boolean>(true); // Still needed for editing spendings
     const [error, setError] = useState<string | null>(null);
     const [editError, setEditError] = useState<string | null>(null); // Separate error state for editing
 
@@ -26,30 +29,30 @@ function SpendingsList({ onBack }: SpendingsListProps) {
     const [deleteError, setDeleteError] = useState<string | null>(null); // Separate error state for deletion
 
     // Expansion state
-    const [expandedGroupIds, setExpandedGroupIds] = useState<Set<number>>(new Set());
+    const [expandedGroupIds, setExpandedGroupIds] = useState<Set<number>>(new Set()); // Keep for spending groups
 
-    // Fetch spendings and categories
+    // Fetch history and categories
     const loadData = useCallback(() => {
         setIsLoading(true);
-        setIsFetchingCategories(true);
+        setIsFetchingCategories(true); // Fetch categories for editing spendings
         setError(null);
-        setEditError(null); // Clear edit errors on reload
-        setDeleteError(null); // Clear delete errors on reload
+        setEditError(null);
+        setDeleteError(null);
 
-        const spendingsPromise = fetchSpendings();
-        const categoriesPromise = fetchCategories();
+        const historyPromise = fetchHistory(); // Use fetchHistory
+        const categoriesPromise = fetchCategories(); // Still fetch categories
 
-        Promise.all([spendingsPromise, categoriesPromise])
-            .then(([spendingsData, categoriesData]) => {
-                setTransactionGroups(spendingsData);
-                setCategories(categoriesData);
+        Promise.all([historyPromise, categoriesPromise])
+            .then(([historyResponse, categoriesData]) => {
+                setHistoryData(historyResponse); // Store the combined history response
+                setCategories(categoriesData); // Store categories
             })
             .catch(err => {
-                console.error("Failed to load data:", err);
-                setError(err instanceof Error ? err.message : 'Failed to load data.');
-                // Set empty arrays on error
-                setTransactionGroups([]);
-                setCategories([]);
+                console.error("Failed to load history or categories:", err);
+                setError(err instanceof Error ? err.message : 'Failed to load history or categories.');
+                // Set null/empty on error
+                setHistoryData(null);
+                setCategories([]); // Ensure categories is empty on error
             })
             .finally(() => {
                 setIsLoading(false);
@@ -59,17 +62,19 @@ function SpendingsList({ onBack }: SpendingsListProps) {
 
     useEffect(() => {
         loadData();
-    }, [loadData]); // Fetch on mount and when loadData changes (which it won't here)
+    }, [loadData]);
 
     // Helper to format date string (can be reused)
-    const formatDate = (dateString: string) => {
+    const formatDate = (dateString: string | Date, options?: Intl.DateTimeFormatOptions) => {
         try {
-            // Use a slightly shorter format for job date maybe?
-            return new Date(dateString).toLocaleString(undefined, {
+            const defaultOptions: Intl.DateTimeFormatOptions = {
                 year: 'numeric', month: 'short', day: 'numeric', hour: 'numeric', minute: '2-digit'
-            });
+            };
+            const finalOptions = { ...defaultOptions, ...options };
+            const date = typeof dateString === 'string' ? new Date(dateString) : dateString;
+            return date.toLocaleString(undefined, finalOptions);
         } catch (e) {
-            return dateString; // Fallback
+            return String(dateString); // Fallback
         }
     };
 
@@ -135,7 +140,7 @@ function SpendingsList({ onBack }: SpendingsListProps) {
         }
     };
 
-    // Toggle group expansion
+    // Toggle spending group expansion
     const toggleGroupExpansion = (jobId: number) => {
         setExpandedGroupIds(prev => {
             const newSet = new Set(prev);
@@ -161,19 +166,80 @@ function SpendingsList({ onBack }: SpendingsListProps) {
         try {
             await deleteAIJob(jobId);
             // Option 1: Refetch all data
-            // loadData();
-            // Option 2: Remove the group from local state for faster UI update
-            setTransactionGroups(prevGroups => prevGroups.filter(group => group.job_id !== jobId));
+            loadData();
+            // Option 2: Remove the group from local state (more complex with combined list)
+            // setHistoryData(prevData => {
+            //     if (!prevData) return null;
+            //     return {
+            //         ...prevData,
+            //         spending_groups: prevData.spending_groups.filter(group => group.job_id !== jobId)
+            //     };
+            // });
         } catch (err) {
-            console.error("Failed to delete job:", err);
-            setDeleteError(err instanceof Error ? err.message : 'Failed to delete the transaction.');
+            console.error("Failed to delete spending group job:", err);
+            setDeleteError(err instanceof Error ? err.message : 'Failed to delete the spending group.');
         } finally {
             setDeletingJobId(null);
         }
     };
 
+    // --- Combined and Sorted History List ---
+    const sortedHistoryItems = useMemo((): HistoryListItem[] => {
+        if (!historyData) return [];
+
+        const combined: HistoryListItem[] = [
+            ...historyData.spending_groups.map(group => ({
+                ...group,
+                itemType: 'spending_group' as const,
+                sortDate: new Date(group.date) // Use the common 'date' field
+            })),
+            ...historyData.deposits.map(deposit => ({
+                ...deposit,
+                itemType: 'deposit' as const,
+                sortDate: new Date(deposit.date) // Use the common 'date' field
+            }))
+        ];
+
+        // Sort by date descending (most recent first)
+        combined.sort((a, b) => b.sortDate.getTime() - a.sortDate.getTime());
+
+        return combined;
+    }, [historyData]);
+
 
     // --- Render Logic ---
+
+    // Helper to render a deposit item
+    const renderDepositItem = (item: DepositItem) => {
+        return (
+            <div key={`dep-${item.id}`} className="border border-green-200 bg-green-50 rounded-lg shadow-sm overflow-hidden p-3">
+                 <div className="flex justify-between items-center flex-wrap gap-2">
+                    {/* Left side: Icon, Description, Date */}
+                    <div className="flex items-center space-x-3 flex-1 min-w-0 mr-2">
+                         {/* Deposit Icon */}
+                         <svg xmlns="http://www.w3.org/2000/svg" className="h-6 w-6 text-green-600 flex-shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                            <path strokeLinecap="round" strokeLinejoin="round" d="M17 9V7a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2m2 4h10a2 2 0 002-2v-6a2 2 0 00-2-2H9a2 2 0 00-2 2v6a2 2 0 002 2zm7-5l-3 3m0 0l-3-3m3 3V8" />
+                        </svg>
+                        <div>
+                            <p className="text-sm font-medium text-green-800 break-words">
+                                Deposit: <span className="text-gray-700 font-normal">{item.description}</span>
+                            </p>
+                            <p className="text-xs text-gray-500">
+                                {formatDate(item.date, { hour: undefined, minute: undefined })} {/* Show only date */}
+                                {item.is_recurring && <span className="ml-2 text-xs italic">({item.recurrence_period || 'Recurring'})</span>}
+                            </p>
+                        </div>
+                    </div>
+                    {/* Right side: Amount */}
+                    <div className="flex-shrink-0">
+                        <p className="text-lg font-semibold text-green-700">
+                            +{formatCurrency(item.amount)}
+                        </p>
+                    </div>
+                 </div>
+            </div>
+        );
+    };
 
     // Helper to render either display row or edit form - now responsive
     const renderSpendingItemRow = (item: SpendingItem) => {
@@ -330,11 +396,11 @@ function SpendingsList({ onBack }: SpendingsListProps) {
                             {item.sharing_status}
                         </span>
                     </div>
-                    {/* Action (Edit Button) */}
+                    {/* Action (Edit Button) - Only for spendings */}
                     <div className="hidden md:table-cell px-4 py-3 whitespace-nowrap text-right text-sm font-medium">
                         <button
                             onClick={() => handleEditClick(item)}
-                            disabled={editingItemId !== null}
+                            disabled={editingItemId !== null} // Disable if any item is being edited
                             className={`text-indigo-600 hover:text-indigo-900 ${editingItemId !== null ? 'opacity-50 cursor-not-allowed' : ''}`}
                         >
                             Edit
@@ -351,12 +417,12 @@ function SpendingsList({ onBack }: SpendingsListProps) {
         <div className="bg-white shadow-md rounded-lg w-full max-w-4xl">
             <div className="p-4"> {/* Add inner padding */}
                 <div className="flex flex-wrap justify-between items-center mb-4 gap-2"> {/* Allow wrapping */}
-                    <h1 className="text-2xl font-bold text-gray-700">Spending History</h1>
+                    <h1 className="text-2xl font-bold text-gray-700">History</h1> {/* Renamed title */}
                     <button
                     onClick={onBack}
                     className="text-sm text-indigo-600 hover:text-indigo-800"
                 >
-                    &larr; Back to Log Spending
+                    &larr; Back {/* Simplified back button text */}
                 </button>
             </div>
 
@@ -367,106 +433,109 @@ function SpendingsList({ onBack }: SpendingsListProps) {
             {/* Display edit error */}
             {editError && <div className="bg-red-100 border border-red-400 text-red-700 px-4 py-3 rounded relative mb-4" role="alert">Error saving changes: {editError}</div>}
             {/* Display delete error */}
-            {deleteError && <div className="bg-red-100 border border-red-400 text-red-700 px-4 py-3 rounded relative mb-4" role="alert">Error deleting transaction: {deleteError}</div>}
+            {deleteError && <div className="bg-red-100 border border-red-400 text-red-700 px-4 py-3 rounded relative mb-4" role="alert">Error deleting spending group: {deleteError}</div>}
 
 
-            {!isLoading && !error && transactionGroups.length === 0 && (
-                <div className="text-center text-gray-500 p-4">No spending history found. Try logging some expenses using the AI mode!</div>
+            {!isLoading && !error && sortedHistoryItems.length === 0 && (
+                <div className="text-center text-gray-500 p-4">No history found. Try logging some expenses or deposits!</div>
             )}
 
-            {/* Render grouped transactions */}
-            {!isLoading && !error && transactionGroups.length > 0 && (
-                <div className="space-y-6">
-                    {transactionGroups.map((group) => (
-                        <div key={group.job_id} className="border border-gray-200 rounded-lg shadow-sm overflow-hidden">
-                            {/* Transaction Group Header - Make clickable */}
-                            <div
-                                className="bg-gray-50 p-3 border-b border-gray-200 cursor-pointer hover:bg-gray-100"
-                                onClick={() => toggleGroupExpansion(group.job_id)}
-                            >
-                                <div className="flex justify-between items-center flex-wrap gap-2"> {/* Use items-center */}
-                                    {/* Left side: Prompt, Date, Buyer, Total */}
-                                    <div className="flex-1 min-w-0 mr-2"> {/* Allow shrinking, add margin */}
-                                        <p className="text-sm font-medium text-indigo-600 break-words" title={group.prompt}>
-                                            Prompt: <span className="text-gray-700 font-normal">{group.prompt}</span>
-                                        </p>
-                                        <p className="text-xs text-gray-500">
-                                            {formatDate(group.job_created_at)} by <span className="font-medium">{group.buyer_name}</span> - Total: {formatCurrency(group.total_amount)}
-                                        </p>
+            {/* Render combined history items */}
+            {!isLoading && !error && sortedHistoryItems.length > 0 && (
+                <div className="space-y-4"> {/* Use less space between items */}
+                    {sortedHistoryItems.map((item) => {
+                        if (item.itemType === 'deposit') {
+                            // Render Deposit Item
+                            return renderDepositItem(item);
+                        } else {
+                            // Render Spending Group (TransactionGroup)
+                            const group = item; // item is a TransactionGroup here
+                            return (
+                                <div key={`sg-${group.job_id}`} className="border border-gray-200 rounded-lg shadow-sm overflow-hidden">
+                                    {/* Transaction Group Header - Make clickable */}
+                                    <div
+                                        className="bg-gray-50 p-3 border-b border-gray-200 cursor-pointer hover:bg-gray-100"
+                                        onClick={() => toggleGroupExpansion(group.job_id)}
+                                    >
+                                        <div className="flex justify-between items-center flex-wrap gap-2">
+                                            {/* Left side: Prompt, Date, Buyer, Total */}
+                                            <div className="flex items-center space-x-3 flex-1 min-w-0 mr-2">
+                                                {/* Spending Icon */}
+                                                <svg xmlns="http://www.w3.org/2000/svg" className="h-6 w-6 text-red-600 flex-shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2">
+                                                  <path strokeLinecap="round" strokeLinejoin="round" d="M3 10h18M7 15h1m4 0h1m-7 4h12a3 3 0 003-3V8a3 3 0 00-3-3H6a3 3 0 00-3 3v8a3 3 0 003 3z" />
+                                                </svg>
+                                                <div>
+                                                    <p className="text-sm font-medium text-indigo-600 break-words" title={group.prompt}>
+                                                        Spending: <span className="text-gray-700 font-normal">{group.prompt}</span>
+                                                    </p>
+                                                    <p className="text-xs text-gray-500">
+                                                        {formatDate(group.date)} by <span className="font-medium">{group.buyer_name}</span> - Total: <span className="font-semibold text-red-700">{formatCurrency(group.total_amount)}</span>
+                                                    </p>
+                                                </div>
+                                            </div>
+                                            {/* Right side: Ambiguity flag, Delete Button, Expander Icon */}
+                                            <div className="flex items-center flex-shrink-0 space-x-2">
+                                                {group.is_ambiguity_flagged && (
+                                                    <span
+                                                        className="px-2 py-1 inline-flex text-xs leading-4 font-semibold rounded-full bg-yellow-100 text-yellow-800 cursor-help"
+                                                        title={`Ambiguity Reason: ${group.ambiguity_flag_reason || 'No reason provided'}`}
+                                                        onClick={(e) => e.stopPropagation()}
+                                                    >
+                                                        ⚠️ Ambiguous
+                                                    </span>
+                                                )}
+                                                <button
+                                                    onClick={(e) => { e.stopPropagation(); handleDeleteJob(group.job_id); }}
+                                                    disabled={deletingJobId === group.job_id || editingItemId !== null}
+                                                    className={`text-red-600 hover:text-red-800 disabled:opacity-50 disabled:cursor-not-allowed p-1 rounded focus:outline-none focus:ring-2 focus:ring-red-500 focus:ring-offset-1`}
+                                                    title="Delete this entire spending group"
+                                                >
+                                                    <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                                                        <path strokeLinecap="round" strokeLinejoin="round" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
+                                                    </svg>
+                                                    {deletingJobId === group.job_id && <span className="ml-1 text-xs">(Deleting...)</span>}
+                                                </button>
+                                                <span className="text-gray-500 text-lg cursor-pointer">
+                                                    {expandedGroupIds.has(group.job_id) ? '▲' : '▼'}
+                                                </span>
+                                            </div>
+                                        </div>
                                     </div>
-                                    {/* Right side: Ambiguity flag, Delete Button, Expander Icon */}
-                                    <div className="flex items-center flex-shrink-0 space-x-2"> {/* Add space-x-2 */}
-                                        {group.is_ambiguity_flagged && (
-                                            <span
-                                                className="px-2 py-1 inline-flex text-xs leading-4 font-semibold rounded-full bg-yellow-100 text-yellow-800 cursor-help"
-                                                title={`Ambiguity Reason: ${group.ambiguity_flag_reason || 'No reason provided'}`}
-                                                onClick={(e) => e.stopPropagation()} // Prevent title click from toggling group
-                                            >
-                                                ⚠️ Ambiguous
-                                            </span>
-                                        )}
-                                        {/* Delete Button */}
-                                        <button
-                                            onClick={(e) => {
-                                                e.stopPropagation(); // Prevent toggling group when clicking delete
-                                                handleDeleteJob(group.job_id);
-                                            }}
-                                            disabled={deletingJobId === group.job_id || editingItemId !== null} // Disable while deleting this or editing any item
-                                            className={`text-red-600 hover:text-red-800 disabled:opacity-50 disabled:cursor-not-allowed p-1 rounded focus:outline-none focus:ring-2 focus:ring-red-500 focus:ring-offset-1`}
-                                            title="Delete this entire transaction"
-                                        >
-                                            {/* Simple Trash Icon (SVG or character) */}
-                                            <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
-                                                <path strokeLinecap="round" strokeLinejoin="round" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
-                                            </svg>
-                                            {/* Show spinner if deleting this specific job */}
-                                            {deletingJobId === group.job_id && <span className="ml-1 text-xs">(Deleting...)</span>}
-                                        </button>
-                                        {/* Expander Icon */}
-                                        <span className="text-gray-500 text-lg cursor-pointer"> {/* Make icon itself clickable */}
-                                            {expandedGroupIds.has(group.job_id) ? '▲' : '▼'}
-                                        </span>
-                                    </div>
-                                </div>
-                            </div>
 
-                            {/* Spending Items Container (Conditional Rendering) */}
-                            {expandedGroupIds.has(group.job_id) && (
-                                <div className="bg-white"> {/* Add bg-white for contrast */}
-                                    {/* Table structure for medium screens and up */}
-                                    <table className="min-w-full hidden md:table">
-                                    {/* Table Head (Hidden on mobile) */}
-                                    <thead className="bg-white hidden md:table-header-group">
-                                        <tr>
-                                            <th scope="col" className="px-4 py-2 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Item Desc.</th>
-                                            <th scope="col" className="px-4 py-2 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Category</th>
-                                            <th scope="col" className="px-4 py-2 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">Amount</th>
-                                            <th scope="col" className="px-4 py-2 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Sharing</th>
-                                            <th scope="col" className="px-4 py-2 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">Actions</th>
-                                        </tr>
-                                    </thead>
-                                    {/* Table Body (Hidden on mobile, rendered via helper) */}
-                                    <tbody className="hidden md:table-row-group">
-                                        {group.spendings.map(renderSpendingItemRow)}
-                                        {group.spendings.length === 0 && (
-                                            <tr className="md:table-row">
-                                                <td colSpan={5} className="md:table-cell px-4 py-3 text-center text-sm text-gray-500 italic">No spending items generated for this job.</td>
-                                            </tr>
-                                        )}
-                                    </tbody>
-                                </table>
-                                {/* Card/List structure for mobile (rendered via helper) */}
-                                {/* Use space-y for separation instead of divide-y for more control */}
-                                <div className="md:hidden space-y-3 p-2 bg-gray-50"> {/* Add padding and slight background */}
-                                     {group.spendings.map(renderSpendingItemRow)}
-                                     {group.spendings.length === 0 && (
-                                        <div className="px-4 py-3 text-center text-sm text-gray-500 italic">No spending items generated for this job.</div>
-                                     )}
+                                    {/* Spending Items Container (Conditional Rendering) */}
+                                    {expandedGroupIds.has(group.job_id) && (
+                                        <div className="bg-white">
+                                            <table className="min-w-full hidden md:table">
+                                                <thead className="bg-white hidden md:table-header-group">
+                                                    <tr>
+                                                        <th scope="col" className="px-4 py-2 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Item Desc.</th>
+                                                        <th scope="col" className="px-4 py-2 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Category</th>
+                                                        <th scope="col" className="px-4 py-2 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">Amount</th>
+                                                        <th scope="col" className="px-4 py-2 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Sharing</th>
+                                                        <th scope="col" className="px-4 py-2 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">Actions</th>
+                                                    </tr>
+                                                </thead>
+                                                <tbody className="hidden md:table-row-group">
+                                                    {group.spendings.map(renderSpendingItemRow)}
+                                                    {group.spendings.length === 0 && (
+                                                        <tr className="md:table-row">
+                                                            <td colSpan={5} className="md:table-cell px-4 py-3 text-center text-sm text-gray-500 italic">No spending items generated for this job.</td>
+                                                        </tr>
+                                                    )}
+                                                </tbody>
+                                            </table>
+                                            <div className="md:hidden space-y-3 p-2 bg-gray-50">
+                                                {group.spendings.map(renderSpendingItemRow)}
+                                                {group.spendings.length === 0 && (
+                                                    <div className="px-4 py-3 text-center text-sm text-gray-500 italic">No spending items generated for this job.</div>
+                                                )}
+                                            </div>
+                                        </div>
+                                    )}
                                 </div>
-                            </div>
-                            )} {/* End conditional rendering for expanded group */}
-                        </div>
-                    ))}
+                            );
+                        }
+                    })}
                 </div>
             )}
             </div> {/* Close inner padding div */}
@@ -474,4 +543,4 @@ function SpendingsList({ onBack }: SpendingsListProps) {
     );
 }
 
-export default SpendingsList;
+export default HistoryList; // Renamed export
