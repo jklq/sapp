@@ -70,8 +70,8 @@ func HandleAddDeposit(db *sql.DB) http.HandlerFunc {
 		depositDate, err := time.Parse("2006-01-02", payload.DepositDate)
 		if err != nil {
 			slog.Warn("invalid add deposit payload: invalid date format", "url", r.URL, "user_id", userID, "date_string", payload.DepositDate, "err", err)
-			slog.Warn("invalid add deposit payload: invalid date format", "url", r.URL, "user_id", userID, "date_string", payload.DepositDate, "err", err)
-			http.Error(w, fmt.Sprintf("Bad Request: %s", err.Error()), http.StatusBadRequest) // Include specific error
+			// Note: Duplicate log line removed for clarity, original code had it twice.
+			http.Error(w, "Bad Request: invalid date format", http.StatusBadRequest)
 			return
 		}
 		// Validate recurrence period if recurring
@@ -308,7 +308,8 @@ func HandleUpdateDeposit(db *sql.DB) http.HandlerFunc {
 		if payload.DepositDate != nil {
 			parsedDate, err := parseOptionalDate(payload.DepositDate) // Use YYYY-MM-DD
 			if err != nil {
-				http.Error(w, fmt.Sprintf("Bad Request: %s", err.Error()), http.StatusBadRequest)
+				slog.Warn("invalid update deposit payload: invalid deposit date format", "url", r.URL, "user_id", userID, "deposit_id", depositID, "date_string", *payload.DepositDate, "err", err)
+				http.Error(w, "Bad Request: invalid date format", http.StatusBadRequest)
 				return
 			}
 			if parsedDate == nil { // Should not happen if string is not nil, but check defensively
@@ -364,7 +365,8 @@ func HandleUpdateDeposit(db *sql.DB) http.HandlerFunc {
 		if payload.EndDate != nil {
 			parsedEndDate, err := parseOptionalDate(payload.EndDate) // Use YYYY-MM-DD
 			if err != nil {
-				http.Error(w, fmt.Sprintf("Bad Request: Invalid end date format: %s", err.Error()), http.StatusBadRequest)
+				slog.Warn("invalid update deposit payload: invalid end date format", "url", r.URL, "user_id", userID, "deposit_id", depositID, "date_string", *payload.EndDate, "err", err)
+				http.Error(w, "Bad Request: invalid date format", http.StatusBadRequest)
 				return
 			}
 			newEndDate = parsedEndDate // Can be nil if payload.EndDate was "" or null
