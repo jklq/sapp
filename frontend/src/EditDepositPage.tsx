@@ -28,7 +28,7 @@ function EditDepositPage({ depositId, onBack }: EditDepositPageProps) {
     // Form field states (initialize empty, fetch data in useEffect)
     const [amount, setAmount] = useState<string>('');
     const [description, setDescription] = useState<string>('');
-    const [depositDate, setDepositDate] = useState<string>(''); // YYYY-MM-DD
+    const [depositDate, setDepositDate] = useState<string>(formatDateForInput(new Date())); // YYYY-MM-DD - Pre-fill with today
     const [isRecurring, setIsRecurring] = useState<boolean>(false);
     const [recurrencePeriod, setRecurrencePeriod] = useState<string>('monthly');
     const [endDate, setEndDate] = useState<string>(''); // YYYY-MM-DD or empty
