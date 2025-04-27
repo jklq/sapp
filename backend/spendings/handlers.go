@@ -12,9 +12,9 @@ import (
 	"strconv"
 	"strings"
 
-	"git.sr.ht/~relay/sapp-backend/auth"    // Import auth package
-	"git.sr.ht/~relay/sapp-backend/history" // Import the new history service package
-	"git.sr.ht/~relay/sapp-backend/types"   // Import shared types
+	"git.sr.ht/~relay/sapp-backend/auth"
+	"git.sr.ht/~relay/sapp-backend/history"
+	"git.sr.ht/~relay/sapp-backend/types"
 )
 
 // EditableSharingStatus moved to types package
@@ -31,20 +31,20 @@ type FrontendHistoryListItem struct {
 	Date time.Time `json:"date"` // Primary sorting key (job creation time or deposit occurrence date)
 
 	// Fields from TransactionGroup (omitempty if not applicable)
-	JobID               *int64             `json:"job_id,omitempty"`
-	Prompt              *string            `json:"prompt,omitempty"`
-	TotalAmount         *float64           `json:"total_amount,omitempty"` // Use pointer for optional field
-	BuyerName           *string            `json:"buyer_name,omitempty"`
-	IsAmbiguityFlagged  *bool              `json:"is_ambiguity_flagged,omitempty"`
-	AmbiguityFlagReason *string            `json:"ambiguity_flag_reason,omitempty"`
+	JobID               *int64               `json:"job_id,omitempty"`
+	Prompt              *string              `json:"prompt,omitempty"`
+	TotalAmount         *float64             `json:"total_amount,omitempty"` // Use pointer for optional field
+	BuyerName           *string              `json:"buyer_name,omitempty"`
+	IsAmbiguityFlagged  *bool                `json:"is_ambiguity_flagged,omitempty"`
+	AmbiguityFlagReason *string              `json:"ambiguity_flag_reason,omitempty"`
 	Spendings           []types.SpendingItem `json:"spendings,omitempty"` // Use types.SpendingItem
 
 	// Fields from DepositItem (omitempty if not applicable)
-	ID               *int64   `json:"id,omitempty"` // Deposit ID (original template ID)
-	Amount           *float64 `json:"amount,omitempty"` // Use pointer for optional field
-	Description      *string  `json:"description,omitempty"`
-	IsRecurring      *bool    `json:"is_recurring,omitempty"`
-	RecurrencePeriod *string  `json:"recurrence_period,omitempty"`
+	ID               *int64     `json:"id,omitempty"`     // Deposit ID (original template ID)
+	Amount           *float64   `json:"amount,omitempty"` // Use pointer for optional field
+	Description      *string    `json:"description,omitempty"`
+	IsRecurring      *bool      `json:"is_recurring,omitempty"`
+	RecurrencePeriod *string    `json:"recurrence_period,omitempty"`
 	CreatedAt        *time.Time `json:"created_at,omitempty"` // Deposit template creation time
 }
 

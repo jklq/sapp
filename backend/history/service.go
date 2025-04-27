@@ -7,16 +7,16 @@ import (
 	"sort"
 	"time"
 
-	"git.sr.ht/~relay/sapp-backend/types" // Import shared types
+	"git.sr.ht/~relay/sapp-backend/types"
 )
 
 // HistoryListItem represents a generic item in the combined history list for internal processing.
 // It includes common fields for sorting and identification, and the raw item.
 type HistoryListItem struct {
-	Type     string    `json:"type"` // "spending_group" or "deposit"
-	Date     time.Time `json:"date"` // Primary sorting key (job creation time or deposit occurrence date)
-	RawItem interface{} `json:"-"` // Store the original struct (types.TransactionGroup or types.DepositItem), ignored by JSON
-	// Add other common fields if necessary
+	Type    string      `json:"type"` // "spending_group" or "deposit"
+	Date    time.Time   `json:"date"` // Primary sorting key (job creation time or deposit occurrence date)
+	RawItem interface{} `json:"-"`    // Store the original struct (types.TransactionGroup or types.DepositItem), ignored by JSON
+
 }
 
 // GenerateHistory fetches and combines spending groups and deposit occurrences for a user up to a given end date.
@@ -56,7 +56,7 @@ func GenerateHistory(db *sql.DB, userID int64, endDate time.Time) ([]HistoryList
 			occurrences := generateDepositOccurrences(deposit, endDate) // Generate up to endDate
 			generatedDeposits = append(generatedDeposits, occurrences...)
 		} else {
-			// Add non-recurring deposits directly
+
 			generatedDeposits = append(generatedDeposits, deposit)
 		}
 	}
@@ -192,7 +192,7 @@ func fetchDeposits(db *sql.DB, userID int64) ([]types.DepositItem, error) {
 	defer depositRows.Close()
 
 	for depositRows.Next() {
-		var d types.DepositItem // Use types.DepositItem
+		var d types.DepositItem  // Use types.DepositItem
 		var endDate sql.NullTime // Need to scan nullable end_date
 
 		if err := depositRows.Scan(
@@ -202,7 +202,7 @@ func fetchDeposits(db *sql.DB, userID int64) ([]types.DepositItem, error) {
 			&d.Date, // Scan directly into d.Date
 			&d.IsRecurring,
 			&d.RecurrencePeriod, // Scan directly into pointer field (driver handles null)
-			&endDate,           // Scan into sql.NullTime
+			&endDate,            // Scan into sql.NullTime
 			&d.CreatedAt,
 		); err != nil {
 			slog.Error("failed to scan deposit template row for history service", "user_id", userID, "err", err)
@@ -239,7 +239,6 @@ func generateDepositOccurrences(template types.DepositItem, generationLimitDate 
 		return occurrences // Template starts after the effective end date
 	}
 
-	// Add the initial occurrence if it's on or before the effective end date
 	// (The check above already ensures currentDate <= effectiveEndDate if we reach here)
 	occurrences = append(occurrences, createOccurrence(template, currentDate))
 
@@ -269,10 +268,10 @@ func createOccurrence(template types.DepositItem, occurrenceDate time.Time) type
 		ID:               template.ID, // Link back to the original template ID
 		Amount:           template.Amount,
 		Description:      template.Description,
-		Date:             occurrenceDate, // This specific occurrence's date
+		Date:             occurrenceDate,       // This specific occurrence's date
 		IsRecurring:      template.IsRecurring, // Keep original template flag
 		RecurrencePeriod: template.RecurrencePeriod,
-		EndDate:          template.EndDate, // Keep original template end date
+		EndDate:          template.EndDate,   // Keep original template end date
 		CreatedAt:        template.CreatedAt, // Keep original creation time
 	}
 }
@@ -286,7 +285,7 @@ func calculateNextDate(current time.Time, period string) time.Time {
 		return current.AddDate(0, 1, 0)
 	case "yearly":
 		return current.AddDate(1, 0, 0)
-	// Add other cases like "bi-weekly" if needed:
+
 	// case "bi-weekly":
 	//	 return current.AddDate(0, 0, 14)
 	default:
