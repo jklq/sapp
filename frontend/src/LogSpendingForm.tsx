@@ -20,6 +20,7 @@ function LogSpendingForm({ }: LogSpendingFormProps) {
     const [prompt, setPrompt] = useState<string>(''); // Used in AI mode
     const [sharedStatus, setSharedStatus] = useState<PayPayload['shared_status']>('alone'); // Manual mode only
     const [preSettled, setPreSettled] = useState<boolean>(false); // Common advanced option
+    const [spendingDate, setSpendingDate] = useState<string>(new Date().toISOString().split('T')[0]); // Default to today
 
     // UI states
     const [showAdvanced, setShowAdvanced] = useState<boolean>(false); // Toggle for advanced options
