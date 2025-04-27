@@ -261,7 +261,13 @@ function EditDepositPage({ depositId, onBack }: EditDepositPageProps) {
                             {isRecurring ? 'Start Date' : 'Deposit Date'}
                         </label>
                         <p className="mt-1 block w-full input-style bg-gray-100 text-gray-500 cursor-not-allowed">
-                            {originalDeposit ? formatDateForInput(originalDeposit.date) : 'N/A'}
+                            {/* More robust display logic */}
+                            {(() => {
+                                if (!originalDeposit) return 'N/A'; // Still loading or fetch failed
+                                const formatted = formatDateForInput(originalDeposit.date);
+                                // If formatting returns empty string despite having data, show an error/placeholder
+                                return formatted === '' ? 'Invalid Date Data' : formatted;
+                            })()}
                         </p>
                     </div>
 
