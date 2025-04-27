@@ -8,10 +8,18 @@ const formatDateForInput = (date: Date | string | null | undefined): string => {
     if (!date) return '';
     try {
         const d = typeof date === 'string' ? new Date(date) : date;
-        // Adjust for timezone offset to get correct local date
-        const offset = d.getTimezoneOffset();
-        const adjustedDate = new Date(d.getTime() - (offset * 60 * 1000));
-        return adjustedDate.toISOString().split('T')[0];
+        // Check if 'd' is a valid Date object after potential parsing
+        if (isNaN(d.getTime())) {
+             console.error("Invalid date value received:", date);
+             return '';
+        }
+
+        // Directly extract year, month, day in local time
+        const year = d.getFullYear();
+        const month = (d.getMonth() + 1).toString().padStart(2, '0'); // getMonth is 0-indexed
+        const day = d.getDate().toString().padStart(2, '0');
+
+        return `${year}-${month}-${day}`;
     } catch (e) {
         console.error("Error formatting date:", e);
         return '';
