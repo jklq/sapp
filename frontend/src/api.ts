@@ -159,7 +159,7 @@ export async function loginUser(payload: LoginPayload): Promise<LoginResponse> {
     try {
       const errData = await response.json();
       errorBody = errData.message || errData.error || errorBody; // Adjust based on backend error format
-    } catch (e) {
+    } catch /* (e) */ { // Remove unused 'e'
       // Ignore if response is not JSON
     }
     throw new Error(errorBody);
@@ -193,14 +193,14 @@ export async function registerPartners(
     try {
       const errData = await response.json();
       errorBody = errData.message || errData.error || errorBody; // Adjust based on backend error format
-    } catch (e) {
+    } catch /* (e) */ { // Remove unused 'e'
       try {
         // If not JSON, try reading as text
         const textError = await response.text();
         if (textError) {
           errorBody += ` - ${textError}`;
         }
-      } catch (textErr) {
+      } catch /* (textErr) */ { // Remove unused 'textErr'
         // Ignore if reading text also fails
       }
     }
@@ -237,7 +237,7 @@ export async function addDeposit(
     try {
       const errData = JSON.parse(errorBody);
       errorMessage = errData.message || errData.error || errorMessage;
-    } catch (e) {
+    } catch /* (e) */ { // Remove unused 'e'
       errorMessage += ` - ${errorBody}`;
     }
     throw new Error(errorMessage);
@@ -266,7 +266,7 @@ export async function fetchDepositById(
     try {
       const errData = JSON.parse(errorBody);
       errorMessage = errData.message || errData.error || errorMessage;
-    } catch (e) {
+    } catch /* (e) */ { // Remove unused 'e'
       errorMessage += ` - ${errorBody}`;
     }
     throw new Error(errorMessage);
@@ -295,7 +295,7 @@ export async function updateDeposit(
     try {
       const errData = JSON.parse(errorBody);
       errorMessage = errData.message || errData.error || errorMessage;
-    } catch (e) {
+    } catch /* (e) */ { // Remove unused 'e'
       errorMessage += ` - ${errorBody}`;
     }
     throw new Error(errorMessage);
@@ -321,7 +321,7 @@ export async function deleteDeposit(
     try {
       const errData = JSON.parse(errorBody);
       errorMessage = errData.message || errData.error || errorMessage;
-    } catch (e) {
+    } catch /* (e) */ { // Remove unused 'e'
       errorMessage += ` - ${errorBody}`;
     }
     throw new Error(errorMessage);
@@ -369,7 +369,7 @@ export async function updateSpendingItem(
       // Try to parse backend error message
       const errData = JSON.parse(errorBody);
       errorMessage = errData.message || errData.error || errorMessage;
-    } catch (e) {
+    } catch /* (e) */ { // Remove unused 'e'
       // Use text if not JSON
       errorMessage += ` - ${errorBody}`;
     }
@@ -399,7 +399,7 @@ export async function deleteAIJob(jobId: number): Promise<void> {
       // Try to parse backend error message
       const errData = JSON.parse(errorBody);
       errorMessage = errData.message || errData.error || errorMessage;
-    } catch (e) {
+    } catch /* (e) */ { // Remove unused 'e'
       // Use text if not JSON
       errorMessage += ` - ${errorBody}`;
     }
@@ -427,7 +427,7 @@ export async function fetchTransferStatus(): Promise<TransferStatusResponse> {
     try {
       const errData = JSON.parse(errorBody);
       errorMessage = errData.message || errData.error || errorMessage;
-    } catch (e) {
+    } catch /* (e) */ { // Remove unused 'e'
       errorMessage += ` - ${errorBody}`;
     }
     throw new Error(errorMessage);
@@ -448,7 +448,7 @@ export async function recordTransfer(): Promise<void> {
     try {
       const errData = JSON.parse(errorBody);
       errorMessage = errData.message || errData.error || errorMessage;
-    } catch (e) {
+    } catch /* (e) */ { // Remove unused 'e'
       errorMessage += ` - ${errorBody}`;
     }
     throw new Error(errorMessage);
