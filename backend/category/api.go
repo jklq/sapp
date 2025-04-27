@@ -5,7 +5,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"io"
-	"log/slog" // Import slog
+	"log/slog"
 	"net/http"
 )
 

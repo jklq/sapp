@@ -3,14 +3,13 @@ package main_test
 import (
 	"database/sql"
 	"fmt"
-	"math"
 	"net/http"
 	"testing"
 	"time"
 
-	"git.sr.ht/~relay/sapp-backend/spendings" // Import spendings for handlers
-	"git.sr.ht/~relay/sapp-backend/testutil" // Import the new test utility package
-	"git.sr.ht/~relay/sapp-backend/types"    // Import shared types
+	"git.sr.ht/~relay/sapp-backend/spendings"
+	"git.sr.ht/~relay/sapp-backend/testutil"
+	"git.sr.ht/~relay/sapp-backend/types"
 )
 
 // Helper function to create a pointer to a string (copied here as it's used in TestGetHistory)
@@ -251,7 +250,7 @@ func TestGetHistory(t *testing.T) {
 		}
 		// Check date is the calculated next occurrence after deposit2Date (T-35d)
 		// Use the same logic as the history service's calculateNextDate
-		expectedNextDate := deposit2Date.AddDate(0, 1, 0) // Add 1 month
+		expectedNextDate := deposit2Date.AddDate(0, 1, 0)
 		if item2.Date.Format("2006-01-02") != expectedNextDate.Format("2006-01-02") {
 			t.Errorf("Expected item 2 date to be %s (1 month after %s), got %s",
 				expectedNextDate.Format("2006-01-02"),
@@ -450,7 +449,7 @@ func TestUpdateSpending(t *testing.T) {
 			spendingID: spendingIDShared,
 			payload: types.UpdateSpendingPayload{ // Use types.UpdateSpendingPayload
 				Description:   "Test",
-				CategoryName:  "", // Missing category
+				CategoryName:  "",                // Missing category
 				SharingStatus: types.StatusAlone, // Use types constant
 			},
 			expectedStatus: http.StatusBadRequest,

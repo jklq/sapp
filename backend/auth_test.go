@@ -1,16 +1,15 @@
 package main_test
 
 import (
-	"database/sql"
 	"net/http"
 	"os"
 	"testing"
 
-	"git.sr.ht/~relay/sapp-backend/auth"     // Import auth for handlers and JWT
-	"git.sr.ht/~relay/sapp-backend/testutil" // Import the new test utility package
-	"git.sr.ht/~relay/sapp-backend/types"    // Import shared types
-	"github.com/golang-jwt/jwt/v5"           // Import JWT for token validation
-	"golang.org/x/crypto/bcrypt"             // Import bcrypt for password verification in registration test
+	"git.sr.ht/~relay/sapp-backend/auth"
+	"git.sr.ht/~relay/sapp-backend/testutil"
+	"git.sr.ht/~relay/sapp-backend/types"
+	"github.com/golang-jwt/jwt/v5"
+	"golang.org/x/crypto/bcrypt"
 )
 
 // TestLogin tests the /v1/login endpoint.

@@ -9,7 +9,7 @@ import (
 	"time"
 
 	"git.sr.ht/~relay/sapp-backend/auth"
-	"git.sr.ht/~relay/sapp-backend/types" // Import shared types
+	"git.sr.ht/~relay/sapp-backend/types"
 )
 
 // HandleGetTransferStatus calculates and returns the net balance between the user and their partner.

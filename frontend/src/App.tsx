@@ -97,7 +97,7 @@ function App() {
     return (
       // Use w-full and max-w-4xl for content consistency, add padding here
       // Make this a flex container to center the view component inside
-      // Add padding-bottom to prevent content being hidden by fixed bottom nav (pb-20 is example, adjust as needed)
+      
       <div className="w-full max-w-4xl p-4 flex flex-col items-center pb-20">
 
         {/* Render the selected view */}

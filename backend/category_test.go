@@ -6,6 +6,7 @@ import (
 	"net/http"
 	"strings"
 	"testing"
+	"time"
 
 	"git.sr.ht/~relay/sapp-backend/testutil"
 	"git.sr.ht/~relay/sapp-backend/types"
@@ -129,7 +130,7 @@ func TestAICategorize(t *testing.T) {
 		payload := map[string]interface{}{
 			"amount":           50.00,
 			"prompt":           "Pre-settled lunch",
-			"pre_settled":      true, // Explicitly true
+			"pre_settled":      true,         // Explicitly true
 			"transaction_date": "2024-05-21", // Add a date
 		}
 		req := testutil.NewAuthenticatedRequest(t, http.MethodPost, "/v1/categorize", env.AuthToken, payload)

@@ -7,8 +7,8 @@ import (
 	"testing"
 	"time"
 
-	"git.sr.ht/~relay/sapp-backend/testutil" // Import the new test utility package
-	"git.sr.ht/~relay/sapp-backend/types"    // Import shared types
+	"git.sr.ht/~relay/sapp-backend/testutil"
+	"git.sr.ht/~relay/sapp-backend/types"
 )
 
 // TestGetTransferStatus tests the /v1/transfer/status endpoint.
@@ -104,10 +104,10 @@ func TestRecordTransfer(t *testing.T) {
 	groceriesID := testutil.GetCategoryID(t, env.DB, "Groceries")
 
 	// --- Setup Data ---
-	// Add some unsettled items involving the user and partner
+
 	spending1 := testutil.InsertSpending(t, env.DB, env.UserID, &env.PartnerID, groceriesID, 50.0, "Shared", false, nil, nil)             // User paid, shared with Partner
 	spending2 := testutil.InsertSpending(t, env.DB, env.PartnerID, &env.UserID, groceriesID, 100.0, "Shared by Partner", false, nil, nil) // Partner paid, shared with User
-	// Add an item not involving the partner (should not be settled)
+
 	spendingAlone := testutil.InsertSpending(t, env.DB, env.UserID, nil, groceriesID, 30.0, "Alone", false, nil, nil) // User paid, alone
 
 	// --- Test Case: Successful Record ---
@@ -178,7 +178,6 @@ func TestRecordTransfer(t *testing.T) {
 				t.Fatalf("Failed to get transfer count after first call: %v (count: %d)", err, initialTransferCount)
 			}
 		}
-
 
 		// Record again
 		req2 := testutil.NewAuthenticatedRequest(t, http.MethodPost, "/v1/transfer/record", env.AuthToken, nil)

@@ -11,7 +11,7 @@ CREATE TABLE IF NOT EXISTS categories (
     id INTEGER PRIMARY KEY AUTOINCREMENT,
     name TEXT NOT NULL UNIQUE,
     ai_notes TEXT -- Added ai_notes used in prompt generation
-    -- Removed unused mean/variation columns for now
+        -- Removed unused mean/variation columns for now
 );
 
 -- Spendings table stores individual spending items, often created by AI categorization

@@ -11,7 +11,7 @@ import (
 
 	"git.sr.ht/~relay/sapp-backend/auth"
 	"git.sr.ht/~relay/sapp-backend/category"
-	"git.sr.ht/~relay/sapp-backend/deposit" // Import deposit package
+	"git.sr.ht/~relay/sapp-backend/deposit"
 	"git.sr.ht/~relay/sapp-backend/pay"
 	"git.sr.ht/~relay/sapp-backend/spendings"
 	"git.sr.ht/~relay/sapp-backend/transfer"
@@ -183,9 +183,9 @@ func main() {
 	updateSpendingHandler := http.HandlerFunc(spendings.HandleUpdateSpending(db))
 	getTransferStatusHandler := http.HandlerFunc(transfer.HandleGetTransferStatus(db))
 	recordTransferHandler := http.HandlerFunc(transfer.HandleRecordTransfer(db))
-	deleteAIJobHandler := http.HandlerFunc(spendings.HandleDeleteAIJob(db)) // Add handler for delete job
-	addDepositHandler := http.HandlerFunc(deposit.HandleAddDeposit(db))     // Add handler for adding deposit
-	getDepositsHandler := http.HandlerFunc(deposit.HandleGetDeposits(db))   // Add handler for getting deposits
+	deleteAIJobHandler := http.HandlerFunc(spendings.HandleDeleteAIJob(db))
+	addDepositHandler := http.HandlerFunc(deposit.HandleAddDeposit(db))
+	getDepositsHandler := http.HandlerFunc(deposit.HandleGetDeposits(db))
 
 	// Apply AuthMiddleware to protected handlers
 	mux.Handle("POST /v1/pay", applyMiddleware(payHandler, auth.AuthMiddleware))
@@ -228,14 +228,14 @@ func main() {
 // 	//
 // 	// // Make requests to server.URL
 // 	// req, _ := http.NewRequest("GET", server.URL+"/v1/categories", nil)
-// 	// // Add auth header etc.
+// 	//
 // 	// resp, err := http.DefaultClient.Do(req)
 // 	// // Assertions on resp and err...
 //
 // 	// Or test handlers directly:
 // 	// rr := httptest.NewRecorder()
 // 	// req, _ := http.NewRequest("GET", "/v1/categories", nil)
-// 	// // Add context, auth etc. to req
+// 	//
 // 	// handler.ServeHTTP(rr, req)
 // 	// // Assertions on rr.Code, rr.Body, etc.
 //

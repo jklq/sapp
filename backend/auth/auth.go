@@ -8,14 +8,14 @@ import (
 	"fmt"
 	"log/slog"
 	"net/http"
-	"os" // Import os to read environment variables
+	"os"
 	"strings"
-	"time" // Import time for token expiration
+	"time"
 
-	"github.com/golang-jwt/jwt/v5" // Import JWT library
+	"github.com/golang-jwt/jwt/v5"
 	"golang.org/x/crypto/bcrypt"
 
-	"git.sr.ht/~relay/sapp-backend/types" // Import shared types
+	"git.sr.ht/~relay/sapp-backend/types"
 )
 
 // JWT secret key - SHOULD be loaded securely from environment variables in production
