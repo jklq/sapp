@@ -42,8 +42,22 @@ type SpendingItem struct {
 	BuyerName          string  `json:"buyer_name"`            // Name of the user who paid for the original transaction
 	PartnerName        *string `json:"partner_name"`          // Name of the partner involved, if any
 	SharedUserTakesAll bool    `json:"shared_user_takes_all"` // True if partner pays this item's full cost
-	SharingStatus      string  `json:"sharing_status"`        // Derived: "Alone", "Shared with X", "Paid by X"
+	SharingStatus string  `json:"sharing_status"` // Derived: "Alone", "Shared with X", "Paid by X"
 }
+
+// DepositItem represents a single deposit entry for the history view.
+// Note: This mirrors backend/deposit/types.go Deposit struct but might evolve for API response.
+type DepositItem struct {
+	ID               int64      `json:"id"`
+	Type             string     `json:"type"` // Always "deposit"
+	Amount           float64    `json:"amount"`
+	Description      string     `json:"description"`
+	Date             time.Time  `json:"date"` // Use common field name 'date'
+	IsRecurring      bool       `json:"is_recurring"`
+	RecurrencePeriod *string    `json:"recurrence_period"`
+	CreatedAt        time.Time  `json:"created_at"`
+}
+
 
 // TransactionGroup represents a single purchase/submission, potentially containing multiple spending items.
 type TransactionGroup struct {
