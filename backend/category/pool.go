@@ -277,7 +277,7 @@ func (p *CategorizingPool) worker(id int) {
 				var res sql.Result
 				res, err = tx.Exec(`INSERT INTO spendings (amount, description, category, made_by, spending_date)
 				VALUES (?, ?, ?, ?, ?)`,
-					spending.Amount, spendingDesc, categoryID, job.Params.Buyer.Id, spendingDateToUse) // Use determined spendingDateToUse
+					spending.Amount, spendingDesc, categoryID, job.Buyer, spendingDateToUse) // Use job.Buyer and determined spendingDateToUse
 				if err != nil {
 					slog.Error("worker failed to insert spending", "worker_id", id, "job_id", job.Id, "err", err)
 					p.updateJobStatus(job.Id, "failed", fmt.Errorf("db error inserting spending: %w", err))
@@ -321,7 +321,7 @@ func (p *CategorizingPool) worker(id int) {
 
 				_, err = tx.Exec(`INSERT INTO user_spendings (spending_id, buyer, shared_with, shared_user_takes_all, settled_at)
 				VALUES (?, ?, ?, ?, ?)`,
-					spendingID, job.Params.Buyer.Id, sharedWithID, sharedUserTakesAll, settledAt)
+					spendingID, job.Buyer, sharedWithID, sharedUserTakesAll, settledAt) // Use job.Buyer
 				if err != nil {
 					slog.Error("worker failed to insert user_spending", "worker_id", id, "job_id", job.Id, "spending_id", spendingID, "err", err)
 					p.updateJobStatus(job.Id, "failed", fmt.Errorf("db error inserting user_spending: %w", err))
