@@ -13,7 +13,7 @@ import (
 	"strings"
 
 	"git.sr.ht/~relay/sapp-backend/auth"
-	"git.sr.ht/~relay/sapp-backend/deposit" // Import deposit package
+	// "git.sr.ht/~relay/sapp-backend/deposit" // Removed unused import
 )
 
 // EditableSharingStatus defines the possible states the frontend can send for updates.
@@ -64,8 +64,8 @@ type TransactionGroup struct {
 
 // HistoryResponse defines the structure for the combined history endpoint.
 type HistoryResponse struct {
-	SpendingGroups []TransactionGroup    `json:"spending_groups"`
-	Deposits       []deposit.DepositItem `json:"deposits"` // Use qualified type
+	SpendingGroups []TransactionGroup `json:"spending_groups"`
+	Deposits       []DepositItem      `json:"deposits"` // Use local type
 }
 
 // HandleGetHistory returns an http.HandlerFunc that fetches both spendings (grouped by AI job)
@@ -83,7 +83,7 @@ func HandleGetHistory(db *sql.DB) http.HandlerFunc {
 
 		historyResponse := HistoryResponse{
 			SpendingGroups: []TransactionGroup{},
-			Deposits:       []deposit.DepositItem{}, // Use qualified type
+			Deposits:       []DepositItem{}, // Use local type
 		}
 
 		// 1. Fetch AI Categorization Jobs (Spending Groups) initiated by the user
@@ -251,13 +251,14 @@ func HandleGetHistory(db *sql.DB) http.HandlerFunc {
 		defer depositRows.Close()
 
 		for depositRows.Next() {
-			var d deposit.DepositItem // Use qualified type
+			var d DepositItem         // Use local type
 			d.Type = "deposit"        // Set type identifier
 			var depositDateStr string // Read date as string first
+			var userIDIgnored int64   // Variable to scan user_id into, but ignore
 
 			if err := depositRows.Scan(
 				&d.ID,
-				&d.UserID, // Scan UserID from DB (even if not directly used in response)
+				&userIDIgnored, // Scan UserID from DB into ignored variable
 				&d.Amount,
 				&d.Description,
 				&depositDateStr, // Scan into string

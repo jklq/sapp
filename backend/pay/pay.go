@@ -8,13 +8,6 @@ import (
 	"strconv"
 	"time" // Added time for potential use with settled_at
 
-	"encoding/json" // Added encoding/json
-	"errors"        // Import errors package
-	"log/slog"
-	"net/http"
-	// "strconv" // Removed strconv
-	"time" // Added time for potential use with settled_at
-
 	"git.sr.ht/~relay/sapp-backend/auth" // Import auth package
 )
 
