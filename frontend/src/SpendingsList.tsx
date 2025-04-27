@@ -1,18 +1,18 @@
-import { useState, useEffect, useCallback, useMemo } from 'react';
+import { useState, useEffect, useCallback } from 'react'; // Removed useMemo
 import { fetchHistory, fetchCategories, updateSpendingItem, deleteAIJob } from './api'; // Use fetchHistory
-import { SpendingItem, TransactionGroup, Category, UpdateSpendingPayload, EditableSharingStatus, HistoryResponse, DepositItem } from './types'; 
+// Import HistoryListItem from types
+import { SpendingItem, TransactionGroup, Category, UpdateSpendingPayload, EditableSharingStatus, HistoryResponse, DepositItem, HistoryListItem } from './types';
 
 interface HistoryListProps { // Renamed props interface
     onBack: () => void;
 }
 
-// Combine spending groups and deposits into a single list with type and date for sorting
-type HistoryListItem = (TransactionGroup & { itemType: 'spending_group'; sortDate: Date }) | (DepositItem & { itemType: 'deposit'; sortDate: Date });
-
+// Removed unused local HistoryListItem type definition
 
 function HistoryList({ onBack }: HistoryListProps) { // Renamed component
     // Data states
-    const [historyData, setHistoryData] = useState<HistoryResponse | null>(null); // Store the raw response
+    // Renamed historyData to historyResponse for clarity
+    const [historyResponse, setHistoryResponse] = useState<HistoryResponse | null>(null); // Store the raw response
     const [categories, setCategories] = useState<Category[]>([]); // Still needed for editing spendings
 
     // UI states
@@ -43,15 +43,15 @@ function HistoryList({ onBack }: HistoryListProps) { // Renamed component
         const categoriesPromise = fetchCategories(); // Still fetch categories
 
         Promise.all([historyPromise, categoriesPromise])
-            .then(([historyResponse, categoriesData]) => {
-                setHistoryData(historyResponse); // Store the combined history response
+            .then(([fetchedHistoryResponse, categoriesData]) => { // Use different name to avoid conflict
+                setHistoryResponse(fetchedHistoryResponse); // Store the combined history response
                 setCategories(categoriesData); // Store categories
             })
             .catch(err => {
                 console.error("Failed to load history or categories:", err);
                 setError(err instanceof Error ? err.message : 'Failed to load history or categories.');
                 // Set null/empty on error
-                setHistoryData(null);
+                setHistoryResponse(null); // Use the renamed state setter
                 setCategories([]); // Ensure categories is empty on error
             })
             .finally(() => {
@@ -413,19 +413,22 @@ function HistoryList({ onBack }: HistoryListProps) { // Renamed component
             {deleteError && <div className="bg-red-100 border border-red-400 text-red-700 px-4 py-3 rounded relative mb-4" role="alert">Error deleting spending group: {deleteError}</div>}
 
 
-            {!isLoading && !error && historyItems.length === 0 && (
+            {/* Use historyResponse.history */}
+            {!isLoading && !error && (!historyResponse || historyResponse.history.length === 0) && (
                 <div className="text-center text-gray-500 p-4">No history found. Try logging some expenses or deposits!</div>
             )}
 
             {/* Render combined history items from the flat list */}
-            {!isLoading && !error && historyItems.length > 0 && (
+            {/* Use historyResponse.history */}
+            {!isLoading && !error && historyResponse && historyResponse.history.length > 0 && (
                 <div className="space-y-4">
-                    {historyItems.map((item) => {
-                        // Use unique key based on type and ID/date
-                        const key = `${item.type}-${item.id ?? item.job_id ?? 'new'}-${item.date}`;
+                    {/* Add type HistoryListItem to item */}
+                    {historyResponse.history.map((item: HistoryListItem) => {
+                        // Removed unused key variable declaration
 
                         if (item.type === 'deposit') {
                             // Render Deposit Item - Cast to DepositItem for type safety
+                            // Key is applied in renderDepositItem
                             return renderDepositItem(item as DepositItem);
                         } else {
                             // Render Spending Group (TransactionGroup)
