@@ -25,7 +25,7 @@ func GenerateHistory(db *sql.DB, userID int64, endDate time.Time) ([]HistoryList
 	// For simplicity, we won't implement a startDate filter yet, but it could be added.
 
 	allHistoryItems := []HistoryListItem{}
-	now := time.Now().UTC() // Use consistent time for generation limit
+	// now := time.Now().UTC() // Use consistent time for generation limit - REMOVED, use endDate parameter
 
 	// --- 1. Fetch Spending Groups (Transaction Groups) ---
 	spendingGroups, err := fetchSpendingGroups(db, userID)
@@ -52,8 +52,8 @@ func GenerateHistory(db *sql.DB, userID int64, endDate time.Time) ([]HistoryList
 	generatedDeposits := []types.DepositItem{} // Use types.DepositItem
 	for _, deposit := range deposits {
 		if deposit.IsRecurring && deposit.RecurrencePeriod != nil {
-			// Generate occurrences for this recurring deposit
-			occurrences := generateDepositOccurrences(deposit, now) // Generate up to 'now'
+			// Generate occurrences for this recurring deposit up to the provided endDate
+			occurrences := generateDepositOccurrences(deposit, endDate) // Generate up to endDate
 			generatedDeposits = append(generatedDeposits, occurrences...)
 		} else {
 			// Add non-recurring deposits directly
