@@ -124,12 +124,12 @@ function App() {
         )}
 
 
-        {/* Bottom Navigation Bar (Only show if not editing a deposit) */}
-        {/* Fixed positioning, background, border-top, rounded-top */}
-        <header className="fixed bottom-0 left-0 right-0 w-full bg-white border-t border-gray-200 rounded-t-lg p-3 z-50 max-w-4xl mx-auto">
-          <div className="flex justify-between items-center">
-            {/* Left Group: Welcome Message (Desktop) + Navigation */}
-            <div className="flex items-center md:gap-4"> {/* Group welcome and nav */}
+        {/* Bottom Navigation Bar (Only show on main authenticated views) */}
+        {['logSpending', 'addDeposit', 'viewHistory', 'transfer'].includes(currentView) && (
+          <header className="fixed bottom-0 left-0 right-0 w-full bg-white border-t border-gray-200 rounded-t-lg p-3 z-50 max-w-4xl mx-auto">
+            <div className="flex justify-between items-center">
+              {/* Left Group: Welcome Message (Desktop) + Navigation */}
+              <div className="flex items-center md:gap-4"> {/* Group welcome and nav */}
               {/* Welcome Message (visible on larger screens) */}
               <div className="hidden md:block">
                 {userInfo && <span className="text-gray-700 text-sm">Welcome, {userInfo.firstName}!</span>}

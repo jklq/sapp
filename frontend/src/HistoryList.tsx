@@ -219,7 +219,7 @@ function HistoryList({ onBack, onNavigateToEditDeposit }: HistoryListProps) {
             console.error("Failed to delete spending group job:", err);
             setDeleteError(err instanceof Error ? err.message : 'Failed to delete the spending group.');
         } finally {
-            setDeletingJobId(null);
+            setDeletingJobId(null); // Clear deleting state for the job
         }
     };
 
