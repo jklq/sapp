@@ -44,16 +44,17 @@ function HistoryList({ onBack, onNavigateToEditDeposit }: HistoryListProps) {
         const historyPromise = fetchHistory();
         const categoriesPromise = fetchCategories(); // Still fetch categories
 
-        Promise.all([historyPromise, categoriesPromise]) // Fetch history and categories concurrently
+        Promise.all([historyPromise, categoriesPromise])
             .then(([historyResponse, categoriesData]) => {
                 // The response now has a flat 'history' array
                 setHistoryItems(historyResponse.history || []); // Store the flat list
-                setCategories(categoriesData);
+                setCategories(categoriesData); // Store categories
             })
             .catch(err => {
                 console.error("Failed to load history or categories:", err);
                 setError(err instanceof Error ? err.message : 'Failed to load history or categories.');
-                setHistoryItems([]); // Set empty on error
+                // Set null/empty on error
+                setHistoryItems([]); // Ensure historyItems is empty on error
                 setCategories([]); // Ensure categories is empty on error
             })
             .finally(() => {
@@ -233,21 +234,22 @@ function HistoryList({ onBack, onNavigateToEditDeposit }: HistoryListProps) {
     const renderDepositItem = (item: DepositItem) => {
         // Key uses original template ID + occurrence date for uniqueness
         const depositId = item.id; // This is the template ID
-        const key = `dep-${depositId}-${item.date}`;
+        const itemKey = `dep-${depositId}-${item.date}`; // Calculate key for the element
         const description = item.description ?? 'N/A';
         const amount = item.amount ?? 0;
         const isRecurring = item.is_recurring ?? false; // From the template
         const recurrencePeriod = item.recurrence_period;
         const isDeleting = deletingDepositId === depositId;
         const disableActions = isDeleting || deletingJobId !== null || editingItemId !== null;
-        const isExpanded = expandedDepositKeys.has(key);
+        const isExpanded = expandedDepositKeys.has(itemKey);
 
         return (
-            <div key={key} className="border border-green-200 bg-green-50 rounded-lg shadow-sm overflow-hidden">
+            // Apply the calculated key here
+            <div key={itemKey} className="border border-green-200 bg-green-50 rounded-lg shadow-sm overflow-hidden">
                 {/* --- Mobile View (Stacked) --- */}
                 <div className="md:hidden p-3">
                     {/* Top Row: Icon, Description, Amount, Expander */}
-                    <div className="flex justify-between items-start gap-2 cursor-pointer" onClick={() => toggleDepositExpansion(key)}>
+                    <div className="flex justify-between items-start gap-2 cursor-pointer" onClick={() => toggleDepositExpansion(itemKey)}>
                         <div className="flex items-center space-x-3 flex-1 min-w-0">
                             <svg xmlns="http://www.w3.org/2000/svg" className="h-6 w-6 text-green-600 flex-shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
                                 <path strokeLinecap="round" strokeLinejoin="round" d="M17 9V7a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2m2 4h10a2 2 0 002-2v-6a2 2 0 00-2-2H9a2 2 0 00-2 2v6a2 2 0 002 2zm7-5l-3 3m0 0l-3-3m3 3V8" />
@@ -312,7 +314,7 @@ function HistoryList({ onBack, onNavigateToEditDeposit }: HistoryListProps) {
                 {/* --- Desktop View (Flex) --- */}
                 <div className="hidden md:block">
                     {/* Header Row */}
-                    <div className="flex justify-between items-center flex-wrap gap-2 p-3 cursor-pointer hover:bg-green-100" onClick={() => toggleDepositExpansion(key)}>
+                    <div className="flex justify-between items-center flex-wrap gap-2 p-3 cursor-pointer hover:bg-green-100" onClick={() => toggleDepositExpansion(itemKey)}>
                         {/* Left side: Icon, Description */}
                         <div className="flex items-center space-x-3 flex-1 min-w-0 mr-2">
                             <svg xmlns="http://www.w3.org/2000/svg" className="h-6 w-6 text-green-600 flex-shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
@@ -579,12 +581,13 @@ function HistoryList({ onBack, onNavigateToEditDeposit }: HistoryListProps) {
             {/* Render combined history items from the flat list */}
             {!isLoading && !error && historyItems.length > 0 && (
                 <div className="space-y-4">
-                    {historyItems.map((item) => {
-                        // Use unique key based on type and ID/date
-                        const key = `${item.type}-${item.id ?? item.job_id ?? 'new'}-${item.date}`;
+                    {/* Add type annotation for 'item' and apply key directly */}
+                    {historyItems.map((item: HistoryListItem) => {
+                        // Removed unused key variable declaration
 
                         if (item.type === 'deposit') {
                             // Render Deposit Item - Cast to DepositItem for type safety
+                            // Apply key directly to the rendered element in renderDepositItem
                             return renderDepositItem(item as DepositItem);
                         } else if (item.type === 'spending_group') {
                             // Render Spending Group
@@ -598,9 +601,11 @@ function HistoryList({ onBack, onNavigateToEditDeposit }: HistoryListProps) {
                             const spendings = item.spendings ?? [];
                             // Extract partner name from the first spending item if available (assuming consistent partner for the group)
                             const partnerNameFromGroup = spendings.length > 0 ? spendings[0].partner_name : null;
+                            const itemKey = `sg-${jobId}`; // Calculate key for the element
 
                             return (
-                                <div key={`sg-${jobId}`} className="border border-gray-200 rounded-lg shadow-sm overflow-hidden">
+                                // Apply the calculated key here
+                                <div key={itemKey} className="border border-gray-200 rounded-lg shadow-sm overflow-hidden">
                                     {/* Transaction Group Header - Make clickable */}
                                     <div
                                         className="bg-gray-50 p-3 border-b border-gray-200 cursor-pointer hover:bg-gray-100"
@@ -691,7 +696,8 @@ function HistoryList({ onBack, onNavigateToEditDeposit }: HistoryListProps) {
                         } else {
                             // Handle unknown item types if necessary
                             console.warn("Unknown history item type:", item.type);
-                            return <div key={key} className="text-red-500">Unknown item type encountered</div>;
+                            const itemKey = `unknown-${item.date}`; // Calculate key for the element
+                            return <div key={itemKey} className="text-red-500">Unknown item type encountered</div>;
                         }
                     })}
                 </div>
