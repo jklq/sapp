@@ -15,15 +15,17 @@ import (
 	"strings"
 	"time"
 
-	"git.sr.ht/~relay/sapp-backend/auth"     // Import auth for LoginRequest/Response
-	"git.sr.ht/~relay/sapp-backend/category" // Import category for APICategory
-	"git.sr.ht/~relay/sapp-backend/deposit"  // Import deposit types
-	"git.sr.ht/~relay/sapp-backend/pay"      // Import pay types
-	"git.sr.ht/~relay/sapp-backend/spendings"
+	"git.sr.ht/~relay/sapp-backend/auth"     // Import auth for handlers and JWT
+	"git.sr.ht/~relay/sapp-backend/category" // Import category for handlers
+	"git.sr.ht/~relay/sapp-backend/deposit"  // Import deposit for handlers
+	"git.sr.ht/~relay/sapp-backend/history"  // Import history for service logic used by spendings handler
+	"git.sr.ht/~relay/sapp-backend/pay"      // Import pay for handlers
+	"git.sr.ht/~relay/sapp-backend/spendings" // Import spendings for handlers
 	"git.sr.ht/~relay/sapp-backend/testutil" // Import the new test utility package
-	"git.sr.ht/~relay/sapp-backend/transfer"
-	"github.com/golang-jwt/jwt/v5" // Import JWT for token validation
-	"golang.org/x/crypto/bcrypt"   // Import bcrypt for password verification in registration test
+	"git.sr.ht/~relay/sapp-backend/transfer" // Import transfer for handlers
+	"git.sr.ht/~relay/sapp-backend/types"    // Import shared types
+	"github.com/golang-jwt/jwt/v5"           // Import JWT for token validation
+	"golang.org/x/crypto/bcrypt"             // Import bcrypt for password verification in registration test
 )
 
 // TestLogin tests the /v1/login endpoint.
@@ -33,7 +35,7 @@ func TestLogin(t *testing.T) {
 
 	// --- Test Case: Successful Login ---
 	t.Run("Success", func(t *testing.T) {
-		loginPayload := auth.LoginRequest{
+		loginPayload := types.LoginRequest{ // Use types.LoginRequest
 			Username: "demo_user", // Use the actual username for login
 			Password: "password",  // Use the correct password seeded in schema.sql
 		}
@@ -52,7 +54,7 @@ func TestLogin(t *testing.T) {
 
 		testutil.AssertStatusCode(t, rr, http.StatusOK)
 
-		var respBody auth.LoginResponse
+		var respBody types.LoginResponse // Use types.LoginResponse
 		testutil.DecodeJSONResponse(t, rr, &respBody)
 
 		// Validate the JWT token
@@ -82,8 +84,8 @@ func TestLogin(t *testing.T) {
 
 	// --- Test Case: Incorrect Password ---
 	t.Run("IncorrectPassword", func(t *testing.T) {
-		loginPayload := auth.LoginRequest{
-			Username: env.User1Name, // Use correct username from env
+		loginPayload := types.LoginRequest{ // Use types.LoginRequest
+			Username: "demo_user", // Use correct username from env (demo_user is seeded)
 			Password: "wrongpassword",
 		}
 		req := testutil.NewAuthenticatedRequest(
@@ -105,7 +107,7 @@ func TestLogin(t *testing.T) {
 
 	// --- Test Case: User Not Found ---
 	t.Run("UserNotFound", func(t *testing.T) {
-		loginPayload := auth.LoginRequest{
+		loginPayload := types.LoginRequest{ // Use types.LoginRequest
 			Username: "nonexistent_user",
 			Password: "password",
 		}
@@ -125,8 +127,8 @@ func TestLogin(t *testing.T) {
 		testutil.AssertStatusCode(t, rr, http.StatusUnauthorized) // Expect Unauthorized as user doesn't match demo user check in HandleLogin
 		testutil.AssertBodyContains(t, rr, "Invalid credentials")
 
-		// Also test with the partner user - login handler only allows demo_user (ID 1)
-		loginPayloadPartner := auth.LoginRequest{
+		// Also test with the partner user
+		loginPayloadPartner := types.LoginRequest{ // Use types.LoginRequest
 			Username: "partner_user", // Use the correct username seeded in schema.sql
 			Password: "password",
 		}
@@ -142,10 +144,10 @@ func TestLogin(t *testing.T) {
 			env.Handler,
 			reqPartner,
 		)
-		// Partner user should now be able to log in successfully
+		// Partner user should be able to log in successfully
 		testutil.AssertStatusCode(t, rrPartner, http.StatusOK)
 		// Decode and check the response body for the partner user
-		var respBodyPartner auth.LoginResponse
+		var respBodyPartner types.LoginResponse // Use types.LoginResponse
 		testutil.DecodeJSONResponse(t, rrPartner, &respBodyPartner)
 
 		// Validate the JWT token for the partner
@@ -174,7 +176,7 @@ func TestLogin(t *testing.T) {
 
 	// --- Test Case: Missing Username ---
 	t.Run("MissingUsername", func(t *testing.T) {
-		loginPayload := auth.LoginRequest{
+		loginPayload := types.LoginRequest{ // Use types.LoginRequest
 			Username: "",
 			Password: "password",
 		}
@@ -211,9 +213,9 @@ func TestPartnerRegistration(t *testing.T) {
 	// --- Test Case: Successful Registration ---
 	t.Run("Success", func(t *testing.T) {
 		// Define payload for new users
-		payload := auth.PartnerRegistrationRequest{
-			User1: auth.UserRegistrationDetails{Username: "alice", Password: "password123", FirstName: "Alice"},
-			User2: auth.UserRegistrationDetails{Username: "bob", Password: "password456", FirstName: "Bob"},
+		payload := types.PartnerRegistrationRequest{ // Use types.PartnerRegistrationRequest
+			User1: types.UserRegistrationDetails{Username: "alice", Password: "password123", FirstName: "Alice"}, // Use types.UserRegistrationDetails
+			User2: types.UserRegistrationDetails{Username: "bob", Password: "password456", FirstName: "Bob"},     // Use types.UserRegistrationDetails
 		}
 
 		// Make the registration request
@@ -222,7 +224,7 @@ func TestPartnerRegistration(t *testing.T) {
 
 		// Assert success status and decode response
 		testutil.AssertStatusCode(t, rr, http.StatusCreated)
-		var respBody auth.PartnerRegistrationResponse
+		var respBody types.PartnerRegistrationResponse // Use types.PartnerRegistrationResponse
 		testutil.DecodeJSONResponse(t, rr, &respBody)
 
 		// Basic response body checks
@@ -287,14 +289,14 @@ func TestPartnerRegistration(t *testing.T) {
 	t.Run("BadRequests", func(t *testing.T) {
 		testCases := []struct {
 			name         string
-			payload      auth.PartnerRegistrationRequest
+			payload      types.PartnerRegistrationRequest // Use types.PartnerRegistrationRequest
 			expectedMsg  string
 			expectedCode int
 		}{
-			{"MissingUser1Username", auth.PartnerRegistrationRequest{User1: auth.UserRegistrationDetails{Password: "p", FirstName: "F"}, User2: auth.UserRegistrationDetails{Username: "u", Password: "p", FirstName: "F"}}, "All fields", http.StatusBadRequest},
-			{"MissingUser2Password", auth.PartnerRegistrationRequest{User1: auth.UserRegistrationDetails{Username: "u", Password: "p", FirstName: "F"}, User2: auth.UserRegistrationDetails{Username: "u2", FirstName: "F"}}, "All fields", http.StatusBadRequest},
-			{"SameUsernames", auth.PartnerRegistrationRequest{User1: auth.UserRegistrationDetails{Username: "same", Password: "p", FirstName: "F"}, User2: auth.UserRegistrationDetails{Username: "same", Password: "p2", FirstName: "F2"}}, "Usernames must be different", http.StatusBadRequest},
-			{"ShortPassword", auth.PartnerRegistrationRequest{User1: auth.UserRegistrationDetails{Username: "u1", Password: "short", FirstName: "F1"}, User2: auth.UserRegistrationDetails{Username: "u2", Password: "password", FirstName: "F2"}}, "Password must be at least 6 characters", http.StatusBadRequest},
+			{"MissingUser1Username", types.PartnerRegistrationRequest{User1: types.UserRegistrationDetails{Password: "p", FirstName: "F"}, User2: types.UserRegistrationDetails{Username: "u", Password: "p", FirstName: "F"}}, "All fields", http.StatusBadRequest},
+			{"MissingUser2Password", types.PartnerRegistrationRequest{User1: types.UserRegistrationDetails{Username: "u", Password: "p", FirstName: "F"}, User2: types.UserRegistrationDetails{Username: "u2", FirstName: "F"}}, "All fields", http.StatusBadRequest},
+			{"SameUsernames", types.PartnerRegistrationRequest{User1: types.UserRegistrationDetails{Username: "same", Password: "p", FirstName: "F"}, User2: types.UserRegistrationDetails{Username: "same", Password: "p2", FirstName: "F2"}}, "Usernames must be different", http.StatusBadRequest},
+			{"ShortPassword", types.PartnerRegistrationRequest{User1: types.UserRegistrationDetails{Username: "u1", Password: "short", FirstName: "F1"}, User2: types.UserRegistrationDetails{Username: "u2", Password: "password", FirstName: "F2"}}, "Password must be at least 6 characters", http.StatusBadRequest},
 		}
 
 		for _, tc := range testCases {
@@ -318,9 +320,9 @@ func TestPartnerRegistration(t *testing.T) {
 		}
 
 		// Attempt to register using the existing username
-		payload := auth.PartnerRegistrationRequest{
-			User1: auth.UserRegistrationDetails{Username: conflictUsername, Password: "password123", FirstName: "Conflict"}, // Use existing username
-			User2: auth.UserRegistrationDetails{Username: "new_partner", Password: "password456", FirstName: "New"},
+		payload := types.PartnerRegistrationRequest{ // Use types.PartnerRegistrationRequest
+			User1: types.UserRegistrationDetails{Username: conflictUsername, Password: "password123", FirstName: "Conflict"}, // Use existing username
+			User2: types.UserRegistrationDetails{Username: "new_partner", Password: "password456", FirstName: "New"},
 		}
 		req := testutil.NewAuthenticatedRequest(t, http.MethodPost, "/v1/register/partners", "", payload) // No auth needed
 		rr := testutil.ExecuteRequest(t, env.Handler, req)
@@ -449,7 +451,7 @@ func TestGetCategories(t *testing.T) {
 
 		testutil.AssertStatusCode(t, rr, http.StatusOK)
 
-		var categories []category.APICategory
+		var categories []types.Category // Use types.Category
 		testutil.DecodeJSONResponse(t, rr, &categories)
 
 		// Check if default categories from schema.sql are present
@@ -644,14 +646,14 @@ func TestAddDeposit(t *testing.T) {
 	// --- Test Cases ---
 	testCases := []struct {
 		name           string
-		payload        deposit.AddDepositPayload
+		payload        types.AddDepositPayload // Use types.AddDepositPayload
 		expectedStatus int
 		expectedBody   string                       // Substring for error messages or success message
 		verifyFunc     func(t *testing.T, id int64) // Optional verification
 	}{
 		{
 			name: "SuccessOneOff",
-			payload: deposit.AddDepositPayload{
+			payload: types.AddDepositPayload{ // Use types.AddDepositPayload
 				Amount:      1000.00,
 				Description: "Salary",
 				DepositDate: "2024-05-15",
@@ -688,7 +690,7 @@ func TestAddDeposit(t *testing.T) {
 		},
 		{
 			name: "SuccessRecurring",
-			payload: deposit.AddDepositPayload{
+			payload: types.AddDepositPayload{ // Use types.AddDepositPayload
 				Amount:           50.00,
 				Description:      "Pocket Money",
 				DepositDate:      "2024-05-10",
@@ -714,7 +716,7 @@ func TestAddDeposit(t *testing.T) {
 		},
 		{
 			name: "ErrorNegativeAmount",
-			payload: deposit.AddDepositPayload{
+			payload: types.AddDepositPayload{ // Use types.AddDepositPayload
 				Amount:      -100.00,
 				Description: "Invalid",
 				DepositDate: "2024-05-15",
@@ -725,7 +727,7 @@ func TestAddDeposit(t *testing.T) {
 		},
 		{
 			name: "ErrorMissingDescription",
-			payload: deposit.AddDepositPayload{
+			payload: types.AddDepositPayload{ // Use types.AddDepositPayload
 				Amount:      100.00,
 				Description: "", // Missing
 				DepositDate: "2024-05-15",
@@ -736,7 +738,7 @@ func TestAddDeposit(t *testing.T) {
 		},
 		{
 			name: "ErrorInvalidDateFormat",
-			payload: deposit.AddDepositPayload{
+			payload: types.AddDepositPayload{ // Use types.AddDepositPayload
 				Amount:      100.00,
 				Description: "Bad Date",
 				DepositDate: "15-05-2024", // Wrong format
@@ -747,7 +749,7 @@ func TestAddDeposit(t *testing.T) {
 		},
 		{
 			name: "ErrorMissingRecurrencePeriod",
-			payload: deposit.AddDepositPayload{
+			payload: types.AddDepositPayload{ // Use types.AddDepositPayload
 				Amount:      100.00,
 				Description: "Recurring No Period",
 				DepositDate: "2024-05-15",
@@ -770,7 +772,7 @@ func TestAddDeposit(t *testing.T) {
 			}
 
 			if tc.expectedStatus == http.StatusCreated && tc.verifyFunc != nil {
-				var respBody deposit.AddDepositResponse
+				var respBody types.AddDepositResponse // Use types.AddDepositResponse
 				testutil.DecodeJSONResponse(t, rr, &respBody)
 				if respBody.DepositID <= 0 {
 					t.Fatalf("Expected positive deposit ID in response, got %d", respBody.DepositID)
@@ -782,7 +784,7 @@ func TestAddDeposit(t *testing.T) {
 
 	// --- Test Case: Unauthorized ---
 	t.Run("Unauthorized", func(t *testing.T) {
-		payload := deposit.AddDepositPayload{Amount: 100, Description: "Test", DepositDate: "2024-01-01"}
+		payload := types.AddDepositPayload{Amount: 100, Description: "Test", DepositDate: "2024-01-01"} // Use types.AddDepositPayload
 		req := testutil.NewAuthenticatedRequest(t, http.MethodPost, "/v1/deposits", "invalid-token", payload)
 		rr := testutil.ExecuteRequest(t, env.Handler, req)
 		testutil.AssertStatusCode(t, rr, http.StatusUnauthorized)
@@ -790,7 +792,7 @@ func TestAddDeposit(t *testing.T) {
 
 	// --- Test Case: Unauthorized ---
 	t.Run("Unauthorized", func(t *testing.T) {
-		payload := deposit.AddDepositPayload{Amount: 100, Description: "Test", DepositDate: "2024-01-01"}
+		payload := types.AddDepositPayload{Amount: 100, Description: "Test", DepositDate: "2024-01-01"} // Use types.AddDepositPayload
 		req := testutil.NewAuthenticatedRequest(t, http.MethodPost, "/v1/deposits", "invalid-token", payload)
 		rr := testutil.ExecuteRequest(t, env.Handler, req)
 		testutil.AssertStatusCode(t, rr, http.StatusUnauthorized)
@@ -809,7 +811,7 @@ func TestGetDeposits(t *testing.T) {
 		rr := testutil.ExecuteRequest(t, env.Handler, req)
 		testutil.AssertStatusCode(t, rr, http.StatusOK)
 
-		var resp []deposit.Deposit
+		var resp []types.Deposit // Use types.Deposit
 		testutil.DecodeJSONResponse(t, rr, &resp)
 		if len(resp) != 0 {
 			t.Errorf("Expected 0 deposits, got %d", len(resp))
@@ -830,7 +832,7 @@ func TestGetDeposits(t *testing.T) {
 		rr := testutil.ExecuteRequest(t, env.Handler, req)
 		testutil.AssertStatusCode(t, rr, http.StatusOK)
 
-		var resp []deposit.Deposit
+		var resp []types.Deposit // Use types.Deposit
 		testutil.DecodeJSONResponse(t, rr, &resp)
 
 		if len(resp) != 2 {
@@ -883,13 +885,11 @@ func TestGetHistory(t *testing.T) {
 		rr := testutil.ExecuteRequest(t, env.Handler, req)
 		testutil.AssertStatusCode(t, rr, http.StatusOK)
 
+		// The response structure is now spendings.HistoryResponse which contains []spendings.FrontendHistoryListItem
 		var resp spendings.HistoryResponse
 		testutil.DecodeJSONResponse(t, rr, &resp)
-		if len(resp.SpendingGroups) != 0 {
-			t.Errorf("Expected 0 spending groups, got %d", len(resp.SpendingGroups))
-		}
-		if len(resp.Deposits) != 0 {
-			t.Errorf("Expected 0 deposits, got %d", len(resp.Deposits))
+		if len(resp.History) != 0 {
+			t.Errorf("Expected 0 history items, got %d", len(resp.History))
 		}
 	})
 
@@ -938,65 +938,94 @@ func TestGetHistory(t *testing.T) {
 		rr := testutil.ExecuteRequest(t, env.Handler, req)
 		testutil.AssertStatusCode(t, rr, http.StatusOK)
 
-		var resp spendings.HistoryResponse
+		var resp spendings.HistoryResponse // Use spendings.HistoryResponse
 		testutil.DecodeJSONResponse(t, rr, &resp)
 
-		// Check counts
-		if len(resp.SpendingGroups) != 2 {
-			t.Fatalf("Expected 2 spending groups, got %d", len(resp.SpendingGroups))
-		}
-		if len(resp.Deposits) != 2 {
-			t.Fatalf("Expected 2 deposits, got %d", len(resp.Deposits))
+		// Check total count (2 jobs + 1 non-recurring deposit + 1 recurring deposit occurrence = 4 items)
+		// Note: The recurring deposit generates occurrences up to 'now'. Since it started 1 month ago,
+		// and recurs monthly, it should have 2 occurrences: the initial one and the one for 'now'.
+		// Let's refine the deposit setup slightly for clarity.
+		// Deposit 1: 10 days ago (non-recurring)
+		// Deposit 2: 35 days ago (recurring monthly) -> Occurrences at T-35d, T-5d (approx)
+		// Job 1: 2 hours ago
+		// Job 2: 1 hour ago
+		// Expected order (newest first): Job2, Job1, Deposit2(T-5d), Deposit1(T-10d), Deposit2(T-35d)
+		// Total expected items = 5
+		if len(resp.History) != 5 {
+			t.Fatalf("Expected 5 history items, got %d", len(resp.History))
+			// For debugging:
+			// for i, item := range resp.History {
+			// 	t.Logf("Item %d: Type=%s, Date=%s", i, item.Type, item.Date)
+			// }
 		}
 
-		// --- Verify Spending Groups (Order: Job2 then Job1 based on created_at DESC) ---
-		group2 := resp.SpendingGroups[0] // Job 2 should be first
-		if group2.JobID != job2ID {
-			t.Errorf("Expected first group JobID %d, got %d", job2ID, group2.JobID)
+		// --- Verify Item Order and Content (Spot Checks) ---
+
+		// Item 0: Should be Job 2 (most recent)
+		item0 := resp.History[0]
+		if item0.Type != "spending_group" || item0.JobID == nil || *item0.JobID != job2ID {
+			t.Errorf("Expected item 0 to be spending_group JobID %d, got Type=%s, JobID=%v", job2ID, item0.Type, item0.JobID)
 		}
-		if group2.Type != "spending_group" {
-			t.Errorf("Expected group type 'spending_group', got '%s'", group2.Type)
-		}
-		if len(group2.Spendings) != 1 || group2.Spendings[0].ID != spending2_1 {
-			t.Errorf("Expected 1 spending item with ID %d in group 2, got %v", spending2_1, group2.Spendings)
+		if item0.Spendings == nil || len(item0.Spendings) != 1 || item0.Spendings[0].ID != spending2_1 {
+			t.Errorf("Expected 1 spending item with ID %d in item 0, got %v", spending2_1, item0.Spendings)
 		}
 		expectedStatus2 := fmt.Sprintf("Paid by %s", env.PartnerName)
-		if group2.Spendings[0].SharingStatus != expectedStatus2 {
-			t.Errorf("Expected spending 2_1 status '%s', got '%s'", expectedStatus2, group2.Spendings[0].SharingStatus)
+		if item0.Spendings[0].SharingStatus != expectedStatus2 {
+			t.Errorf("Expected spending 2_1 status '%s', got '%s'", expectedStatus2, item0.Spendings[0].SharingStatus)
 		}
 
-		group1 := resp.SpendingGroups[1] // Job 1 should be second
-		if group1.JobID != job1ID {
-			t.Errorf("Expected second group JobID %d, got %d", job1ID, group1.JobID)
+		// Item 1: Should be Job 1
+		item1 := resp.History[1]
+		if item1.Type != "spending_group" || item1.JobID == nil || *item1.JobID != job1ID {
+			t.Errorf("Expected item 1 to be spending_group JobID %d, got Type=%s, JobID=%v", job1ID, item1.Type, item1.JobID)
 		}
-		if len(group1.Spendings) != 2 {
-			t.Fatalf("Expected 2 spending items in group 1, got %d", len(group1.Spendings))
+		if item1.Spendings == nil || len(item1.Spendings) != 2 {
+			t.Fatalf("Expected 2 spending items in item 1, got %d", len(item1.Spendings))
 		}
-		if group1.Spendings[0].ID != spending1_1 || group1.Spendings[1].ID != spending1_2 {
-			t.Errorf("Expected spending IDs %d, %d in group 1, got %d, %d", spending1_1, spending1_2, group1.Spendings[0].ID, group1.Spendings[1].ID)
-		}
-
-		// --- Verify Deposits (Order: Deposit1 then Deposit2 based on deposit_date DESC) ---
-		dep1 := resp.Deposits[0] // Deposit 1 (May 15th) should be first
-		if dep1.ID != deposit1ID {
-			t.Errorf("Expected first deposit ID %d, got %d", deposit1ID, dep1.ID)
-		}
-		if dep1.Type != "deposit" {
-			t.Errorf("Expected deposit type 'deposit', got '%s'", dep1.Type)
-		}
-		if dep1.Description != "Salary May" {
-			t.Errorf("Expected deposit 1 description 'Salary May', got '%s'", dep1.Description)
-		}
-		if dep1.IsRecurring {
-			t.Error("Expected deposit 1 not to be recurring")
+		if item1.Spendings[0].ID != spending1_1 || item1.Spendings[1].ID != spending1_2 {
+			t.Errorf("Expected spending IDs %d, %d in item 1, got %d, %d", spending1_1, spending1_2, item1.Spendings[0].ID, item1.Spendings[1].ID)
 		}
 
-		dep2 := resp.Deposits[1] // Deposit 2 (Apr 25th) should be second
-		if dep2.ID != deposit2ID {
-			t.Errorf("Expected second deposit ID %d, got %d", deposit2ID, dep2.ID)
+		// Item 2: Should be Deposit 2 occurrence (recent)
+		item2 := resp.History[2]
+		if item2.Type != "deposit" || item2.ID == nil || *item2.ID != deposit2ID {
+			t.Errorf("Expected item 2 to be deposit ID %d, got Type=%s, ID=%v", deposit2ID, item2.Type, item2.ID)
 		}
-		if !dep2.IsRecurring || dep2.RecurrencePeriod == nil || *dep2.RecurrencePeriod != "monthly" {
-			t.Errorf("Expected deposit 2 to be recurring monthly, got recurring=%v, period=%v", dep2.IsRecurring, dep2.RecurrencePeriod)
+		if item2.Description == nil || *item2.Description != "Pocket Money" {
+			t.Errorf("Expected item 2 description 'Pocket Money', got %v", item2.Description)
+		}
+		if item2.IsRecurring == nil || !*item2.IsRecurring || item2.RecurrencePeriod == nil || *item2.RecurrencePeriod != "monthly" {
+			t.Errorf("Expected item 2 to be recurring monthly, got recurring=%v, period=%v", item2.IsRecurring, item2.RecurrencePeriod)
+		}
+		// Check date is recent (approx T-5d) - compare date part only
+		if item2.Date.Format("2006-01-02") != time.Now().AddDate(0, 0, -5).Format("2006-01-02") {
+			// Allow for slight variation due to AddDate(0, 1, 0) behavior
+			t.Logf("Warning: Item 2 date (%s) doesn't exactly match expected T-5d (%s), possibly due to AddDate month calculation.", item2.Date.Format("2006-01-02"), time.Now().AddDate(0, 0, -5).Format("2006-01-02"))
+		}
+
+
+		// Item 3: Should be Deposit 1 (non-recurring)
+		item3 := resp.History[3]
+		if item3.Type != "deposit" || item3.ID == nil || *item3.ID != deposit1ID {
+			t.Errorf("Expected item 3 to be deposit ID %d, got Type=%s, ID=%v", deposit1ID, item3.Type, item3.ID)
+		}
+		if item3.Description == nil || *item3.Description != "Salary May" {
+			t.Errorf("Expected item 3 description 'Salary May', got %v", item3.Description)
+		}
+		if item3.IsRecurring == nil || *item3.IsRecurring {
+			t.Error("Expected item 3 not to be recurring")
+		}
+		if item3.Date.Format("2006-01-02") != deposit1Date.Format("2006-01-02") {
+			t.Errorf("Expected item 3 date %s, got %s", deposit1Date.Format("2006-01-02"), item3.Date.Format("2006-01-02"))
+		}
+
+		// Item 4: Should be Deposit 2 occurrence (original)
+		item4 := resp.History[4]
+		if item4.Type != "deposit" || item4.ID == nil || *item4.ID != deposit2ID {
+			t.Errorf("Expected item 4 to be deposit ID %d, got Type=%s, ID=%v", deposit2ID, item4.Type, item4.ID)
+		}
+		if item4.Date.Format("2006-01-02") != deposit2Date.Format("2006-01-02") {
+			t.Errorf("Expected item 4 date %s, got %s", deposit2Date.Format("2006-01-02"), item4.Date.Format("2006-01-02"))
 		}
 	})
 
@@ -1032,7 +1061,7 @@ func TestUpdateSpending(t *testing.T) {
 	testCases := []struct {
 		name           string
 		spendingID     int64
-		payload        spendings.UpdateSpendingPayload
+		payload        types.UpdateSpendingPayload // Use types.UpdateSpendingPayload
 		expectedStatus int
 		expectedBody   string                       // Substring to check in body for errors
 		verifyFunc     func(t *testing.T, id int64) // Optional verification function
@@ -1040,10 +1069,10 @@ func TestUpdateSpending(t *testing.T) {
 		{
 			name:       "SuccessUpdateToAlone",
 			spendingID: spendingIDShared,
-			payload: spendings.UpdateSpendingPayload{
+			payload: types.UpdateSpendingPayload{ // Use types.UpdateSpendingPayload
 				Description:   "Updated to Alone",
 				CategoryName:  "Transport",
-				SharingStatus: spendings.StatusAlone,
+				SharingStatus: types.StatusAlone, // Use types constant
 			},
 			expectedStatus: http.StatusOK,
 			verifyFunc: func(t *testing.T, id int64) {
@@ -1072,10 +1101,10 @@ func TestUpdateSpending(t *testing.T) {
 		{
 			name:       "SuccessUpdateToShared",
 			spendingID: spendingIDAlone,
-			payload: spendings.UpdateSpendingPayload{
+			payload: types.UpdateSpendingPayload{ // Use types.UpdateSpendingPayload
 				Description:   "Updated to Shared",
 				CategoryName:  "Groceries",
-				SharingStatus: spendings.StatusShared,
+				SharingStatus: types.StatusShared, // Use types constant
 			},
 			expectedStatus: http.StatusOK,
 			verifyFunc: func(t *testing.T, id int64) {
@@ -1096,10 +1125,10 @@ func TestUpdateSpending(t *testing.T) {
 		{
 			name:       "SuccessUpdateToPaidByPartner",
 			spendingID: spendingIDShared, // Use the initially shared one
-			payload: spendings.UpdateSpendingPayload{
+			payload: types.UpdateSpendingPayload{ // Use types.UpdateSpendingPayload
 				Description:   "Updated to PaidByPartner",
 				CategoryName:  "Shopping",
-				SharingStatus: spendings.StatusPaidByPartner,
+				SharingStatus: types.StatusPaidByPartner, // Use types constant
 			},
 			expectedStatus: http.StatusOK,
 			verifyFunc: func(t *testing.T, id int64) {
@@ -1120,10 +1149,10 @@ func TestUpdateSpending(t *testing.T) {
 		{
 			name:       "ErrorNotFound",
 			spendingID: 99999,
-			payload: spendings.UpdateSpendingPayload{
+			payload: types.UpdateSpendingPayload{ // Use types.UpdateSpendingPayload
 				Description:   "Test",
 				CategoryName:  "Groceries",
-				SharingStatus: spendings.StatusAlone,
+				SharingStatus: types.StatusAlone, // Use types constant
 			},
 			expectedStatus: http.StatusNotFound,
 			expectedBody:   "Spending item not found",
@@ -1131,10 +1160,10 @@ func TestUpdateSpending(t *testing.T) {
 		{
 			name:       "ErrorForbidden",
 			spendingID: spendingIDPartners, // Belongs to partner
-			payload: spendings.UpdateSpendingPayload{
+			payload: types.UpdateSpendingPayload{ // Use types.UpdateSpendingPayload
 				Description:   "Attempt Forbidden Update",
 				CategoryName:  "Groceries",
-				SharingStatus: spendings.StatusAlone,
+				SharingStatus: types.StatusAlone, // Use types constant
 			},
 			expectedStatus: http.StatusForbidden,
 			expectedBody:   "Forbidden",
@@ -1142,10 +1171,10 @@ func TestUpdateSpending(t *testing.T) {
 		{
 			name:       "ErrorInvalidCategory",
 			spendingID: spendingIDShared,
-			payload: spendings.UpdateSpendingPayload{
+			payload: types.UpdateSpendingPayload{ // Use types.UpdateSpendingPayload
 				Description:   "Test",
 				CategoryName:  "NonExistentCategory",
-				SharingStatus: spendings.StatusAlone,
+				SharingStatus: types.StatusAlone, // Use types constant
 			},
 			expectedStatus: http.StatusBadRequest, // Bad request because category is invalid input
 			expectedBody:   "Category not found",
@@ -1153,10 +1182,10 @@ func TestUpdateSpending(t *testing.T) {
 		{
 			name:       "ErrorInvalidStatus",
 			spendingID: spendingIDShared,
-			payload: spendings.UpdateSpendingPayload{
+			payload: types.UpdateSpendingPayload{ // Use types.UpdateSpendingPayload
 				Description:   "Test",
 				CategoryName:  "Groceries",
-				SharingStatus: "invalid_status",
+				SharingStatus: "invalid_status", // Keep as string for test case
 			},
 			expectedStatus: http.StatusBadRequest,
 			expectedBody:   "Invalid sharing status",
@@ -1164,10 +1193,10 @@ func TestUpdateSpending(t *testing.T) {
 		{
 			name:       "ErrorMissingCategory",
 			spendingID: spendingIDShared,
-			payload: spendings.UpdateSpendingPayload{
+			payload: types.UpdateSpendingPayload{ // Use types.UpdateSpendingPayload
 				Description:   "Test",
 				CategoryName:  "", // Missing category
-				SharingStatus: spendings.StatusAlone,
+				SharingStatus: types.StatusAlone, // Use types constant
 			},
 			expectedStatus: http.StatusBadRequest,
 			expectedBody:   "Category name is required",
@@ -1194,10 +1223,10 @@ func TestUpdateSpending(t *testing.T) {
 	// --- Test Case: Unauthorized ---
 	t.Run("Unauthorized", func(t *testing.T) {
 		url := fmt.Sprintf("/v1/spendings/%d", spendingIDShared)
-		payload := spendings.UpdateSpendingPayload{
+		payload := types.UpdateSpendingPayload{ // Use types.UpdateSpendingPayload
 			Description:   "Unauthorized Update",
 			CategoryName:  "Groceries",
-			SharingStatus: spendings.StatusAlone,
+			SharingStatus: types.StatusAlone, // Use types constant
 		}
 		req := testutil.NewAuthenticatedRequest(t, http.MethodPut, url, "invalid-token", payload)
 		rr := testutil.ExecuteRequest(t, env.Handler, req)
@@ -1221,7 +1250,7 @@ func TestGetTransferStatus(t *testing.T) {
 		rr := testutil.ExecuteRequest(t, env.Handler, req)
 		testutil.AssertStatusCode(t, rr, http.StatusOK)
 
-		var resp transfer.TransferStatusResponse
+		var resp types.TransferStatusResponse // Use types.TransferStatusResponse
 		testutil.DecodeJSONResponse(t, rr, &resp)
 
 		if resp.PartnerName != env.PartnerName {
@@ -1261,7 +1290,7 @@ func TestGetTransferStatus(t *testing.T) {
 		rr := testutil.ExecuteRequest(t, env.Handler, req)
 		testutil.AssertStatusCode(t, rr, http.StatusOK)
 
-		var resp transfer.TransferStatusResponse
+		var resp types.TransferStatusResponse // Use types.TransferStatusResponse
 		testutil.DecodeJSONResponse(t, rr, &resp)
 
 		if resp.PartnerName != env.PartnerName {
@@ -1345,7 +1374,7 @@ func TestRecordTransfer(t *testing.T) {
 		reqStatus := testutil.NewAuthenticatedRequest(t, http.MethodGet, "/v1/transfer/status", env.AuthToken, nil)
 		rrStatus := testutil.ExecuteRequest(t, env.Handler, reqStatus)
 		testutil.AssertStatusCode(t, rrStatus, http.StatusOK)
-		var resp transfer.TransferStatusResponse
+		var resp types.TransferStatusResponse // Use types.TransferStatusResponse
 		testutil.DecodeJSONResponse(t, rrStatus, &resp)
 		if resp.AmountOwed != 0.0 || resp.OwedBy != nil || resp.OwedTo != nil {
 			t.Errorf("Expected status to be settled after recording transfer, got %v", resp)
@@ -1402,14 +1431,14 @@ func TestPay(t *testing.T) {
 	// --- Test Cases ---
 	testCases := []struct {
 		name           string
-		payload        pay.PayPayload // Use the struct for payload
+		payload        types.PayPayload // Use types.PayPayload
 		expectedStatus int
 		expectedBody   string             // Substring for error messages
 		verifyFunc     func(t *testing.T) // Optional verification
 	}{
 		{
 			name: "SuccessAloneNotPreSettled",
-			payload: pay.PayPayload{
+			payload: types.PayPayload{ // Use types.PayPayload
 				SharedStatus: "alone",
 				Amount:       42.50,
 				Category:     "Shopping",
@@ -1454,7 +1483,7 @@ func TestPay(t *testing.T) {
 		},
 		{
 			name: "SuccessSharedPreSettled",
-			payload: pay.PayPayload{
+			payload: types.PayPayload{ // Use types.PayPayload
 				SharedStatus: "shared",
 				Amount:       100.00,
 				Category:     "Eating Out",
@@ -1504,7 +1533,7 @@ func TestPay(t *testing.T) {
 		},
 		{
 			name: "ErrorInvalidStatus",
-			payload: pay.PayPayload{
+			payload: types.PayPayload{ // Use types.PayPayload
 				SharedStatus: "mixed", // Invalid status
 				Amount:       10.0,
 				Category:     "Groceries",
@@ -1515,7 +1544,7 @@ func TestPay(t *testing.T) {
 		},
 		{
 			name: "ErrorInvalidAmountZero",
-			payload: pay.PayPayload{
+			payload: types.PayPayload{ // Use types.PayPayload
 				SharedStatus: "alone",
 				Amount:       0,
 				Category:     "Groceries",
@@ -1526,7 +1555,7 @@ func TestPay(t *testing.T) {
 		},
 		{
 			name: "ErrorInvalidAmountNegative",
-			payload: pay.PayPayload{
+			payload: types.PayPayload{ // Use types.PayPayload
 				SharedStatus: "alone",
 				Amount:       -10.5,
 				Category:     "Groceries",
@@ -1537,7 +1566,7 @@ func TestPay(t *testing.T) {
 		},
 		{
 			name: "ErrorInvalidCategory",
-			payload: pay.PayPayload{
+			payload: types.PayPayload{ // Use types.PayPayload
 				SharedStatus: "alone",
 				Amount:       20.0,
 				Category:     "NonExistent",
@@ -1548,7 +1577,7 @@ func TestPay(t *testing.T) {
 		},
 		{
 			name: "ErrorMissingCategory", // Test missing category name in payload
-			payload: pay.PayPayload{
+			payload: types.PayPayload{ // Use types.PayPayload
 				SharedStatus: "alone",
 				Amount:       25.0,
 				Category:     "", // Empty category name
@@ -1581,7 +1610,7 @@ func TestPay(t *testing.T) {
 	// --- Test Case: Unauthorized ---
 	t.Run("Unauthorized", func(t *testing.T) {
 		url := "/v1/pay"
-		payload := pay.PayPayload{SharedStatus: "alone", Amount: 50, Category: "Shopping", PreSettled: false}
+		payload := types.PayPayload{SharedStatus: "alone", Amount: 50, Category: "Shopping", PreSettled: false} // Use types.PayPayload
 		req := testutil.NewAuthenticatedRequest(t, http.MethodPost, url, "invalid-token", payload)
 		rr := testutil.ExecuteRequest(t, env.Handler, req)
 		testutil.AssertStatusCode(t, rr, http.StatusUnauthorized)

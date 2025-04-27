@@ -9,13 +9,10 @@ import (
 	"net/http"
 
 	"git.sr.ht/~relay/sapp-backend/auth" // Import auth package
+	"git.sr.ht/~relay/sapp-backend/types" // Import shared types
 )
 
-// APICategory represents a category returned by the API.
-type APICategory struct {
-	ID   int64  `json:"id"`
-	Name string `json:"name"`
-}
+// APICategory moved to types package
 
 // HandleGetCategories returns an http.HandlerFunc that fetches all categories (protected).
 func HandleGetCategories(db *sql.DB) http.HandlerFunc {
@@ -36,9 +33,10 @@ func HandleGetCategories(db *sql.DB) http.HandlerFunc {
 		}
 		defer rows.Close()
 
-		categories := []APICategory{}
+		categories := []types.Category{} // Use types.Category
 		for rows.Next() {
-			var cat APICategory
+			var cat types.Category // Use types.Category
+			// Scan only ID and Name, as APICategory doesn't include ai_notes
 			if err := rows.Scan(&cat.ID, &cat.Name); err != nil {
 				slog.Error("failed to scan category row", "url", r.URL, "user_id", userID, "err", err)
 				http.Error(w, "Internal server error", http.StatusInternalServerError)

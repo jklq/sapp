@@ -14,6 +14,8 @@ import (
 
 	"github.com/golang-jwt/jwt/v5" // Import JWT library
 	"golang.org/x/crypto/bcrypt"
+
+	"git.sr.ht/~relay/sapp-backend/types" // Import shared types
 )
 
 // JWT secret key - SHOULD be loaded securely from environment variables in production
@@ -26,18 +28,8 @@ type contextKey string
 
 const userContextKey = contextKey("userID")
 
-// LoginRequest defines the structure for the login request body
-type LoginRequest struct {
-	Username string `json:"username"`
-	Password string `json:"password"`
-}
-
-// LoginResponse defines the structure for the login response body
-type LoginResponse struct {
-	Token     string `json:"token"`
-	UserID    int64  `json:"user_id"`
-	FirstName string `json:"first_name"`
-}
+// LoginRequest moved to types package
+// LoginResponse moved to types package
 
 // Claims defines the structure for JWT claims
 type Claims struct {
@@ -45,25 +37,9 @@ type Claims struct {
 	jwt.RegisteredClaims
 }
 
-// PartnerRegistrationRequest defines the structure for the partner registration request body
-type PartnerRegistrationRequest struct {
-	User1 UserRegistrationDetails `json:"user1"`
-	User2 UserRegistrationDetails `json:"user2"`
-}
-
-// UserRegistrationDetails contains the details needed to register a single user
-type UserRegistrationDetails struct {
-	Username  string `json:"username"`
-	Password  string `json:"password"`
-	FirstName string `json:"first_name"`
-}
-
-// PartnerRegistrationResponse defines the structure for the partner registration response body
-type PartnerRegistrationResponse struct {
-	Message string `json:"message"`
-	User1ID int64  `json:"user1_id"`
-	User2ID int64  `json:"user2_id"`
-}
+// PartnerRegistrationRequest moved to types package
+// UserRegistrationDetails moved to types package
+// PartnerRegistrationResponse moved to types package
 
 // generateJWT generates a new JWT for a given user ID.
 func generateJWT(userID int64) (string, error) {
@@ -101,7 +77,7 @@ func generateJWT(userID int64) (string, error) {
 // HandleLogin creates a handler for user login
 func HandleLogin(db *sql.DB) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
-		var req LoginRequest
+		var req types.LoginRequest // Use types.LoginRequest
 		if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
 			http.Error(w, "Invalid request body", http.StatusBadRequest)
 			return
@@ -148,7 +124,7 @@ func HandleLogin(db *sql.DB) http.HandlerFunc {
 		}
 
 		w.Header().Set("Content-Type", "application/json")
-		json.NewEncoder(w).Encode(LoginResponse{
+		json.NewEncoder(w).Encode(types.LoginResponse{ // Use types.LoginResponse
 			Token:     tokenString, // Return the generated JWT
 			UserID:    userID,
 			FirstName: firstName,
@@ -279,7 +255,7 @@ func GetPartnerUserID(q Querier, requestingUserID int64) (int64, bool) {
 // HandlePartnerRegistration creates a handler for registering two users as partners.
 func HandlePartnerRegistration(db *sql.DB) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
-		var req PartnerRegistrationRequest
+		var req types.PartnerRegistrationRequest // Use types.PartnerRegistrationRequest
 		if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
 			http.Error(w, "Invalid request body", http.StatusBadRequest)
 			return
@@ -400,7 +376,7 @@ func HandlePartnerRegistration(db *sql.DB) http.HandlerFunc {
 		slog.Info("Partner registration successful", "user1", u1.Username, "user2", u2.Username, "user1_id", user1ID, "user2_id", user2ID)
 		w.Header().Set("Content-Type", "application/json")
 		w.WriteHeader(http.StatusCreated)
-		json.NewEncoder(w).Encode(PartnerRegistrationResponse{
+		json.NewEncoder(w).Encode(types.PartnerRegistrationResponse{ // Use types.PartnerRegistrationResponse
 			Message: "Users registered and partnered successfully",
 			User1ID: user1ID,
 			User2ID: user2ID,

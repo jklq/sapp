@@ -9,16 +9,10 @@ import (
 	"time" // Added time for potential use with settled_at
 
 	"git.sr.ht/~relay/sapp-backend/auth" // Import auth package
+	"git.sr.ht/~relay/sapp-backend/types" // Import shared types
 )
 
-// PayPayload defines the structure for the manual payment request body.
-// This matches the frontend type.
-type PayPayload struct {
-	SharedStatus string  `json:"shared_status"` // 'alone' or 'shared'
-	Amount       float64 `json:"amount"`
-	Category     string  `json:"category"`    // Category name
-	PreSettled   bool    `json:"pre_settled"` // New flag
-}
+// PayPayload moved to types package
 
 func HandlePayRoute(db *sql.DB) http.HandlerFunc { // Return http.HandlerFunc directly
 	return func(w http.ResponseWriter, r *http.Request) {
@@ -31,7 +25,7 @@ func HandlePayRoute(db *sql.DB) http.HandlerFunc { // Return http.HandlerFunc di
 		}
 
 		// Decode JSON payload from request body
-		var payload PayPayload
+		var payload types.PayPayload // Use types.PayPayload
 		if err := json.NewDecoder(r.Body).Decode(&payload); err != nil {
 			slog.Error("failed to decode pay request body", "url", r.URL, "user_id", userID, "err", err)
 			http.Error(w, "Bad Request: Invalid JSON", http.StatusBadRequest)

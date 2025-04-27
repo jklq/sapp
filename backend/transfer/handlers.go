@@ -9,15 +9,10 @@ import (
 	"time"
 
 	"git.sr.ht/~relay/sapp-backend/auth"
+	"git.sr.ht/~relay/sapp-backend/types" // Import shared types
 )
 
-// TransferStatusResponse defines the structure for the balance status.
-type TransferStatusResponse struct {
-	PartnerName string  `json:"partner_name"`
-	AmountOwed  float64 `json:"amount_owed"` // Positive if partner owes user, negative if user owes partner
-	OwedBy      *string `json:"owed_by"`     // Name of the person who owes money (null if settled)
-	OwedTo      *string `json:"owed_to"`     // Name of the person who is owed money (null if settled)
-}
+// TransferStatusResponse moved to types package
 
 // HandleGetTransferStatus calculates and returns the net balance between the user and their partner.
 func HandleGetTransferStatus(db *sql.DB) http.HandlerFunc {
@@ -144,6 +139,7 @@ func HandleGetTransferStatus(db *sql.DB) http.HandlerFunc {
 		w.Header().Set("Content-Type", "application/json")
 		if err := json.NewEncoder(w).Encode(resp); err != nil {
 			slog.Error("failed to encode transfer status response", "url", r.URL, "user_id", userID, "err", err)
+			// Avoid writing header again if already written
 		}
 	}
 }

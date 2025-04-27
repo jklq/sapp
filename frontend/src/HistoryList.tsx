@@ -1,22 +1,13 @@
 import { useState, useEffect, useCallback, useMemo } from 'react';
 import { fetchHistory, fetchCategories, updateSpendingItem, deleteAIJob } from './api';
-// Import specific types needed, HistoryResponse now contains HistoryListItem
-import { SpendingItem, TransactionGroup, Category, UpdateSpendingPayload, EditableSharingStatus, HistoryResponse, HistoryListItem } from './types';
+// Import types. HistoryListItem now contains flattened data.
+import { Category, UpdateSpendingPayload, EditableSharingStatus, HistoryResponse, HistoryListItem, SpendingItem } from './types';
 
 interface HistoryListProps {
     onBack: () => void;
+}
 
-// Define local types for casting within the component for better type safety
-type SpendingGroupItem = HistoryListItem & TransactionGroup;
-type DepositHistoryItem = HistoryListItem & { // Based on history.DepositItem in Go
-    id: number;
-    amount: number;
-    description: string;
-    is_recurring: boolean;
-    recurrence_period: string | null;
-    created_at: string;
-};
-
+// No longer need local casting types like SpendingGroupItem, DepositHistoryItem
 
 function HistoryList({ onBack }: HistoryListProps) {
     // Data states
@@ -93,6 +84,7 @@ function HistoryList({ onBack }: HistoryListProps) {
 
     // --- Edit Handlers ---
 
+    // Edit click now takes a SpendingItem, which is part of a HistoryListItem
     const handleEditClick = (item: SpendingItem) => {
         setEditingItemId(item.id);
         setEditError(null); // Clear previous edit errors
@@ -195,36 +187,42 @@ function HistoryList({ onBack }: HistoryListProps) {
     };
 
     // --- Render Logic ---
-    // The historyItems state already contains the sorted, combined list from the backend
 
-    // Helper to render a deposit item (now receives DepositHistoryItem)
-    const renderDepositItem = (item: DepositHistoryItem) => {
+    // Helper to render a deposit item (receives a HistoryListItem of type 'deposit')
+    const renderDepositItem = (item: HistoryListItem) => {
         // Key uses original template ID + occurrence date for uniqueness
-        const key = `dep-${item.id}-${item.date}`;
+        // Use optional chaining and provide defaults
+        const key = `dep-${item.id ?? 'new'}-${item.date}`;
+        const description = item.description ?? 'N/A';
+        const amount = item.amount ?? 0;
+        const isRecurring = item.is_recurring ?? false;
+        const recurrencePeriod = item.recurrence_period;
+
         return (
             <div key={key} className="border border-green-200 bg-green-50 rounded-lg shadow-sm overflow-hidden p-3">
                  <div className="flex justify-between items-center flex-wrap gap-2">
                     {/* Left side: Icon, Description, Date */}
                     <div className="flex items-center space-x-3 flex-1 min-w-0 mr-2">
                          {/* Deposit Icon */}
+                         {/* Deposit Icon */}
                          <svg xmlns="http://www.w3.org/2000/svg" className="h-6 w-6 text-green-600 flex-shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
                             <path strokeLinecap="round" strokeLinejoin="round" d="M17 9V7a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2m2 4h10a2 2 0 002-2v-6a2 2 0 00-2-2H9a2 2 0 00-2 2v6a2 2 0 002 2zm7-5l-3 3m0 0l-3-3m3 3V8" />
                         </svg>
                         <div>
                             <p className="text-sm font-medium text-green-800 break-words">
-                                Deposit: <span className="text-gray-700 font-normal">{item.description}</span>
+                                Deposit: <span className="text-gray-700 font-normal">{description}</span>
                             </p>
                             <p className="text-xs text-gray-500">
                                 {formatDate(item.date, { hour: undefined, minute: undefined })} {/* Show only date of this occurrence */}
                                 {/* Optionally indicate if it's part of a recurring series */}
-                                {item.is_recurring && <span className="ml-2 text-xs italic">({item.recurrence_period || 'Recurring'})</span>}
+                                {isRecurring && <span className="ml-2 text-xs italic">({recurrencePeriod || 'Recurring'})</span>}
                             </p>
                         </div>
                     </div>
                     {/* Right side: Amount */}
                     <div className="flex-shrink-0">
                         <p className="text-lg font-semibold text-green-700">
-                            +{formatCurrency(item.amount)}
+                            +{formatCurrency(amount)}
                         </p>
                     </div>
                  </div>
@@ -232,8 +230,8 @@ function HistoryList({ onBack }: HistoryListProps) {
         );
     };
 
-    // Helper to render either display row or edit form - now responsive
-    const renderSpendingItemRow = (item: SpendingItem) => {
+    // Helper to render either display row or edit form for a SpendingItem (within a spending group)
+    const renderSpendingItemRow = (item: SpendingItem, partnerNameFromGroup: string | null | undefined) => {
         const isEditing = editingItemId === item.id && editFormData;
 
         // Common classes for the container (card on mobile, table row on md+)
@@ -290,10 +288,10 @@ function HistoryList({ onBack }: HistoryListProps) {
                             onChange={(e) => handleEditFormChange('sharing_status', e.target.value)}
                             className="mt-1 md:mt-0 w-full px-2 py-1 border border-gray-300 rounded text-sm bg-white"
                         >
-                            {/* Dynamically display partner name if available */}
+                            {/* Dynamically display partner name from the group if available */}
                             <option value="Alone">Alone</option>
-                            <option value="Shared">Shared {item.partner_name ? `with ${item.partner_name}` : ''}</option>
-                            <option value="Paid by Partner">Paid by {item.partner_name || 'Partner'}</option>
+                            <option value="Shared">Shared {partnerNameFromGroup ? `with ${partnerNameFromGroup}` : ''}</option>
+                            <option value="Paid by Partner">Paid by {partnerNameFromGroup || 'Partner'}</option>
                         </select>
                     </div>
                     {/* Actions (Save/Cancel) - Moved below other fields on mobile */}
@@ -434,19 +432,29 @@ function HistoryList({ onBack }: HistoryListProps) {
             {/* Render combined history items from the flat list */}
             {!isLoading && !error && historyItems.length > 0 && (
                 <div className="space-y-4"> {/* Use less space between items */}
-                    {historyItems.map((item, index) => { // Use index for key if IDs aren't unique across types
+                    {historyItems.map((item) => { // Use unique key based on type and ID/date
                         if (item.type === 'deposit') {
-                            // Render Deposit Item - Cast to the specific type
-                            return renderDepositItem(item as DepositHistoryItem);
+                            // Render Deposit Item
+                            return renderDepositItem(item);
                         } else if (item.type === 'spending_group') {
-                            // Render Spending Group (TransactionGroup) - Cast to the specific type
-                            const group = item as SpendingGroupItem;
+                            // Render Spending Group
+                            // Use optional chaining and provide defaults for safety
+                            const jobId = item.job_id ?? 0;
+                            const prompt = item.prompt ?? 'N/A';
+                            const totalAmount = item.total_amount ?? 0;
+                            const buyerName = item.buyer_name ?? 'Unknown';
+                            const isAmbiguous = item.is_ambiguity_flagged ?? false;
+                            const ambiguityReason = item.ambiguity_flag_reason;
+                            const spendings = item.spendings ?? [];
+                            // Extract partner name from the first spending item if available (assuming consistent partner for the group)
+                            const partnerNameFromGroup = spendings.length > 0 ? spendings[0].partner_name : null;
+
                             return (
-                                <div key={`sg-${group.job_id}`} className="border border-gray-200 rounded-lg shadow-sm overflow-hidden">
+                                <div key={`sg-${jobId}`} className="border border-gray-200 rounded-lg shadow-sm overflow-hidden">
                                     {/* Transaction Group Header - Make clickable */}
                                     <div
                                         className="bg-gray-50 p-3 border-b border-gray-200 cursor-pointer hover:bg-gray-100"
-                                        onClick={() => toggleGroupExpansion(group.job_id)}
+                                        onClick={() => toggleGroupExpansion(jobId)}
                                     >
                                         <div className="flex justify-between items-center flex-wrap gap-2">
                                             {/* Left side: Prompt, Date, Buyer, Total */}
@@ -456,46 +464,47 @@ function HistoryList({ onBack }: HistoryListProps) {
                                                   <path strokeLinecap="round" strokeLinejoin="round" d="M3 10h18M7 15h1m4 0h1m-7 4h12a3 3 0 003-3V8a3 3 0 00-3-3H6a3 3 0 00-3 3v8a3 3 0 003 3z" />
                                                 </svg>
                                                 <div>
-                                                    <p className="text-sm font-medium text-indigo-600 break-words" title={group.prompt}>
-                                                        Spending: <span className="text-gray-700 font-normal">{group.prompt}</span>
+                                                    <p className="text-sm font-medium text-indigo-600 break-words" title={prompt}>
+                                                        Spending: <span className="text-gray-700 font-normal">{prompt}</span>
                                                     </p>
                                                     <p className="text-xs text-gray-500">
-                                                        {formatDate(group.date)} by <span className="font-medium">{group.buyer_name}</span> - Total: <span className="font-semibold text-red-700">{formatCurrency(group.total_amount)}</span>
+                                                        {formatDate(item.date)} by <span className="font-medium">{buyerName}</span> - Total: <span className="font-semibold text-red-700">{formatCurrency(totalAmount)}</span>
                                                     </p>
                                                 </div>
                                             </div>
                                             {/* Right side: Ambiguity flag, Delete Button, Expander Icon */}
                                             <div className="flex items-center flex-shrink-0 space-x-2">
-                                                {group.is_ambiguity_flagged && (
+                                                {isAmbiguous && (
                                                     <span
                                                         className="px-2 py-1 inline-flex text-xs leading-4 font-semibold rounded-full bg-yellow-100 text-yellow-800 cursor-help"
-                                                        title={`Ambiguity Reason: ${group.ambiguity_flag_reason || 'No reason provided'}`}
+                                                        title={`Ambiguity Reason: ${ambiguityReason || 'No reason provided'}`}
                                                         onClick={(e) => e.stopPropagation()}
                                                     >
                                                         ⚠️ Ambiguous
                                                     </span>
                                                 )}
                                                 <button
-                                                    onClick={(e) => { e.stopPropagation(); handleDeleteJob(group.job_id); }}
-                                                    disabled={deletingJobId === group.job_id || editingItemId !== null}
+                                                    onClick={(e) => { e.stopPropagation(); handleDeleteJob(jobId); }}
+                                                    disabled={deletingJobId === jobId || editingItemId !== null}
                                                     className={`text-red-600 hover:text-red-800 disabled:opacity-50 disabled:cursor-not-allowed p-1 rounded focus:outline-none focus:ring-2 focus:ring-red-500 focus:ring-offset-1`}
                                                     title="Delete this entire spending group"
                                                 >
                                                     <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
                                                         <path strokeLinecap="round" strokeLinejoin="round" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
                                                     </svg>
-                                                    {deletingJobId === group.job_id && <span className="ml-1 text-xs">(Deleting...)</span>}
+                                                    {deletingJobId === jobId && <span className="ml-1 text-xs">(Deleting...)</span>}
                                                 </button>
                                                 <span className="text-gray-500 text-lg cursor-pointer">
-                                                    {expandedGroupIds.has(group.job_id) ? '▲' : '▼'}
+                                                    {expandedGroupIds.has(jobId) ? '▲' : '▼'}
                                                 </span>
                                             </div>
                                         </div>
                                     </div>
 
                                     {/* Spending Items Container (Conditional Rendering) */}
-                                    {expandedGroupIds.has(group.job_id) && (
+                                    {expandedGroupIds.has(jobId) && (
                                         <div className="bg-white">
+                                            {/* Pass partner name to spending item renderer */}
                                             <table className="min-w-full hidden md:table">
                                                 <thead className="bg-white hidden md:table-header-group">
                                                     <tr>
@@ -507,8 +516,8 @@ function HistoryList({ onBack }: HistoryListProps) {
                                                     </tr>
                                                 </thead>
                                                 <tbody className="hidden md:table-row-group">
-                                                    {group.spendings.map(renderSpendingItemRow)}
-                                                    {group.spendings.length === 0 && (
+                                                    {spendings.map(sp => renderSpendingItemRow(sp, partnerNameFromGroup))}
+                                                    {spendings.length === 0 && (
                                                         <tr className="md:table-row">
                                                             <td colSpan={5} className="md:table-cell px-4 py-3 text-center text-sm text-gray-500 italic">No spending items generated for this job.</td>
                                                         </tr>
@@ -516,8 +525,8 @@ function HistoryList({ onBack }: HistoryListProps) {
                                                 </tbody>
                                             </table>
                                             <div className="md:hidden space-y-3 p-2 bg-gray-50">
-                                                {group.spendings.map(renderSpendingItemRow)}
-                                                {group.spendings.length === 0 && (
+                                                 {spendings.map(sp => renderSpendingItemRow(sp, partnerNameFromGroup))}
+                                                 {spendings.length === 0 && (
                                                     <div className="px-4 py-3 text-center text-sm text-gray-500 italic">No spending items generated for this job.</div>
                                                 )}
                                             </div>
@@ -528,7 +537,8 @@ function HistoryList({ onBack }: HistoryListProps) {
                         } else {
                             // Handle unknown item types if necessary
                             console.warn("Unknown history item type:", item.type);
-                            return <div key={`unknown-${index}`} className="text-red-500">Unknown item type encountered</div>;
+                            // Use a unique key for unknown items
+                            return <div key={`unknown-${item.date}-${Math.random()}`} className="text-red-500">Unknown item type encountered</div>;
                         }
                     })}
                 </div> // Close history items container

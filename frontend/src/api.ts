@@ -1,8 +1,9 @@
-import { Category, PayPayload, AICategorizationPayload, LoginPayload, LoginResponse, GroupedSpendingsResponse, UpdateSpendingPayload, TransferStatusResponse, PartnerRegistrationPayload, PartnerRegistrationResponse, AddDepositPayload, HistoryResponse, DepositItem } from "./types"; // Added AddDepositPayload, HistoryResponse, DepositItem
+// --- Shared Enums / Constants ---
 
-// --- Token Management ---
+// Represents the possible sharing states a user can select when editing
+export type EditableSharingStatus = 'Alone' | 'Shared' | 'Paid by Partner';
 
-const AUTH_TOKEN_KEY = 'authToken';
+// --- API Payloads and Responses ---
 
 export function storeToken(token: string): void {
   localStorage.setItem(AUTH_TOKEN_KEY, token);
@@ -13,14 +14,179 @@ export function getToken(): string | null {
 }
 
 export function removeToken(): void {
-  localStorage.removeItem(AUTH_TOKEN_KEY);
+// Payload for manual payment submission
+export interface PayPayload {
+  shared_status: 'alone' | 'shared'; // Backend currently only supports these
+  amount: number;
+  category: string; // Category name
+  pre_settled?: boolean; // Optional: Flag to mark as settled immediately
 }
 
-// --- API Base URL ---
-const API_BASE_URL = import.meta.env.VITE_API_URL || "http://localhost:3000";
+// Payload specifically for triggering AI categorization
+export interface AICategorizationPayload {
+  amount: number;
+  prompt: string;
+  pre_settled?: boolean; // Optional: Flag to mark as settled immediately
+}
 
-// --- Helper for authenticated requests ---
-async function fetchWithAuth(url: string, options: RequestInit = {}): Promise<Response> {
+// Payload for the login request
+export interface LoginPayload {
+  username: string;
+  password: string;
+}
+
+// Response from the login endpoint
+export interface LoginResponse {
+  token: string;
+  user_id: number;
+  first_name: string;
+}
+
+// Details for registering a single user within the partner registration form
+export interface UserRegistrationDetails {
+  username: string;
+  password: string;
+  first_name: string;
+}
+
+// Payload for the POST /v1/register/partners endpoint
+export interface PartnerRegistrationPayload {
+  user1: UserRegistrationDetails;
+  user2: UserRegistrationDetails;
+}
+
+// Response from the POST /v1/register/partners endpoint
+export interface PartnerRegistrationResponse {
+  message: string;
+  user1_id: number;
+  user2_id: number;
+}
+
+// Payload for adding a new deposit
+export interface AddDepositPayload {
+  amount: number;
+  description: string;
+  deposit_date: string; // Format: "YYYY-MM-DD"
+  is_recurring: boolean;
+  recurrence_period?: string | null; // Optional, required if is_recurring is true
+}
+
+// Response from the add deposit endpoint (example, adjust if needed)
+export interface AddDepositResponse {
+    message: string;
+    deposit_id: number;
+}
+
+// Payload for updating a spending item
+export interface UpdateSpendingPayload {
+  description: string;
+  category_name: string;
+  sharing_status: EditableSharingStatus;
+}
+
+// Response from the GET /v1/transfer/status endpoint
+export interface TransferStatusResponse {
+  partner_name: string;
+  amount_owed: number; // Always positive, indicates the magnitude of the debt
+  owed_by: string | null; // Name of the person who owes (null if settled)
+  owed_to: string | null; // Name of the person who is owed (null if settled)
+}
+
+
+// --- Core Data Structures ---
+
+export interface Category {
+  id: number;
+  name: string;
+  // ai_notes is likely backend-only
+}
+
+// Represents a single spending item within a transaction group
+// This structure is used within the HistoryListItem for spending groups
+export interface SpendingItem {
+  id: number;
+  amount: number;
+  description: string;
+  category_name: string;
+  buyer_name: string;
+  partner_name: string | null;
+  shared_user_takes_all: boolean;
+  sharing_status: string; // Derived: "Alone", "Shared with X", "Paid by X"
+}
+
+// Represents a generic history item returned by the /v1/history endpoint
+// Fields are optional because an item is either a spending group OR a deposit
+export interface HistoryListItem {
+  // Common fields
+  type: 'spending_group' | 'deposit';
+  date: string; // ISO date string for sorting (job creation or deposit occurrence)
+
+  // Fields from TransactionGroup (present if type is 'spending_group')
+  job_id?: number;
+  prompt?: string;
+  total_amount?: number;
+  buyer_name?: string;
+  is_ambiguity_flagged?: boolean;
+  ambiguity_flag_reason?: string | null;
+  spendings?: SpendingItem[];
+
+  // Fields from DepositItem (present if type is 'deposit')
+  id?: number; // Deposit ID (original template ID)
+  amount?: number;
+  description?: string;
+  is_recurring?: boolean;
+  recurrence_period?: string | null;
+  created_at?: string; // Deposit template creation time
+}
+
+// Response from the GET /v1/history endpoint
+export interface HistoryResponse {
+  history: HistoryListItem[]; // A flat, sorted list of items
+}
+
+
+// --- Deprecated / Old Types (Can be removed if no longer used) ---
+
+// Structure for detailed spending info fetched from the backend (Likely replaced by HistoryListItem)
+// export interface SpendingDetail {
+//   id: number;
+//   amount: number;
+//   description: string;
+//   category_name: string;
+//   created_at: string; // ISO date string
+//   buyer_name: string;
+//   partner_name: string | null; // Can be null if not shared or partner name missing
+//   shared_user_takes_all: boolean;
+//   sharing_status: string; // Derived status: "Alone", "Shared with X", "Paid by X"
+// }
+
+// Represents a group of spendings originating from one AI job/transaction (Replaced by HistoryListItem type='spending_group')
+// export interface TransactionGroup {
+//   job_id: number;
+//   prompt: string;
+//   total_amount: number;
+//   job_created_at: string; // ISO date string for the job creation
+//   buyer_name: string; // Added: Name of the user who submitted the job
+//   is_ambiguity_flagged: boolean;
+//   ambiguity_flag_reason: string | null;
+//   spendings: SpendingItem[]; // The list of individual spendings for this job
+// }
+
+// Type for the response from the updated /v1/spendings endpoint (Replaced by HistoryResponse)
+// export type GroupedSpendingsResponse = TransactionGroup[];
+
+
+// Represents a deposit item fetched from the backend history endpoint (Replaced by HistoryListItem type='deposit')
+// export interface DepositItem {
+//   id: number;
+//   type: 'deposit'; // Identifier
+//   amount: number;
+//   description: string;
+//   date: string; // ISO date string
+//   is_recurring: boolean;
+//   recurrence_period: string | null;
+//   created_at: string; // ISO date string
+// }
   const token = getToken();
   const headers = new Headers(options.headers || {});
 

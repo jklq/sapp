@@ -7,34 +7,19 @@ import (
 	"sort"
 	"time"
 
-	"git.sr.ht/~relay/sapp-backend/spendings" // Import spendings types (TransactionGroup, SpendingItem)
-	// Note: We define DepositItem locally to avoid circular dependency with deposit package if needed,
-	// or we ensure deposit types are suitable. Let's define it locally for clarity.
+	"git.sr.ht/~relay/sapp-backend/types" // Import shared types
 )
 
-// HistoryListItem represents a generic item in the combined history list.
-// It includes common fields for sorting and identification.
+// HistoryListItem represents a generic item in the combined history list for internal processing.
+// It includes common fields for sorting and identification, and the raw item.
 type HistoryListItem struct {
 	Type     string    `json:"type"` // "spending_group" or "deposit"
 	Date     time.Time `json:"date"` // Primary sorting key (job creation time or deposit occurrence date)
-	RawItem  interface{} `json:"-"`    // Store the original struct (TransactionGroup or DepositItem), ignored by JSON
-	// Add other common fields if necessary, e.g., ID, but types differ
+	RawItem interface{} `json:"-"` // Store the original struct (types.TransactionGroup or types.DepositItem), ignored by JSON
+	// Add other common fields if necessary
 }
 
-// DepositItem represents a single deposit occurrence (either original non-recurring or generated recurring).
-// This is similar to spendings.DepositItem but defined here for the service.
-type DepositItem struct {
-	ID               int64      `json:"id"`                // ID of the original deposit template for recurring items
-	Type             string     `json:"type"`              // Always "deposit"
-	Amount           float64    `json:"amount"`
-	Description      string     `json:"description"`
-	Date             time.Time  `json:"date"`              // The actual date of this occurrence
-	IsRecurring      bool       `json:"is_recurring"`      // Indicates if this is a generated occurrence from a template
-	RecurrencePeriod *string    `json:"recurrence_period"` // Period of the original template
-	CreatedAt        time.Time  `json:"created_at"`        // Creation time of the original template
-}
-
-// GenerateHistory fetches and combines spending groups and deposit occurrences for a user within a given time range.
+// GenerateHistory fetches and combines spending groups and deposit occurrences for a user up to a given end date.
 func GenerateHistory(db *sql.DB, userID int64, endDate time.Time) ([]HistoryListItem, error) {
 	// We'll fetch all relevant items and generate occurrences up to the endDate.
 	// For simplicity, we won't implement a startDate filter yet, but it could be added.
@@ -64,7 +49,7 @@ func GenerateHistory(db *sql.DB, userID int64, endDate time.Time) ([]HistoryList
 	}
 
 	// --- 3. Generate Occurrences for Recurring Deposits ---
-	generatedDeposits := []DepositItem{}
+	generatedDeposits := []types.DepositItem{} // Use types.DepositItem
 	for _, deposit := range deposits {
 		if deposit.IsRecurring && deposit.RecurrencePeriod != nil {
 			// Generate occurrences for this recurring deposit
@@ -95,13 +80,12 @@ func GenerateHistory(db *sql.DB, userID int64, endDate time.Time) ([]HistoryList
 	return allHistoryItems, nil
 }
 
-// fetchSpendingGroups fetches transaction groups initiated by the user.
-// (This logic is extracted from the original HandleGetHistory)
-func fetchSpendingGroups(db *sql.DB, userID int64) ([]spendings.TransactionGroup, error) {
-	groups := []spendings.TransactionGroup{}
+// fetchSpendingGroups fetches transaction groups (as types.TransactionGroup) initiated by the user.
+func fetchSpendingGroups(db *sql.DB, userID int64) ([]types.TransactionGroup, error) {
+	groups := []types.TransactionGroup{} // Use types.TransactionGroup
 	jobQuery := `
 		SELECT
-			j.id, j.prompt, j.total_amount, j.created_at, j.is_ambiguity_flagged, j.ambiguity_flag_reason, u.first_name AS buyer_name
+			j.id, j.prompt, j.total_amount, j.created_at AS date, j.is_ambiguity_flagged, j.ambiguity_flag_reason, u.first_name AS buyer_name
 		FROM ai_categorization_jobs j
 		JOIN users u ON j.buyer = u.id
 		WHERE j.buyer = ?
@@ -136,12 +120,11 @@ func fetchSpendingGroups(db *sql.DB, userID int64) ([]spendings.TransactionGroup
 	defer spendingStmt.Close()
 
 	for jobRows.Next() {
-		var group spendings.TransactionGroup
-		group.Type = "spending_group"
+		var group types.TransactionGroup // Use types.TransactionGroup
 		var ambiguityReason sql.NullString
 
 		if err := jobRows.Scan(
-			&group.JobID, &group.Prompt, &group.TotalAmount, &group.Date,
+			&group.JobID, &group.Prompt, &group.TotalAmount, &group.Date, // Scan directly into Date field
 			&group.IsAmbiguityFlagged, &ambiguityReason, &group.BuyerName,
 		); err != nil {
 			slog.Error("failed to scan AI job row for history", "user_id", userID, "err", err)
@@ -155,9 +138,9 @@ func fetchSpendingGroups(db *sql.DB, userID int64) ([]spendings.TransactionGroup
 			return nil, err
 		}
 
-		group.Spendings = []spendings.SpendingItem{}
+		group.Spendings = []types.SpendingItem{} // Use types.SpendingItem
 		for spendingRows.Next() {
-			var item spendings.SpendingItem
+			var item types.SpendingItem // Use types.SpendingItem
 			var partnerName sql.NullString
 			var sharedWithID sql.NullInt64
 
@@ -188,9 +171,9 @@ func fetchSpendingGroups(db *sql.DB, userID int64) ([]spendings.TransactionGroup
 	return groups, nil
 }
 
-// fetchDeposits fetches all deposit records (templates and non-recurring) for the user.
-func fetchDeposits(db *sql.DB, userID int64) ([]DepositItem, error) {
-	fetchedDeposits := []DepositItem{}
+// fetchDeposits fetches all deposit records (as types.DepositItem) for the user.
+func fetchDeposits(db *sql.DB, userID int64) ([]types.DepositItem, error) {
+	fetchedDeposits := []types.DepositItem{} // Use types.DepositItem
 	depositQuery := `
 		SELECT id, amount, description, deposit_date, is_recurring, recurrence_period, created_at
 		FROM deposits
@@ -205,15 +188,14 @@ func fetchDeposits(db *sql.DB, userID int64) ([]DepositItem, error) {
 	defer depositRows.Close()
 
 	for depositRows.Next() {
-		var d DepositItem
-		d.Type = "deposit"
-		var depositDateDB time.Time // Scan directly into time.Time
+		var d types.DepositItem // Use types.DepositItem
+		// var depositDateDB time.Time // No longer needed, scan directly into d.Date
 
 		if err := depositRows.Scan(
 			&d.ID,
 			&d.Amount,
 			&d.Description,
-			&depositDateDB, // Scan directly
+			&d.Date, // Scan directly into d.Date
 			&d.IsRecurring,
 			&d.RecurrencePeriod,
 			&d.CreatedAt,
@@ -221,7 +203,7 @@ func fetchDeposits(db *sql.DB, userID int64) ([]DepositItem, error) {
 			slog.Error("failed to scan deposit row for history service", "user_id", userID, "err", err)
 			return nil, err
 		}
-		d.Date = depositDateDB // Assign scanned date
+		// d.Date = depositDateDB // No longer needed
 		fetchedDeposits = append(fetchedDeposits, d)
 	}
 	if err := depositRows.Err(); err != nil {
@@ -232,9 +214,9 @@ func fetchDeposits(db *sql.DB, userID int64) ([]DepositItem, error) {
 }
 
 // generateDepositOccurrences calculates future dates for a recurring deposit.
-func generateDepositOccurrences(template DepositItem, endDate time.Time) []DepositItem {
-	occurrences := []DepositItem{}
-	currentDate := template.Date // Start from the initial deposit date
+func generateDepositOccurrences(template types.DepositItem, endDate time.Time) []types.DepositItem {
+	occurrences := []types.DepositItem{} // Use types.DepositItem
+	currentDate := template.Date         // Start from the initial deposit date
 
 	// Ensure we don't generate occurrences before the template start date
 	// and include the initial date itself if it's within range (it always should be based on fetch logic)
@@ -258,14 +240,13 @@ func generateDepositOccurrences(template DepositItem, endDate time.Time) []Depos
 	return occurrences
 }
 
-// createOccurrence creates a DepositItem instance for a specific occurrence date.
-func createOccurrence(template DepositItem, occurrenceDate time.Time) DepositItem {
-	return DepositItem{
-		ID:               template.ID, // Link back to the original template ID
-		Type:             "deposit",
-		Amount:           template.Amount,
-		Description:      template.Description,
-		Date:             occurrenceDate, // This specific occurrence's date
+// createOccurrence creates a types.DepositItem instance for a specific occurrence date.
+func createOccurrence(template types.DepositItem, occurrenceDate time.Time) types.DepositItem {
+	return types.DepositItem{
+		ID:          template.ID, // Link back to the original template ID
+		Amount:      template.Amount,
+		Description: template.Description,
+		Date:        occurrenceDate, // This specific occurrence's date
 		IsRecurring:      true,           // Mark as generated from a recurring template
 		RecurrencePeriod: template.RecurrencePeriod,
 		CreatedAt:        template.CreatedAt, // Keep original creation time

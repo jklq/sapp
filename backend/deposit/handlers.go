@@ -8,6 +8,7 @@ import (
 	"time"
 
 	"git.sr.ht/~relay/sapp-backend/auth" // Import auth package
+	"git.sr.ht/~relay/sapp-backend/types" // Import shared types
 )
 
 // HandleAddDeposit handles requests to add a new deposit record (protected).
@@ -22,7 +23,7 @@ func HandleAddDeposit(db *sql.DB) http.HandlerFunc {
 		}
 
 		// 1. Decode the JSON payload
-		var payload AddDepositPayload
+		var payload types.AddDepositPayload // Use types.AddDepositPayload
 		if err := json.NewDecoder(r.Body).Decode(&payload); err != nil {
 			slog.Error("failed to decode add deposit request body", "url", r.URL, "user_id", userID, "err", err)
 			http.Error(w, "Bad Request: Invalid JSON", http.StatusBadRequest)
@@ -97,7 +98,7 @@ func HandleAddDeposit(db *sql.DB) http.HandlerFunc {
 		// 5. Respond with success
 		w.Header().Set("Content-Type", "application/json")
 		w.WriteHeader(http.StatusCreated)
-		json.NewEncoder(w).Encode(AddDepositResponse{
+		json.NewEncoder(w).Encode(types.AddDepositResponse{ // Use types.AddDepositResponse
 			Message:   "Deposit added successfully",
 			DepositID: depositID,
 		})

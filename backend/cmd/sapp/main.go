@@ -10,9 +10,10 @@ import (
 
 	"git.sr.ht/~relay/sapp-backend/auth"
 	"git.sr.ht/~relay/sapp-backend/category"
-	"git.sr.ht/~relay/sapp-backend/deposit" // Import deposit package
+	"git.sr.ht/~relay/sapp-backend/deposit"  // Import deposit package
+	"git.sr.ht/~relay/sapp-backend/history"  // Import history package for HandleGetHistory
 	"git.sr.ht/~relay/sapp-backend/pay"
-	"git.sr.ht/~relay/sapp-backend/spendings" // Import the spendings package
+	"git.sr.ht/~relay/sapp-backend/spendings" // Import spendings package for other handlers
 	"git.sr.ht/~relay/sapp-backend/transfer"  // Import the new transfer package
 	"github.com/joho/godotenv"
 	"github.com/rs/cors"
@@ -106,7 +107,7 @@ func main() {
 	payHandler := http.HandlerFunc(pay.HandlePayRoute(db))
 	getCategoriesHandler := http.HandlerFunc(category.HandleGetCategories(db))
 	categorizeHandler := http.HandlerFunc(category.HandleAICategorize(db, categorizationPool))
-	getHistoryHandler := http.HandlerFunc(spendings.HandleGetHistory(db))               // Renamed from getSpendingsHandler
+	getHistoryHandler := http.HandlerFunc(spendings.HandleGetHistory(db)) // Use spendings.HandleGetHistory which internally uses history service
 	updateSpendingHandler := http.HandlerFunc(spendings.HandleUpdateSpending(db))
 	getTransferStatusHandler := http.HandlerFunc(transfer.HandleGetTransferStatus(db)) // Create handler for transfer status
 	recordTransferHandler := http.HandlerFunc(transfer.HandleRecordTransfer(db))       // Create handler for recording transfer

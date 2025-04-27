@@ -17,9 +17,11 @@ import (
 	"git.sr.ht/~relay/sapp-backend/auth"
 	"git.sr.ht/~relay/sapp-backend/category"
 	"git.sr.ht/~relay/sapp-backend/deposit" // Import deposit package
+	"git.sr.ht/~relay/sapp-backend/history" // Import history package
 	"git.sr.ht/~relay/sapp-backend/pay"
 	"git.sr.ht/~relay/sapp-backend/spendings"
 	"git.sr.ht/~relay/sapp-backend/transfer"
+	"git.sr.ht/~relay/sapp-backend/types" // Import shared types
 	"github.com/rs/cors"
 	_ "modernc.org/sqlite"
 )
@@ -215,7 +217,7 @@ func SetupTestEnvironment(t *testing.T) *TestEnv {
 	payHandler := http.HandlerFunc(pay.HandlePayRoute(db))
 	getCategoriesHandler := http.HandlerFunc(category.HandleGetCategories(db))
 	categorizeHandler := http.HandlerFunc(category.HandleAICategorize(db, categorizationPool)) // Use pool with mock API
-	getHistoryHandler := http.HandlerFunc(spendings.HandleGetHistory(db))                      // Renamed
+	getHistoryHandler := http.HandlerFunc(spendings.HandleGetHistory(db))                      // Use spendings handler
 	updateSpendingHandler := http.HandlerFunc(spendings.HandleUpdateSpending(db))
 	getTransferStatusHandler := http.HandlerFunc(transfer.HandleGetTransferStatus(db))
 	recordTransferHandler := http.HandlerFunc(transfer.HandleRecordTransfer(db))
