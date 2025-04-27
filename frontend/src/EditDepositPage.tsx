@@ -56,9 +56,48 @@ function EditDepositPage({ depositId, onBack }: EditDepositPageProps) {
         fetchDepositById(depositId)
             .then(data => {
                 setOriginalDeposit(data);
-                // Pre-fill form fields using the fetched data
-                const formattedDepositDate = formatDateForInput(data.date);
-                const formattedEndDate = formatDateForInput(data.end_date);
+
+                // --- Debugging Date Handling ---
+                console.log("Raw data.date from API:", data.date);
+                console.log("Raw data.end_date from API:", data.end_date);
+
+                let depositDateObj: Date | null = null;
+                if (data.date) {
+                    try {
+                        depositDateObj = new Date(data.date);
+                        if (isNaN(depositDateObj.getTime())) { // Check if date is valid
+                            console.error("Invalid deposit date received from API:", data.date);
+                            depositDateObj = null;
+                        } else {
+                             console.log("Parsed depositDateObj (local time):", depositDateObj, depositDateObj.toLocaleDateString());
+                        }
+                    } catch (e) {
+                        console.error("Error parsing deposit date:", data.date, e);
+                    }
+                }
+
+                let endDateObj: Date | null = null;
+                if (data.end_date) {
+                    try {
+                        endDateObj = new Date(data.end_date);
+                         if (isNaN(endDateObj.getTime())) { // Check if date is valid
+                            console.error("Invalid end date received from API:", data.end_date);
+                            endDateObj = null;
+                        } else {
+                            console.log("Parsed endDateObj (local time):", endDateObj, endDateObj.toLocaleDateString());
+                        }
+                    } catch (e) {
+                        console.error("Error parsing end date:", data.end_date, e);
+                    }
+                }
+                // --- End Debugging ---
+
+                // Pre-fill form fields using the potentially corrected Date objects
+                const formattedDepositDate = formatDateForInput(depositDateObj); // Pass Date object or null
+                const formattedEndDate = formatDateForInput(endDateObj); // Pass Date object or null
+
+                console.log("Formatted deposit date for input value:", formattedDepositDate); // Log formatted date
+                console.log("Formatted end date for input value:", formattedEndDate);
 
                 setAmount(data.amount.toString());
                 setDescription(data.description);
