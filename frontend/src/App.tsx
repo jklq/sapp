@@ -18,7 +18,6 @@ interface UserInfo {
 
 function App() {
   // Authentication state
-  // Authentication state
   const [authToken, setAuthToken] = useState<string | null>(getToken());
   const [userInfo, setUserInfo] = useState<UserInfo | null>(null);
   const [isLoadingAuth, setIsLoadingAuth] = useState<boolean>(true);
