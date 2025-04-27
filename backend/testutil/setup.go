@@ -361,6 +361,23 @@ func InsertAIJob(t *testing.T, db *sql.DB, buyerID int64, sharedWithID *int64, p
 	return jobID
 }
 
+// Helper function to insert a deposit item for testing
+func InsertDeposit(t *testing.T, db *sql.DB, userID int64, amount float64, description string, depositDate time.Time, isRecurring bool, recurrencePeriod *string) int64 {
+	t.Helper()
+	res, err := db.Exec(`INSERT INTO deposits (user_id, amount, description, deposit_date, is_recurring, recurrence_period, created_at)
+		VALUES (?, ?, ?, ?, ?, ?, ?)`,
+		userID, amount, description, depositDate.Format("2006-01-02 15:04:05"), isRecurring, recurrencePeriod, time.Now().UTC())
+	if err != nil {
+		t.Fatalf("Failed to insert deposit: %v", err)
+	}
+	depositID, err := res.LastInsertId()
+	if err != nil {
+		t.Fatalf("Failed to get last insert ID for deposit: %v", err)
+	}
+	return depositID
+}
+
+
 // Helper function to create a new request with JSON body and auth token.
 func NewAuthenticatedRequest(t *testing.T, method, path, token string, body interface{}) *http.Request {
 	t.Helper()

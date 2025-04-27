@@ -56,18 +56,36 @@ type TransactionGroup struct {
 	Spendings           []SpendingItem `json:"spendings"`
 }
 
-// HandleGetSpendings returns an http.HandlerFunc that fetches spendings grouped by AI job for the logged-in user.
+// HistoryItem is a union type for the history response, using an interface.
+// We'll actually return a struct with separate lists for simplicity in Go's JSON marshalling.
+// type HistoryItem interface{} // Could be TransactionGroup or DepositItem
+
+// HistoryResponse defines the structure for the combined history endpoint.
+type HistoryResponse struct {
+	SpendingGroups []TransactionGroup `json:"spending_groups"`
+	Deposits       []DepositItem      `json:"deposits"`
+}
+
+
+// HandleGetHistory returns an http.HandlerFunc that fetches both spendings (grouped by AI job)
+// and deposits for the logged-in user, ordered chronologically.
 // TODO: Add handling for manual spendings not linked to an AI job.
-func HandleGetSpendings(db *sql.DB) http.HandlerFunc {
+// TODO: Implement combined chronological sorting if needed, currently returns separate lists.
+func HandleGetHistory(db *sql.DB) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		userID, ok := auth.GetUserIDFromContext(r.Context())
 		if !ok {
-			slog.Error("failed to get user ID from context for getting spendings", "url", r.URL)
+			slog.Error("failed to get user ID from context for getting history", "url", r.URL)
 			http.Error(w, "Authentication error", http.StatusInternalServerError)
 			return
 		}
 
-		// 1. Fetch AI Categorization Jobs initiated by the user, joining users table for buyer name
+		historyResponse := HistoryResponse{
+			SpendingGroups: []TransactionGroup{},
+			Deposits:       []DepositItem{},
+		}
+
+		// 1. Fetch AI Categorization Jobs (Spending Groups) initiated by the user
 		jobQuery := `
 			SELECT
 				j.id, j.prompt, j.total_amount, j.created_at, j.is_ambiguity_flagged, j.ambiguity_flag_reason, u.first_name AS buyer_name
@@ -82,11 +100,9 @@ func HandleGetSpendings(db *sql.DB) http.HandlerFunc {
 			http.Error(w, "Internal server error", http.StatusInternalServerError)
 			return
 		}
-		defer jobRows.Close() // Keep the defer for safety
+		defer jobRows.Close()
 
-		transactionGroups := []TransactionGroup{}
-
-		// Define query string outside loop
+		// Prepare spending query statement outside the loop
 		spendingQuery := `
 			SELECT
 				s.id,
@@ -108,7 +124,7 @@ func HandleGetSpendings(db *sql.DB) http.HandlerFunc {
 		`
 		spendingStmt, err := db.Prepare(spendingQuery)
 		if err != nil {
-			slog.Error("failed to prepare spending query statement", "url", r.URL, "user_id", userID, "err", err)
+			slog.Error("failed to prepare spending query statement for history", "url", r.URL, "user_id", userID, "err", err)
 			http.Error(w, "Internal server error", http.StatusInternalServerError)
 			return
 		}
@@ -117,18 +133,19 @@ func HandleGetSpendings(db *sql.DB) http.HandlerFunc {
 		// 2. Iterate through jobs and fetch associated spendings
 		for jobRows.Next() {
 			var group TransactionGroup
+			group.Type = "spending_group" // Set type identifier
 			var ambiguityReason sql.NullString // Use sql.NullString for nullable reason
 
 			if err := jobRows.Scan(
 				&group.JobID,
 				&group.Prompt,
 				&group.TotalAmount,
-				&group.JobCreatedAt,
+				&group.Date, // Scan into the common 'Date' field
 				&group.IsAmbiguityFlagged,
 				&ambiguityReason,
-				&group.BuyerName, // Scan the buyer's name
+				&group.BuyerName,
 			); err != nil {
-				slog.Error("failed to scan AI job row", "url", r.URL, "user_id", userID, "err", err)
+				slog.Error("failed to scan AI job row for history", "url", r.URL, "user_id", userID, "err", err)
 				// Log and continue to next job? Or fail request? Let's fail for now.
 				http.Error(w, "Internal server error", http.StatusInternalServerError)
 				return
@@ -162,12 +179,12 @@ func HandleGetSpendings(db *sql.DB) http.HandlerFunc {
 					&item.Amount,
 					&item.Description,
 					&item.CategoryName,
-					&item.BuyerName, // This should be the same as the job buyer, but we fetch it per spending item
+					&item.BuyerName,
 					&partnerName,
 					&item.SharedUserTakesAll,
 					&sharedWithID,
 				); err != nil {
-					slog.Error("failed to scan spending item row", "url", r.URL, "user_id", userID, "job_id", group.JobID, "err", err)
+					slog.Error("failed to scan spending item row for history", "url", r.URL, "user_id", userID, "job_id", group.JobID, "err", err)
 					spendingRows.Close() // Close inner rows before returning
 					http.Error(w, "Internal server error", http.StatusInternalServerError)
 					return
@@ -201,27 +218,87 @@ func HandleGetSpendings(db *sql.DB) http.HandlerFunc {
 			spendingRows.Close() // Explicitly close rows after iterating
 
 			// Check for errors during spending iteration
-			if err := spendingRows.Err(); err != nil { // spendingRows.Err() checks for errors after the loop
-				slog.Error("error iterating spending item rows", "url", r.URL, "user_id", userID, "job_id", group.JobID, "err", err)
+			if err := spendingRows.Err(); err != nil {
+				slog.Error("error iterating spending item rows for history", "url", r.URL, "user_id", userID, "job_id", group.JobID, "err", err)
 				http.Error(w, "Internal server error", http.StatusInternalServerError)
 				return
 			}
 
-			transactionGroups = append(transactionGroups, group)
+			historyResponse.SpendingGroups = append(historyResponse.SpendingGroups, group)
 		} // End of jobRows loop
 
 		// Check for errors from iterating over job rows.
 		if err := jobRows.Err(); err != nil {
-			slog.Error("error iterating AI job rows", "url", r.URL, "user_id", userID, "err", err)
+			slog.Error("error iterating AI job rows for history", "url", r.URL, "user_id", userID, "err", err)
 			http.Error(w, "Internal server error", http.StatusInternalServerError)
 			return
 		}
 
+		// 3. Fetch Deposits for the user
+		depositQuery := `
+			SELECT id, amount, description, deposit_date, is_recurring, recurrence_period, created_at
+			FROM deposits
+			WHERE user_id = ?
+			ORDER BY deposit_date DESC, created_at DESC;
+		`
+		depositRows, err := db.Query(depositQuery, userID)
+		if err != nil {
+			slog.Error("failed to query deposits for history", "url", r.URL, "user_id", userID, "err", err)
+			http.Error(w, "Internal server error", http.StatusInternalServerError)
+			return
+		}
+		defer depositRows.Close()
+
+		for depositRows.Next() {
+			var d DepositItem
+			d.Type = "deposit" // Set type identifier
+			var depositDateStr string // Read date as string first
+
+			if err := depositRows.Scan(
+				&d.ID,
+				&d.Amount,
+				&d.Description,
+				&depositDateStr, // Scan into string
+				&d.IsRecurring,
+				&d.RecurrencePeriod,
+				&d.CreatedAt,
+			); err != nil {
+				slog.Error("failed to scan deposit row for history", "url", r.URL, "user_id", userID, "err", err)
+				http.Error(w, "Internal server error", http.StatusInternalServerError)
+				return
+			}
+			// Parse the date string (assuming format 'YYYY-MM-DD HH:MM:SS' from DB)
+			// Adjust format if DB stores it differently
+			parsedDate, parseErr := time.Parse("2006-01-02 15:04:05", depositDateStr)
+			if parseErr != nil {
+				// Fallback or log error - maybe try just date?
+				parsedDate, parseErr = time.Parse("2006-01-02", depositDateStr)
+				if parseErr != nil {
+					slog.Error("failed to parse deposit date from DB for history", "url", r.URL, "user_id", userID, "date_string", depositDateStr, "err", parseErr)
+					d.Date = time.Time{} // Use zero time on error
+				} else {
+					d.Date = parsedDate
+				}
+			} else {
+				d.Date = parsedDate
+			}
+
+			historyResponse.Deposits = append(historyResponse.Deposits, d)
+		}
+
+		if err := depositRows.Err(); err != nil {
+			slog.Error("error iterating deposit rows for history", "url", r.URL, "user_id", userID, "err", err)
+			http.Error(w, "Internal server error", http.StatusInternalServerError)
+			return
+		}
+
+
 		// TODO: Query and append manual spendings separately if needed
 
+		// 4. Encode and send the combined response
 		w.Header().Set("Content-Type", "application/json")
-		if err := json.NewEncoder(w).Encode(transactionGroups); err != nil {
-			slog.Error("failed to encode transaction groups to JSON", "url", r.URL, "user_id", userID, "err", err)
+		if err := json.NewEncoder(w).Encode(historyResponse); err != nil {
+			slog.Error("failed to encode history response to JSON", "url", r.URL, "user_id", userID, "err", err)
 			// Avoid writing header again if already written
 		}
 	}

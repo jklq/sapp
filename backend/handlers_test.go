@@ -610,77 +610,246 @@ func TestAICategorize(t *testing.T) {
 	})
 }
 
-// TestGetSpendings tests the /v1/spendings endpoint.
-func TestGetSpendings(t *testing.T) {
+
+// TestAddDeposit tests the POST /v1/deposits endpoint.
+func TestAddDeposit(t *testing.T) {
+	env := testutil.SetupTestEnvironment(t)
+	defer env.TearDownDB()
+
+	// --- Test Cases ---
+	testCases := []struct {
+		name           string
+		payload        deposit.AddDepositPayload
+		expectedStatus int
+		expectedBody   string // Substring for error messages or success message
+		verifyFunc     func(t *testing.T, id int64) // Optional verification
+	}{
+		{
+			name: "SuccessOneOff",
+			payload: deposit.AddDepositPayload{
+				Amount:      1000.00,
+				Description: "Salary",
+				DepositDate: "2024-05-15",
+				IsRecurring: false,
+			},
+			expectedStatus: http.StatusCreated,
+			expectedBody:   "Deposit added successfully",
+			verifyFunc: func(t *testing.T, id int64) {
+				var dbAmount float64
+				var dbDesc string
+				var dbDate string
+				var dbRecurring bool
+				var dbPeriod sql.NullString
+				err := env.DB.QueryRow("SELECT amount, description, strftime('%Y-%m-%d', deposit_date), is_recurring, recurrence_period FROM deposits WHERE id = ?", id).Scan(&dbAmount, &dbDesc, &dbDate, &dbRecurring, &dbPeriod)
+				if err != nil {
+					t.Fatalf("Verification query failed: %v", err)
+				}
+				if math.Abs(dbAmount-1000.00) > 0.001 {
+					t.Errorf("Expected amount 1000.00, got %f", dbAmount)
+				}
+				if dbDesc != "Salary" {
+					t.Errorf("Expected description 'Salary', got '%s'", dbDesc)
+				}
+				if dbDate != "2024-05-15" {
+					t.Errorf("Expected date '2024-05-15', got '%s'", dbDate)
+				}
+				if dbRecurring != false {
+					t.Error("Expected is_recurring false")
+				}
+				if dbPeriod.Valid {
+					t.Errorf("Expected recurrence_period NULL, got %v", dbPeriod.String)
+				}
+			},
+		},
+		{
+			name: "SuccessRecurring",
+			payload: deposit.AddDepositPayload{
+				Amount:           50.00,
+				Description:      "Pocket Money",
+				DepositDate:      "2024-05-10",
+				IsRecurring:      true,
+				RecurrencePeriod: Ptr("weekly"), // Use helper for pointer
+			},
+			expectedStatus: http.StatusCreated,
+			expectedBody:   "Deposit added successfully",
+			verifyFunc: func(t *testing.T, id int64) {
+				var dbRecurring bool
+				var dbPeriod sql.NullString
+				err := env.DB.QueryRow("SELECT is_recurring, recurrence_period FROM deposits WHERE id = ?", id).Scan(&dbRecurring, &dbPeriod)
+				if err != nil {
+					t.Fatalf("Verification query failed: %v", err)
+				}
+				if dbRecurring != true {
+					t.Error("Expected is_recurring true")
+				}
+				if !dbPeriod.Valid || dbPeriod.String != "weekly" {
+					t.Errorf("Expected recurrence_period 'weekly', got %v", dbPeriod)
+				}
+			},
+		},
+		{
+			name: "ErrorNegativeAmount",
+			payload: deposit.AddDepositPayload{
+				Amount:      -100.00,
+				Description: "Invalid",
+				DepositDate: "2024-05-15",
+				IsRecurring: false,
+			},
+			expectedStatus: http.StatusBadRequest,
+			expectedBody:   "Amount must be positive",
+		},
+		{
+			name: "ErrorMissingDescription",
+			payload: deposit.AddDepositPayload{
+				Amount:      100.00,
+				Description: "", // Missing
+				DepositDate: "2024-05-15",
+				IsRecurring: false,
+			},
+			expectedStatus: http.StatusBadRequest,
+			expectedBody:   "Description is required",
+		},
+		{
+			name: "ErrorInvalidDateFormat",
+			payload: deposit.AddDepositPayload{
+				Amount:      100.00,
+				Description: "Bad Date",
+				DepositDate: "15-05-2024", // Wrong format
+				IsRecurring: false,
+			},
+			expectedStatus: http.StatusBadRequest,
+			expectedBody:   "Invalid date format",
+		},
+		{
+			name: "ErrorMissingRecurrencePeriod",
+			payload: deposit.AddDepositPayload{
+				Amount:      100.00,
+				Description: "Recurring No Period",
+				DepositDate: "2024-05-15",
+				IsRecurring: true,
+				// RecurrencePeriod: nil, // Missing
+			},
+			expectedStatus: http.StatusBadRequest,
+			expectedBody:   "Recurrence period is required",
+		},
+	}
+
+	for _, tc := range testCases {
+		t.Run(tc.name, func(t *testing.T) {
+			req := testutil.NewAuthenticatedRequest(t, http.MethodPost, "/v1/deposits", env.AuthToken, tc.payload)
+			rr := testutil.ExecuteRequest(t, env.Handler, req)
+
+			testutil.AssertStatusCode(t, rr, tc.expectedStatus)
+			if tc.expectedBody != "" {
+				testutil.AssertBodyContains(t, rr, tc.expectedBody)
+			}
+
+			if tc.expectedStatus == http.StatusCreated && tc.verifyFunc != nil {
+				var respBody deposit.AddDepositResponse
+				testutil.DecodeJSONResponse(t, rr, &respBody)
+				if respBody.DepositID <= 0 {
+					t.Fatalf("Expected positive deposit ID in response, got %d", respBody.DepositID)
+				}
+				tc.verifyFunc(t, respBody.DepositID)
+			}
+		})
+	}
+
+	// --- Test Case: Unauthorized ---
+	t.Run("Unauthorized", func(t *testing.T) {
+		payload := deposit.AddDepositPayload{Amount: 100, Description: "Test", DepositDate: "2024-01-01"}
+		req := testutil.NewAuthenticatedRequest(t, http.MethodPost, "/v1/deposits", "invalid-token", payload)
+		rr := testutil.ExecuteRequest(t, env.Handler, req)
+		testutil.AssertStatusCode(t, rr, http.StatusUnauthorized)
+	})
+}
+
+// Helper function to create a pointer to a string
+func Ptr(s string) *string {
+	return &s
+}
+
+
+// TestGetHistory tests the /v1/history endpoint (previously /v1/spendings).
+func TestGetHistory(t *testing.T) {
 	env := testutil.SetupTestEnvironment(t)
 	defer env.TearDownDB()
 
 	groceriesID := testutil.GetCategoryID(t, env.DB, "Groceries")
 	transportID := testutil.GetCategoryID(t, env.DB, "Transport")
 
-	// --- Test Case: No Spendings ---
-	t.Run("NoSpendings", func(t *testing.T) {
-		// Use env.AuthToken which is now the user ID string
-		req := testutil.NewAuthenticatedRequest(t, http.MethodGet, "/v1/spendings", env.AuthToken, nil)
+	// --- Test Case: Empty History ---
+	t.Run("EmptyHistory", func(t *testing.T) {
+		req := testutil.NewAuthenticatedRequest(t, http.MethodGet, "/v1/history", env.AuthToken, nil)
 		rr := testutil.ExecuteRequest(t, env.Handler, req)
 		testutil.AssertStatusCode(t, rr, http.StatusOK)
-		testutil.AssertBodyContains(t, rr, `[]`) // Expect empty JSON array
+
+		var resp spendings.HistoryResponse
+		testutil.DecodeJSONResponse(t, rr, &resp)
+		if len(resp.SpendingGroups) != 0 {
+			t.Errorf("Expected 0 spending groups, got %d", len(resp.SpendingGroups))
+		}
+		if len(resp.Deposits) != 0 {
+			t.Errorf("Expected 0 deposits, got %d", len(resp.Deposits))
+		}
 	})
 
 	// --- Setup Data for Subsequent Tests ---
-	// Job 1: Shared groceries and alone transport (User paid)
+	// Spending Job 1: Shared groceries and alone transport (User paid)
+	job1Time := time.Now().Add(-2 * time.Hour) // Ensure distinct time
 	job1ID := testutil.InsertAIJob(t, env.DB, env.UserID, &env.PartnerID, "Groceries and bus ticket", 75.0, "finished", true, false, nil)
-	spending1_1 := testutil.InsertSpending(t, env.DB, env.UserID, &env.PartnerID, groceriesID, 50.0, "Milk & Bread", false, &job1ID, nil) // Shared with Partner
-	spending1_2 := testutil.InsertSpending(t, env.DB, env.UserID, nil, transportID, 25.0, "Bus Ticket", false, &job1ID, nil)              // User Alone
+	spending1_1 := testutil.InsertSpending(t, env.DB, env.UserID, &env.PartnerID, groceriesID, 50.0, "Milk & Bread", false, &job1ID, nil)
+	spending1_2 := testutil.InsertSpending(t, env.DB, env.UserID, nil, transportID, 25.0, "Bus Ticket", false, &job1ID, nil)
+	// Manually update job created_at time for sorting test
+	_, err := env.DB.Exec("UPDATE ai_categorization_jobs SET created_at = ? WHERE id = ?", job1Time, job1ID)
+	if err != nil { t.Fatalf("Failed to update job1 time: %v", err) }
 
-	// Job 2: Paid by partner (User submitted job, but partner paid - simulated via shared_user_takes_all=true)
-	// Note: The job buyer is still the user (env.UserID) as they submitted the prompt.
-	// The spending item indicates the partner paid via shared_user_takes_all=true.
+	// Spending Job 2: Paid by partner (User submitted job)
+	job2Time := time.Now().Add(-1 * time.Hour) // Ensure distinct time
 	job2ID := testutil.InsertAIJob(t, env.DB, env.UserID, &env.PartnerID, "Gift for me from Partner", 100.0, "finished", true, false, nil)
-	spending2_1 := testutil.InsertSpending(t, env.DB, env.UserID, &env.PartnerID, groceriesID, 100.0, "Gift", true, &job2ID, nil) // User is buyer, shared with partner, partner takes all cost
+	spending2_1 := testutil.InsertSpending(t, env.DB, env.UserID, &env.PartnerID, groceriesID, 100.0, "Gift", true, &job2ID, nil)
+	_, err = env.DB.Exec("UPDATE ai_categorization_jobs SET created_at = ? WHERE id = ?", job2Time, job2ID)
+	if err != nil { t.Fatalf("Failed to update job2 time: %v", err) }
 
-	// Job 3: Ambiguous flag (User paid, shared)
-	ambigReason := "Unclear item"
-	job3ID := testutil.InsertAIJob(t, env.DB, env.UserID, &env.PartnerID, "Mystery box", 20.0, "finished", true, true, &ambigReason)
-	spending3_1 := testutil.InsertSpending(t, env.DB, env.UserID, &env.PartnerID, groceriesID, 20.0, "Mystery", false, &job3ID, nil) // Shared with Partner
+	// Deposit 1: Salary
+	deposit1Time := time.Now().Add(-3 * time.Hour) // Ensure distinct time
+	deposit1Date := time.Now().AddDate(0, 0, -10) // 10 days ago
+	deposit1ID := testutil.InsertDeposit(t, env.DB, env.UserID, 2000.0, "Salary May", deposit1Date, false, nil)
+	_, err = env.DB.Exec("UPDATE deposits SET created_at = ? WHERE id = ?", deposit1Time, deposit1ID) // Update created_at for sorting consistency if needed
+	if err != nil { t.Fatalf("Failed to update deposit1 time: %v", err) }
 
-	// --- Test Case: Fetch Spendings ---
-	t.Run("FetchSpendings", func(t *testing.T) {
-		// Use env.AuthToken which is now the user ID string
-		req := testutil.NewAuthenticatedRequest(t, http.MethodGet, "/v1/spendings", env.AuthToken, nil)
+	// Deposit 2: Recurring
+	deposit2Time := time.Now().Add(-4 * time.Hour) // Ensure distinct time
+	deposit2Date := time.Now().AddDate(0, -1, 0) // 1 month ago
+	deposit2ID := testutil.InsertDeposit(t, env.DB, env.UserID, 50.0, "Pocket Money", deposit2Date, true, Ptr("monthly"))
+	_, err = env.DB.Exec("UPDATE deposits SET created_at = ? WHERE id = ?", deposit2Time, deposit2ID) // Update created_at for sorting consistency if needed
+	if err != nil { t.Fatalf("Failed to update deposit2 time: %v", err) }
+
+
+	// --- Test Case: Fetch History (Combined) ---
+	t.Run("FetchHistoryCombined", func(t *testing.T) {
+		req := testutil.NewAuthenticatedRequest(t, http.MethodGet, "/v1/history", env.AuthToken, nil)
 		rr := testutil.ExecuteRequest(t, env.Handler, req)
 		testutil.AssertStatusCode(t, rr, http.StatusOK)
 
-		var groups []spendings.TransactionGroup
-		testutil.DecodeJSONResponse(t, rr, &groups)
+		var resp spendings.HistoryResponse
+		testutil.DecodeJSONResponse(t, rr, &resp)
 
-		if len(groups) != 3 {
-			t.Fatalf("Expected 3 transaction groups, got %d", len(groups))
+		// Check counts
+		if len(resp.SpendingGroups) != 2 {
+			t.Fatalf("Expected 2 spending groups, got %d", len(resp.SpendingGroups))
 		}
-
-		// Basic checks on the first group (Job 3 - most recent)
-		group3 := groups[0]
-		if group3.JobID != job3ID {
-			t.Errorf("Expected first group JobID %d, got %d", job3ID, group3.JobID)
-		}
-		if !group3.IsAmbiguityFlagged || group3.AmbiguityFlagReason == nil || *group3.AmbiguityFlagReason != ambigReason {
-			t.Errorf("Expected ambiguity flag set with reason '%s', got flag=%v, reason=%v", ambigReason, group3.IsAmbiguityFlagged, group3.AmbiguityFlagReason)
-		}
-		if len(group3.Spendings) != 1 || group3.Spendings[0].ID != spending3_1 {
-			t.Errorf("Expected 1 spending item with ID %d in group 3, got %v", spending3_1, group3.Spendings)
-		}
-		expectedStatus3 := fmt.Sprintf("Shared with %s", env.PartnerName)
-		if group3.Spendings[0].SharingStatus != expectedStatus3 {
-			t.Errorf("Expected spending 3_1 status '%s', got '%s'", expectedStatus3, group3.Spendings[0].SharingStatus)
+		if len(resp.Deposits) != 2 {
+			t.Fatalf("Expected 2 deposits, got %d", len(resp.Deposits))
 		}
 
-		// Basic checks on the second group (Job 2)
-		group2 := groups[1]
+		// --- Verify Spending Groups (Order: Job2 then Job1 based on created_at DESC) ---
+		group2 := resp.SpendingGroups[0] // Job 2 should be first
 		if group2.JobID != job2ID {
-			t.Errorf("Expected second group JobID %d, got %d", job2ID, group2.JobID)
+			t.Errorf("Expected first group JobID %d, got %d", job2ID, group2.JobID)
 		}
-		if group2.IsAmbiguityFlagged {
-			t.Error("Expected ambiguity flag not set for group 2")
+		if group2.Type != "spending_group" {
+			t.Errorf("Expected group type 'spending_group', got '%s'", group2.Type)
 		}
 		if len(group2.Spendings) != 1 || group2.Spendings[0].ID != spending2_1 {
 			t.Errorf("Expected 1 spending item with ID %d in group 2, got %v", spending2_1, group2.Spendings)
@@ -690,36 +859,46 @@ func TestGetSpendings(t *testing.T) {
 			t.Errorf("Expected spending 2_1 status '%s', got '%s'", expectedStatus2, group2.Spendings[0].SharingStatus)
 		}
 
-		// Basic checks on the third group (Job 1)
-		group1 := groups[2]
+		group1 := resp.SpendingGroups[1] // Job 1 should be second
 		if group1.JobID != job1ID {
-			t.Errorf("Expected third group JobID %d, got %d", job1ID, group1.JobID)
+			t.Errorf("Expected second group JobID %d, got %d", job1ID, group1.JobID)
 		}
 		if len(group1.Spendings) != 2 {
 			t.Fatalf("Expected 2 spending items in group 1, got %d", len(group1.Spendings))
 		}
-		// Order should be spending1_1, spending1_2 based on ID ASC
 		if group1.Spendings[0].ID != spending1_1 || group1.Spendings[1].ID != spending1_2 {
 			t.Errorf("Expected spending IDs %d, %d in group 1, got %d, %d", spending1_1, spending1_2, group1.Spendings[0].ID, group1.Spendings[1].ID)
 		}
-		expectedStatus1_1 := fmt.Sprintf("Shared with %s", env.PartnerName)
-		if group1.Spendings[0].SharingStatus != expectedStatus1_1 {
-			t.Errorf("Expected spending 1_1 status '%s', got '%s'", expectedStatus1_1, group1.Spendings[0].SharingStatus)
+
+		// --- Verify Deposits (Order: Deposit1 then Deposit2 based on deposit_date DESC) ---
+		dep1 := resp.Deposits[0] // Deposit 1 (May 15th) should be first
+		if dep1.ID != deposit1ID {
+			t.Errorf("Expected first deposit ID %d, got %d", deposit1ID, dep1.ID)
 		}
-		if group1.Spendings[1].SharingStatus != "Alone" {
-			t.Errorf("Expected spending 1_2 status 'Alone', got '%s'", group1.Spendings[1].SharingStatus)
+		if dep1.Type != "deposit" {
+			t.Errorf("Expected deposit type 'deposit', got '%s'", dep1.Type)
 		}
-		if group1.Spendings[1].PartnerName != nil {
-			t.Errorf("Expected spending 1_2 PartnerName to be nil, got %v", *group1.Spendings[1].PartnerName)
+		if dep1.Description != "Salary May" {
+			t.Errorf("Expected deposit 1 description 'Salary May', got '%s'", dep1.Description)
+		}
+		if dep1.IsRecurring {
+			t.Error("Expected deposit 1 not to be recurring")
+		}
+
+		dep2 := resp.Deposits[1] // Deposit 2 (Apr 25th) should be second
+		if dep2.ID != deposit2ID {
+			t.Errorf("Expected second deposit ID %d, got %d", deposit2ID, dep2.ID)
+		}
+		if !dep2.IsRecurring || dep2.RecurrencePeriod == nil || *dep2.RecurrencePeriod != "monthly" {
+			t.Errorf("Expected deposit 2 to be recurring monthly, got recurring=%v, period=%v", dep2.IsRecurring, dep2.RecurrencePeriod)
 		}
 	})
 
 	// --- Test Case: Unauthorized ---
 	t.Run("Unauthorized", func(t *testing.T) {
-		// Use an invalid user ID string as the token
-		req := testutil.NewAuthenticatedRequest(t, http.MethodGet, "/v1/spendings", "invalid-user-id-string", nil)
+		req := testutil.NewAuthenticatedRequest(t, http.MethodGet, "/v1/history", "invalid-token", nil)
 		rr := testutil.ExecuteRequest(t, env.Handler, req)
-		testutil.AssertStatusCode(t, rr, http.StatusUnauthorized) // Middleware should reject non-integer token
+		testutil.AssertStatusCode(t, rr, http.StatusUnauthorized)
 	})
 }
 

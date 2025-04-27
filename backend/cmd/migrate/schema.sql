@@ -87,6 +87,19 @@ CREATE TABLE IF NOT EXISTS partnerships (
     CHECK (user1_id < user2_id) -- Ensures consistent ordering (user1 always lower ID) and prevents self-partnership
 );
 
+-- Deposits table stores income/deposit information
+CREATE TABLE IF NOT EXISTS deposits (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    user_id INTEGER NOT NULL, -- User who received the deposit
+    amount REAL NOT NULL,
+    description TEXT,
+    deposit_date DATETIME NOT NULL, -- Date the deposit was received/effective
+    is_recurring BOOLEAN DEFAULT 0,
+    recurrence_period TEXT, -- e.g., 'monthly', 'weekly', 'yearly', NULL if not recurring
+    created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+    FOREIGN KEY(user_id) REFERENCES users(id) ON UPDATE CASCADE ON DELETE CASCADE
+);
+
 
 -- Add settled_at column to user_spendings to track settlement status
 -- We need to add this column separately as ALTER TABLE ADD COLUMN is standard SQL
