@@ -72,11 +72,8 @@ func HandleAICategorize(db *sql.DB, pool CategorizingPoolStrategy) http.HandlerF
 		}
 
 		// 1. Decode the JSON payload from the request body
-		var payload struct {
-			Amount     float64 `json:"amount"`
-			Prompt     string  `json:"prompt"`
-			PreSettled bool    `json:"pre_settled"` // Added: Flag for pre-settled status
-		}
+		// Use the dedicated type from the types package
+		var payload types.AICategorizationPayload
 
 		if err := json.NewDecoder(r.Body).Decode(&payload); err != nil {
 			slog.Error("failed to decode AI categorization request body", "url", r.URL, "user_id", userID, "err", err)
@@ -84,6 +81,24 @@ func HandleAICategorize(db *sql.DB, pool CategorizingPoolStrategy) http.HandlerF
 			return
 		}
 		defer r.Body.Close()
+
+		// --- Parse Optional Spending Date ---
+		var spendingDate *time.Time // Pointer to handle optional date
+		if payload.SpendingDate != nil && *payload.SpendingDate != "" {
+			parsedDate, err := time.Parse("2006-01-02", *payload.SpendingDate)
+			if err != nil {
+				slog.Warn("invalid spending_date format received for AI categorization, ignoring", "url", r.URL, "user_id", userID, "date_string", *payload.SpendingDate, "err", err)
+				// Don't fail, just proceed without a specific date (pool will use job creation time)
+			} else {
+				// Use the start of the day in UTC
+				dateUTC := time.Date(parsedDate.Year(), parsedDate.Month(), parsedDate.Day(), 0, 0, 0, 0, time.UTC)
+				spendingDate = &dateUTC // Assign the address of the parsed date
+				slog.Debug("Using provided spending_date for AI job", "user_id", userID, "date", *spendingDate)
+			}
+		} else {
+			slog.Debug("spending_date not provided for AI job, will use job creation time", "user_id", userID)
+		}
+		// --- End Parse Spending Date ---
 
 		// 2. Validate payload
 		// shared_status validation is removed
@@ -149,10 +164,10 @@ func HandleAICategorize(db *sql.DB, pool CategorizingPoolStrategy) http.HandlerF
 			// 'tries' is handled internally by ProcessCategorizationJob
 		}
 
-		// 5. Add the job to the pool
-		jobID, err := pool.AddJob(params) // AddJob now takes the params including PreSettled
+		// 5. Add the job to the pool, passing the parsed spendingDate
+		jobID, err := pool.AddJob(params, spendingDate)
 		if err != nil {
-			slog.Error("failed to add AI categorization job to pool", "url", r.URL, "user_id", userID, "pre_settled", payload.PreSettled, "err", err)
+			slog.Error("failed to add AI categorization job to pool", "url", r.URL, "user_id", userID, "pre_settled", payload.PreSettled, "spending_date", spendingDate, "err", err)
 			http.Error(w, "Internal Server Error", http.StatusInternalServerError)
 			return
 		}

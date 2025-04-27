@@ -17,10 +17,13 @@ type Job struct {
 	SharedWithId *int64 `json:"other_id"`
 	PreSettled   bool   `json:"pre_settled"` // Added: Pre-settled flag from the job table
 	Result       *JobResult
+	Result       *JobResult
+	SpendingDate *time.Time // Added: Store the specific spending date for the job
 }
 
 type CategorizingPoolStrategy interface {
-	AddJob(CategorizationParams) (int64, error)
+	// AddJob adds a new categorization job with optional spending date.
+	AddJob(params CategorizationParams, spendingDate *time.Time) (int64, error)
 	StartPool()
 	GetStatus(int64) (Job, error)
 }
@@ -42,10 +45,13 @@ func NewCategorizingPool(db *sql.DB, numWorkers int, api ModelAPI) CategorizingP
 	}
 }
 
-func (p CategorizingPool) AddJob(params CategorizationParams) (int64, error) {
+// AddJob adds a new categorization job to the queue.
+// It inserts the job details (including optional spending date) into the database
+// and sends the job details to the channel for processing.
+func (p CategorizingPool) AddJob(params CategorizationParams, spendingDate *time.Time) (int64, error) {
 	tx, err := p.db.Begin()
 	if err != nil {
-		return 0, err
+		return 0, fmt.Errorf("failed to begin transaction: %w", err)
 	}
 	defer tx.Rollback()
 
@@ -55,10 +61,17 @@ func (p CategorizingPool) AddJob(params CategorizationParams) (int64, error) {
 		otherPersonInt = &params.SharedWith.Id
 	}
 
-	result, err := tx.Exec(`INSERT INTO ai_categorization_jobs (buyer, shared_with, prompt, total_amount, pre_settled)
-	VALUES (?, ?, ?, ?, ?)`, params.Buyer.Id, otherPersonInt, params.Prompt, params.TotalAmount, params.PreSettled)
+	// Convert *time.Time to sql.NullTime for insertion
+	var sqlSpendingDate sql.NullTime
+	if spendingDate != nil {
+		sqlSpendingDate = sql.NullTime{Time: *spendingDate, Valid: true}
+	}
+
+	// Store pre_settled flag and spending_date in the job record
+	result, err := tx.Exec(`INSERT INTO ai_categorization_jobs (buyer, shared_with, prompt, total_amount, pre_settled, spending_date, status)
+	VALUES (?, ?, ?, ?, ?, ?, ?)`, params.Buyer.Id, otherPersonInt, params.Prompt, params.TotalAmount, params.PreSettled, sqlSpendingDate, "pending")
 	if err != nil {
-		slog.Error("error inserting ai categorization job", "error", err, "pre_settled", params.PreSettled)
+		slog.Error("error inserting ai categorization job", "error", err, "pre_settled", params.PreSettled, "spending_date", spendingDate)
 		return 0, err
 	}
 
@@ -69,8 +82,22 @@ func (p CategorizingPool) AddJob(params CategorizationParams) (int64, error) {
 	}
 
 	if err := tx.Commit(); err != nil {
-		return 0, err
+		return 0, fmt.Errorf("failed to commit transaction: %w", err)
 	}
+
+	// Send job details to the worker channel (non-blocking send might be better if channel can fill)
+	// We pass the full job details needed by the worker.
+	job := Job{
+		Id:           jobId,
+		Params:       params,       // Pass the original params
+		SpendingDate: spendingDate, // Pass the parsed spending date
+		Status:       "pending",
+		// Result is initially nil
+	}
+	// Consider adding a timeout or select with a default case for non-blocking send
+	p.unhandledJobs <- job
+	slog.Debug("Job sent to worker channel", "job_id", jobId)
+
 	return jobId, nil
 }
 
@@ -87,11 +114,21 @@ func (p CategorizingPool) GetStatus(id int64) (Job, error) {
 		return jobStatus, nil
 	}
 
-	// TODO: Populate JobResult more completely by joining user_spendings as well
-	// to determine sharing status etc., if needed by the GetStatus consumer.
+	// TODO: Populate JobResult more completely if needed by the GetStatus consumer.
 	// Currently, this function is not used by tested handlers.
+	// Fetch spending_date as well if needed here.
+	// row := p.db.QueryRow("SELECT id, status, is_finished, spending_date FROM ai_categorization_jobs WHERE id = ?", id)
+	// var sqlSpendingDate sql.NullTime
+	// ... scan &jobStatus.Id, &jobStatus.Status, &jobStatus.IsFinished, &sqlSpendingDate ...
+	// if sqlSpendingDate.Valid { jobStatus.SpendingDate = &sqlSpendingDate.Time }
 
-	rows, err := p.db.Query(`SELECT s.id, s.amount, s.description
+
+	if !jobStatus.IsFinished {
+		return jobStatus, nil
+	}
+
+	// Example of fetching associated spendings if needed (adapt query as necessary)
+	rows, err := p.db.Query(`SELECT s.id, s.amount, s.description -- Add other fields like category_name, spending_date if needed
 	FROM spendings s
 	INNER JOIN ai_categorized_spendings acs ON s.id = acs.spending_id
 	WHERE acs.job_id = ?`, jobStatus.Id)
