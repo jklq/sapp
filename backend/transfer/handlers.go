@@ -9,7 +9,6 @@ import (
 	"time"
 
 	"git.sr.ht/~relay/sapp-backend/auth"
-	"git.sr.ht/~relay/sapp-backend/types" // Import shared types
 )
 
 // TransferStatusResponse moved to types package
