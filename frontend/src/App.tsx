@@ -95,42 +95,87 @@ function App() {
       // Use w-full and max-w-4xl for content consistency, add padding here
       // Make this a flex container to center the view component inside
       <div className="w-full max-w-4xl p-4 flex flex-col items-center">
-        {/* Header: Wrap in w-full div to prevent centering */}
-        <div className="w-full mb-4 flex flex-wrap justify-between items-center gap-2">
-          {/* Left side: Welcome message and navigation */}
-          <div className="flex flex-wrap items-center gap-x-3 gap-y-1">
-            {userInfo && <span className="text-gray-600 text-sm">Welcome, {userInfo.firstName}!</span>}
-            {/* Navigation Links/Buttons */}
+        {/* Header: Wrap in w-full div to prevent centering, add padding and background */}
+        <header className="w-full mb-6 bg-white shadow-sm rounded-lg p-3">
+          <div className="flex justify-between items-center">
+            {/* Welcome Message (visible on larger screens) */}
+            <div className="hidden md:block">
+              {userInfo && <span className="text-gray-700 text-sm">Welcome, {userInfo.firstName}!</span>}
+            </div>
+
+            {/* Navigation Icons/Links (Centered on mobile, left-aligned on desktop) */}
+            {/* Use fixed width container on mobile for centering */}
+            <nav className="flex-grow md:flex-grow-0 flex justify-center md:justify-start space-x-2 md:space-x-1">
+              {/* Log Spending */}
+              <button
+                onClick={() => setCurrentView('logSpending')}
+                disabled={currentView === 'logSpending'}
+                className={`flex flex-col md:flex-row items-center p-2 rounded-md transition-colors duration-150 ${
+                  currentView === 'logSpending'
+                    ? 'bg-indigo-100 text-indigo-700'
+                    : 'text-gray-500 hover:bg-gray-100 hover:text-gray-700'
+                }`}
+                aria-label="Log Spending"
+              >
+                {/* Icon: Pencil */}
+                <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5 mb-1 md:mb-0 md:mr-1" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                  <path strokeLinecap="round" strokeLinejoin="round" d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" />
+                </svg>
+                <span className="text-xs md:text-sm">Log</span>
+              </button>
+
+              {/* View History */}
+              <button
+                onClick={() => setCurrentView('viewSpendings')}
+                disabled={currentView === 'viewSpendings'}
+                className={`flex flex-col md:flex-row items-center p-2 rounded-md transition-colors duration-150 ${
+                  currentView === 'viewSpendings'
+                    ? 'bg-indigo-100 text-indigo-700'
+                    : 'text-gray-500 hover:bg-gray-100 hover:text-gray-700'
+                }`}
+                aria-label="View History"
+              >
+                {/* Icon: List */}
+                 <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5 mb-1 md:mb-0 md:mr-1" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                  <path strokeLinecap="round" strokeLinejoin="round" d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2m-3 7h3m-3 4h3m-6-4h.01M9 16h.01" />
+                </svg>
+                <span className="text-xs md:text-sm">History</span>
+              </button>
+
+              {/* Transfer Status */}
+              <button
+                onClick={() => setCurrentView('transfer')}
+                disabled={currentView === 'transfer'}
+                className={`flex flex-col md:flex-row items-center p-2 rounded-md transition-colors duration-150 ${
+                  currentView === 'transfer'
+                    ? 'bg-indigo-100 text-indigo-700'
+                    : 'text-gray-500 hover:bg-gray-100 hover:text-gray-700'
+                }`}
+                aria-label="Transfer Status"
+              >
+                {/* Icon: Arrows */}
+                <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5 mb-1 md:mb-0 md:mr-1" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                  <path strokeLinecap="round" strokeLinejoin="round" d="M8 7h12m0 0l-4-4m4 4l-4 4m0 6H4m0 0l4 4m-4-4l4-4" />
+                </svg>
+                <span className="text-xs md:text-sm">Transfer</span>
+              </button>
+            </nav>
+
+            {/* Logout Button */}
             <button
-              onClick={() => setCurrentView('logSpending')}
-              className={`text-sm mr-3 ${currentView === 'logSpending' ? 'text-indigo-700 font-semibold' : 'text-indigo-600 hover:text-indigo-800'}`}
-              disabled={currentView === 'logSpending'}
+              onClick={handleLogout}
+              className="text-sm text-red-600 hover:text-red-800 flex-shrink-0 p-2 rounded-md hover:bg-red-50"
+              aria-label="Logout"
             >
-              Log Spending
-            </button>
-            <button
-              onClick={() => setCurrentView('viewSpendings')}
-              className={`text-sm ${currentView === 'viewSpendings' ? 'text-indigo-700 font-semibold' : 'text-indigo-600 hover:text-indigo-800'}`}
-              disabled={currentView === 'viewSpendings'}
-            >
-              View History
-            </button>
-            <button
-              onClick={() => setCurrentView('transfer')}
-              className={`text-sm ${currentView === 'transfer' ? 'text-indigo-700 font-semibold' : 'text-indigo-600 hover:text-indigo-800'}`}
-              disabled={currentView === 'transfer'}
-            >
-              Transfer Status
+               {/* Icon: Logout */}
+               <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                 <path strokeLinecap="round" strokeLinejoin="round" d="M17 16l4-4m0 0l-4-4m4 4H7m6 4v1a3 3 0 01-3 3H6a3 3 0 01-3-3V7a3 3 0 013-3h4a3 3 0 013 3v1" />
+               </svg>
+               {/* Optional: Add text label for larger screens */}
+               {/* <span className="hidden md:inline ml-1">Logout</span> */}
             </button>
           </div>
-          {/* Right side: Logout button */}
-          <button
-            onClick={handleLogout}
-            className="text-sm text-red-600 hover:text-red-800 flex-shrink-0"
-          >
-            Logout
-          </button>
-        </div> {/* End Header Wrapper */}
+        </header> {/* End Header */}
 
         {/* Render the selected view - these components now manage their own internal padding */}
         {/* The flex container above will center these components horizontally */}
