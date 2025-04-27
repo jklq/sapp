@@ -12,12 +12,12 @@ export interface PayPayload {
 }
 
 // Payload specifically for triggering AI categorization
-type AICategorizationPayload struct {
-	Amount       float64 `json:"amount"`
-	Prompt       string  `json:"prompt"`
-	SpendingDate *string `json:"spending_date,omitempty"` // Optional: Date of spending "YYYY-MM-DD"
-	PreSettled   bool    `json:"pre_settled"`           // Optional: Flag to mark as settled immediately
-	// Note: category is NOT included here as the AI determines it.
+export interface AICategorizationPayload {
+  amount: number;
+  prompt: string;
+  transaction_date?: string | null; // Optional: Date of transaction "YYYY-MM-DD" (matches backend)
+  pre_settled: boolean;             // Flag to mark as settled immediately
+  // Note: category is NOT included here as the AI determines it.
 }
 
 // Payload for the login request
