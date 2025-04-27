@@ -2,10 +2,10 @@ package pay
 
 import (
 	"database/sql"
-	"encoding/json"
 	"errors" // Import errors package
 	"log/slog"
 	"net/http"
+	"strconv"
 	"time" // Added time for potential use with settled_at
 
 	"git.sr.ht/~relay/sapp-backend/auth" // Import auth package
@@ -16,7 +16,7 @@ import (
 type PayPayload struct {
 	SharedStatus string  `json:"shared_status"` // 'alone' or 'shared'
 	Amount       float64 `json:"amount"`
-	Category     string  `json:"category"` // Category name
+	Category     string  `json:"category"`    // Category name
 	PreSettled   bool    `json:"pre_settled"` // New flag
 }
 
@@ -86,7 +86,6 @@ func HandlePayRoute(db *sql.DB) http.HandlerFunc { // Return http.HandlerFunc di
 			return
 		}
 
-
 		var category_id int64 // Category ID is integer
 		categoryName := r.PathValue("category")
 		row := tx.QueryRow("SELECT id FROM categories WHERE name = ? LIMIT 1", categoryName)
@@ -139,7 +138,6 @@ func HandlePayRoute(db *sql.DB) http.HandlerFunc { // Return http.HandlerFunc di
 			http.Error(w, "Internal server error", http.StatusInternalServerError)
 			return
 		}
-
 
 		// Commit the transaction
 		if err = tx.Commit(); err != nil {

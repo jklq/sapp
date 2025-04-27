@@ -66,7 +66,6 @@ type HistoryResponse struct {
 	Deposits       []DepositItem      `json:"deposits"`
 }
 
-
 // HandleGetHistory returns an http.HandlerFunc that fetches both spendings (grouped by AI job)
 // and deposits for the logged-in user, ordered chronologically.
 // TODO: Add handling for manual spendings not linked to an AI job.
@@ -133,7 +132,7 @@ func HandleGetHistory(db *sql.DB) http.HandlerFunc {
 		// 2. Iterate through jobs and fetch associated spendings
 		for jobRows.Next() {
 			var group TransactionGroup
-			group.Type = "spending_group" // Set type identifier
+			group.Type = "spending_group"      // Set type identifier
 			var ambiguityReason sql.NullString // Use sql.NullString for nullable reason
 
 			if err := jobRows.Scan(
@@ -251,7 +250,7 @@ func HandleGetHistory(db *sql.DB) http.HandlerFunc {
 
 		for depositRows.Next() {
 			var d DepositItem
-			d.Type = "deposit" // Set type identifier
+			d.Type = "deposit"        // Set type identifier
 			var depositDateStr string // Read date as string first
 
 			if err := depositRows.Scan(
@@ -291,7 +290,6 @@ func HandleGetHistory(db *sql.DB) http.HandlerFunc {
 			http.Error(w, "Internal server error", http.StatusInternalServerError)
 			return
 		}
-
 
 		// TODO: Query and append manual spendings separately if needed
 
