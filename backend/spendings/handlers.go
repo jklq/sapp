@@ -259,9 +259,9 @@ func HandleGetHistory(db *sql.DB) http.HandlerFunc {
 			// Do NOT defer here, as it's inside the outer jobRows loop.
 			// defer spendingRows.Close() // Close rows associated with this specific job <-- REMOVED DEFER
 
-			group.Spendings = []SpendingItem{} // Initialize slice
+			group.Spendings = []types.SpendingItem{} // Initialize slice, use types.SpendingItem
 			for spendingRows.Next() {
-				var item SpendingItem
+				var item types.SpendingItem // Use types.SpendingItem
 				var partnerName sql.NullString
 				var sharedWithID sql.NullInt64
 

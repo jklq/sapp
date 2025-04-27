@@ -130,9 +130,9 @@ func HandleGetDeposits(db *sql.DB) http.HandlerFunc {
 		}
 		defer rows.Close()
 
-		deposits := []Deposit{}
+		deposits := []types.Deposit{} // Use types.Deposit
 		for rows.Next() {
-			var d Deposit
+			var d types.Deposit // Use types.Deposit
 			// Scan deposit_date directly into time.Time field
 			if err := rows.Scan(
 				&d.ID,
