@@ -5,20 +5,24 @@ import (
 	"testing"
 
 	"database/sql"
+	"encoding/json" // Import json for decoding JWT claims
 	"fmt"
 	"io"
 	"math"
-	"net/url"
-	"strconv" // Import strconv
+	// "net/url" // No longer needed for pay test
+	// "strconv" // No longer needed for token check
 	"strings"
 	"time"
 
 	"git.sr.ht/~relay/sapp-backend/auth"     // Import auth for LoginRequest/Response
 	"git.sr.ht/~relay/sapp-backend/category" // Import category for APICategory
+	"git.sr.ht/~relay/sapp-backend/deposit"  // Import deposit types
+	"git.sr.ht/~relay/sapp-backend/pay"      // Import pay types
 	"git.sr.ht/~relay/sapp-backend/spendings"
 	"git.sr.ht/~relay/sapp-backend/testutil" // Import the new test utility package
 	"git.sr.ht/~relay/sapp-backend/transfer"
-	"golang.org/x/crypto/bcrypt" // Import bcrypt for password verification in registration test
+	"github.com/golang-jwt/jwt/v5" // Import JWT for token validation
+	"golang.org/x/crypto/bcrypt"   // Import bcrypt for password verification in registration test
 )
 
 // TestLogin tests the /v1/login endpoint.
@@ -50,13 +54,25 @@ func TestLogin(t *testing.T) {
 		var respBody auth.LoginResponse
 		testutil.DecodeJSONResponse(t, rr, &respBody)
 
-		// Expect user ID string as token
-		expectedToken := strconv.FormatInt(env.UserID, 10)
-		if respBody.Token != expectedToken {
-			t.Errorf("handler returned unexpected token: got %v want %v", respBody.Token, expectedToken)
+		// Validate the JWT token
+		claims := &auth.Claims{}
+		_, err := jwt.ParseWithClaims(respBody.Token, claims, func(token *jwt.Token) (interface{}, error) {
+			// Use the same secret retrieval logic as in auth middleware (or a test helper)
+			secret := []byte(os.Getenv("JWT_SECRET_KEY"))
+			if len(secret) == 0 {
+				secret = []byte("a-secure-secret-key-for-dev-only-replace-in-prod") // Default from auth.go
+			}
+			return secret, nil
+		})
+		if err != nil {
+			t.Fatalf("Failed to parse or validate JWT token: %v", err)
 		}
+		if claims.UserID != env.UserID {
+			t.Errorf("JWT claims contain unexpected user ID: got %v want %v", claims.UserID, env.UserID)
+		}
+		// Check other response fields
 		if respBody.UserID != env.UserID {
-			t.Errorf("handler returned unexpected user ID: got %v want %v", respBody.UserID, env.UserID)
+			t.Errorf("handler returned unexpected user ID in response body: got %v want %v", respBody.UserID, env.UserID)
 		}
 		if respBody.FirstName != env.User1Name { // Check first name from test env setup
 			t.Errorf("handler returned unexpected first name: got %v want %v", respBody.FirstName, env.User1Name)
@@ -86,10 +102,10 @@ func TestLogin(t *testing.T) {
 		testutil.AssertBodyContains(t, rr, "Invalid credentials")
 	})
 
-	// --- Test Case: User Not Found (or not the specific demo user allowed by simplified login handler) ---
-	t.Run("UserNotFoundOrNotDemo", func(t *testing.T) {
+	// --- Test Case: User Not Found ---
+	t.Run("UserNotFound", func(t *testing.T) {
 		loginPayload := auth.LoginRequest{
-			Username: "nonexistent_user", // A user that doesn't exist
+			Username: "nonexistent_user",
 			Password: "password",
 		}
 		req := testutil.NewAuthenticatedRequest(
@@ -125,21 +141,32 @@ func TestLogin(t *testing.T) {
 			env.Handler,
 			reqPartner,
 		)
-		// Partner user should now be able to log in successfully and receive the demo token
+		// Partner user should now be able to log in successfully
 		testutil.AssertStatusCode(t, rrPartner, http.StatusOK)
 		// Decode and check the response body for the partner user
 		var respBodyPartner auth.LoginResponse
 		testutil.DecodeJSONResponse(t, rrPartner, &respBodyPartner)
 
-		// Expect partner ID string as token
-		expectedPartnerToken := strconv.FormatInt(env.PartnerID, 10)
-		if respBodyPartner.Token != expectedPartnerToken {
-			t.Errorf("Partner login returned unexpected token: got %v want %v", respBodyPartner.Token, expectedPartnerToken)
+		// Validate the JWT token for the partner
+		claimsPartner := &auth.Claims{}
+		_, err := jwt.ParseWithClaims(respBodyPartner.Token, claimsPartner, func(token *jwt.Token) (interface{}, error) {
+			secret := []byte(os.Getenv("JWT_SECRET_KEY"))
+			if len(secret) == 0 {
+				secret = []byte("a-secure-secret-key-for-dev-only-replace-in-prod")
+			}
+			return secret, nil
+		})
+		if err != nil {
+			t.Fatalf("Failed to parse or validate partner JWT token: %v", err)
 		}
-		if respBodyPartner.UserID != env.PartnerID { // Should get the partner's actual ID
-			t.Errorf("Partner login returned unexpected user ID: got %v want %v", respBodyPartner.UserID, env.PartnerID)
+		if claimsPartner.UserID != env.PartnerID {
+			t.Errorf("Partner JWT claims contain unexpected user ID: got %v want %v", claimsPartner.UserID, env.PartnerID)
 		}
-		if respBodyPartner.FirstName != env.PartnerName { // Should get the partner's name
+		// Check other response fields
+		if respBodyPartner.UserID != env.PartnerID {
+			t.Errorf("Partner login returned unexpected user ID in response body: got %v want %v", respBodyPartner.UserID, env.PartnerID)
+		}
+		if respBodyPartner.FirstName != env.PartnerName {
 			t.Errorf("Partner login returned unexpected first name: got %v want %v", respBodyPartner.FirstName, env.PartnerName)
 		}
 	})
@@ -451,14 +478,13 @@ func TestGetCategories(t *testing.T) {
 		testutil.AssertBodyContains(t, rr, "Authorization header required")
 	})
 
-	// --- Test Case: Unauthorized (Invalid Token) ---
-	t.Run("UnauthorizedInvalidToken", func(t *testing.T) {
-		// Use an invalid user ID string as the token
-		req := testutil.NewAuthenticatedRequest(t, http.MethodGet, "/v1/categories", "invalid-user-id-string", nil)
+	// --- Test Case: Unauthorized (Malformed Token) ---
+	t.Run("UnauthorizedMalformedToken", func(t *testing.T) {
+		req := testutil.NewAuthenticatedRequest(t, http.MethodGet, "/v1/categories", "this-is-not-a-jwt", nil)
 		rr := testutil.ExecuteRequest(t, env.Handler, req)
 
-		testutil.AssertStatusCode(t, rr, http.StatusUnauthorized)                // Middleware should reject non-integer token
-		testutil.AssertBodyContains(t, rr, "Invalid authorization token format") // Expect new error message
+		testutil.AssertStatusCode(t, rr, http.StatusUnauthorized)
+		testutil.AssertBodyContains(t, rr, "Invalid token") // Expect JWT parsing error message
 	})
 }
 
@@ -602,10 +628,10 @@ func TestAICategorize(t *testing.T) {
 			"amount": 100.0,
 			"prompt": "test",
 		}
-		// Use an invalid user ID string as the token
-		req := testutil.NewAuthenticatedRequest(t, http.MethodPost, "/v1/categorize", "invalid-user-id-string", payload)
+		req := testutil.NewAuthenticatedRequest(t, http.MethodPost, "/v1/categorize", "invalid-token", payload)
 		rr := testutil.ExecuteRequest(t, env.Handler, req)
-		testutil.AssertStatusCode(t, rr, http.StatusUnauthorized) // Middleware should reject non-integer token
+		testutil.AssertStatusCode(t, rr, http.StatusUnauthorized)
+		testutil.AssertBodyContains(t, rr, "Invalid token")
 	})
 }
 
@@ -760,6 +786,81 @@ func TestAddDeposit(t *testing.T) {
 		rr := testutil.ExecuteRequest(t, env.Handler, req)
 		testutil.AssertStatusCode(t, rr, http.StatusUnauthorized)
 	})
+
+	// --- Test Case: Unauthorized ---
+	t.Run("Unauthorized", func(t *testing.T) {
+		payload := deposit.AddDepositPayload{Amount: 100, Description: "Test", DepositDate: "2024-01-01"}
+		req := testutil.NewAuthenticatedRequest(t, http.MethodPost, "/v1/deposits", "invalid-token", payload)
+		rr := testutil.ExecuteRequest(t, env.Handler, req)
+		testutil.AssertStatusCode(t, rr, http.StatusUnauthorized)
+		testutil.AssertBodyContains(t, rr, "Invalid token")
+	})
+}
+
+// TestGetDeposits tests the GET /v1/deposits endpoint.
+func TestGetDeposits(t *testing.T) {
+	env := testutil.SetupTestEnvironment(t)
+	defer env.TearDownDB()
+
+	// --- Test Case: Empty Deposits ---
+	t.Run("EmptyDeposits", func(t *testing.T) {
+		req := testutil.NewAuthenticatedRequest(t, http.MethodGet, "/v1/deposits", env.AuthToken, nil)
+		rr := testutil.ExecuteRequest(t, env.Handler, req)
+		testutil.AssertStatusCode(t, rr, http.StatusOK)
+
+		var resp []deposit.Deposit
+		testutil.DecodeJSONResponse(t, rr, &resp)
+		if len(resp) != 0 {
+			t.Errorf("Expected 0 deposits, got %d", len(resp))
+		}
+	})
+
+	// --- Setup Data ---
+	depositDate1 := time.Now().AddDate(0, 0, -5)
+	depositDate2 := time.Now().AddDate(0, 0, -15)
+	deposit1ID := testutil.InsertDeposit(t, env.DB, env.UserID, 1500.0, "Bonus", depositDate1, false, nil)
+	deposit2ID := testutil.InsertDeposit(t, env.DB, env.UserID, 200.0, "Refund", depositDate2, false, nil)
+	// Insert deposit for partner (should not be fetched)
+	_ = testutil.InsertDeposit(t, env.DB, env.PartnerID, 500.0, "Partner Deposit", depositDate1, false, nil)
+
+	// --- Test Case: Fetch Deposits ---
+	t.Run("FetchDeposits", func(t *testing.T) {
+		req := testutil.NewAuthenticatedRequest(t, http.MethodGet, "/v1/deposits", env.AuthToken, nil)
+		rr := testutil.ExecuteRequest(t, env.Handler, req)
+		testutil.AssertStatusCode(t, rr, http.StatusOK)
+
+		var resp []deposit.Deposit
+		testutil.DecodeJSONResponse(t, rr, &resp)
+
+		if len(resp) != 2 {
+			t.Fatalf("Expected 2 deposits, got %d", len(resp))
+		}
+
+		// Check order (most recent first based on deposit_date)
+		if resp[0].ID != deposit1ID {
+			t.Errorf("Expected first deposit ID %d, got %d", deposit1ID, resp[0].ID)
+		}
+		if resp[1].ID != deposit2ID {
+			t.Errorf("Expected second deposit ID %d, got %d", deposit2ID, resp[1].ID)
+		}
+
+		// Check content of one deposit
+		if resp[0].Description != "Bonus" || math.Abs(resp[0].Amount-1500.0) > 0.001 {
+			t.Errorf("Deposit 1 content mismatch: got %+v", resp[0])
+		}
+		// Check date (ignoring time part for simplicity)
+		if resp[0].DepositDate.Format("2006-01-02") != depositDate1.Format("2006-01-02") {
+			t.Errorf("Deposit 1 date mismatch: got %s, want %s", resp[0].DepositDate.Format("2006-01-02"), depositDate1.Format("2006-01-02"))
+		}
+	})
+
+	// --- Test Case: Unauthorized ---
+	t.Run("Unauthorized", func(t *testing.T) {
+		req := testutil.NewAuthenticatedRequest(t, http.MethodGet, "/v1/deposits", "invalid-token", nil)
+		rr := testutil.ExecuteRequest(t, env.Handler, req)
+		testutil.AssertStatusCode(t, rr, http.StatusUnauthorized)
+		testutil.AssertBodyContains(t, rr, "Invalid token")
+	})
 }
 
 // Helper function to create a pointer to a string
@@ -903,6 +1004,7 @@ func TestGetHistory(t *testing.T) {
 		req := testutil.NewAuthenticatedRequest(t, http.MethodGet, "/v1/history", "invalid-token", nil)
 		rr := testutil.ExecuteRequest(t, env.Handler, req)
 		testutil.AssertStatusCode(t, rr, http.StatusUnauthorized)
+		testutil.AssertBodyContains(t, rr, "Invalid token")
 	})
 }
 
@@ -1096,10 +1198,10 @@ func TestUpdateSpending(t *testing.T) {
 			CategoryName:  "Groceries",
 			SharingStatus: spendings.StatusAlone,
 		}
-		// Use an invalid user ID string as the token
-		req := testutil.NewAuthenticatedRequest(t, http.MethodPut, url, "invalid-user-id-string", payload)
+		req := testutil.NewAuthenticatedRequest(t, http.MethodPut, url, "invalid-token", payload)
 		rr := testutil.ExecuteRequest(t, env.Handler, req)
-		testutil.AssertStatusCode(t, rr, http.StatusUnauthorized) // Middleware should reject non-integer token
+		testutil.AssertStatusCode(t, rr, http.StatusUnauthorized)
+		testutil.AssertBodyContains(t, rr, "Invalid token")
 	})
 }
 
@@ -1178,10 +1280,10 @@ func TestGetTransferStatus(t *testing.T) {
 
 	// --- Test Case: Unauthorized ---
 	t.Run("Unauthorized", func(t *testing.T) {
-		// Use an invalid user ID string as the token
-		req := testutil.NewAuthenticatedRequest(t, http.MethodGet, "/v1/transfer/status", "invalid-user-id-string", nil)
+		req := testutil.NewAuthenticatedRequest(t, http.MethodGet, "/v1/transfer/status", "invalid-token", nil)
 		rr := testutil.ExecuteRequest(t, env.Handler, req)
-		testutil.AssertStatusCode(t, rr, http.StatusUnauthorized) // Middleware should reject non-integer token
+		testutil.AssertStatusCode(t, rr, http.StatusUnauthorized)
+		testutil.AssertBodyContains(t, rr, "Invalid token")
 	})
 
 	// Note: Testing the "No partner configured" case requires modifying the test setup or auth logic,
@@ -1277,19 +1379,24 @@ func TestRecordTransfer(t *testing.T) {
 
 	// --- Test Case: Unauthorized ---
 	t.Run("Unauthorized", func(t *testing.T) {
-		// Use an invalid user ID string as the token
-		req := testutil.NewAuthenticatedRequest(t, http.MethodPost, "/v1/transfer/record", "invalid-user-id-string", nil)
+		req := testutil.NewAuthenticatedRequest(t, http.MethodPost, "/v1/transfer/record", "invalid-token", nil)
 		rr := testutil.ExecuteRequest(t, env.Handler, req)
-		testutil.AssertStatusCode(t, rr, http.StatusUnauthorized) // Middleware should reject non-integer token
+		testutil.AssertStatusCode(t, rr, http.StatusUnauthorized)
+		testutil.AssertBodyContains(t, rr, "Invalid token")
 	})
 
 	// Note: Testing the "No partner configured" case requires modifying the test setup or auth logic.
 }
 
-// TestPay tests the POST /v1/pay endpoint (now expects JSON body).
+// TestPay tests the POST /v1/pay endpoint.
 func TestPay(t *testing.T) {
 	env := testutil.SetupTestEnvironment(t)
 	defer env.TearDownDB()
+
+	// Get category IDs needed for verification
+	shoppingCatID := testutil.GetCategoryID(t, env.DB, "Shopping")
+	eatingOutCatID := testutil.GetCategoryID(t, env.DB, "Eating Out")
+	groceriesCatID := testutil.GetCategoryID(t, env.DB, "Groceries")
 
 	// --- Test Cases ---
 	testCases := []struct {
@@ -1332,7 +1439,6 @@ func TestPay(t *testing.T) {
 				// Verify spending details
 				var sAmount float64
 				var sCatID int64
-				catID := testutil.GetCategoryID(t, env.DB, "Shopping")
 				err = env.DB.QueryRow("SELECT amount, category FROM spendings WHERE id = ?", spendingID).Scan(&sAmount, &sCatID)
 				if err != nil {
 					t.Fatalf("Verification spending query failed: %v", err)
@@ -1340,8 +1446,8 @@ func TestPay(t *testing.T) {
 				if math.Abs(sAmount-42.50) > 0.001 {
 					t.Errorf("Expected amount 42.50, got %f", sAmount)
 				}
-				if sCatID != catID {
-					t.Errorf("Expected category ID %d, got %d", catID, sCatID)
+				if sCatID != shoppingCatID {
+					t.Errorf("Expected category ID %d (Shopping), got %d", shoppingCatID, sCatID)
 				}
 			},
 		},
@@ -1355,11 +1461,11 @@ func TestPay(t *testing.T) {
 			},
 			expectedStatus: http.StatusCreated,
 			verifyFunc: func(t *testing.T) {
-				var buyerID int64
+				var spendingID, buyerID int64 // Need spendingID too
 				var sharedWith sql.NullInt64
 				var takesAll bool
 				var settledAt sql.NullTime // Check settled_at
-				err := env.DB.QueryRow("SELECT buyer, shared_with, shared_user_takes_all, settled_at FROM user_spendings ORDER BY id DESC LIMIT 1").Scan(&buyerID, &sharedWith, &takesAll, &settledAt)
+				err := env.DB.QueryRow("SELECT spending_id, buyer, shared_with, shared_user_takes_all, settled_at FROM user_spendings ORDER BY id DESC LIMIT 1").Scan(&spendingID, &buyerID, &sharedWith, &takesAll, &settledAt)
 				if err != nil {
 					t.Fatalf("Verification query failed: %v", err)
 				}
@@ -1379,6 +1485,19 @@ func TestPay(t *testing.T) {
 					if time.Since(settledAt.Time.UTC()) > 5*time.Second {
 						t.Errorf("Expected recent settled_at time, got %v", settledAt.Time)
 					}
+				}
+				// Verify spending details
+				var sAmount float64
+				var sCatID int64
+				err = env.DB.QueryRow("SELECT amount, category FROM spendings WHERE id = ?", spendingID).Scan(&sAmount, &sCatID)
+				if err != nil {
+					t.Fatalf("Verification spending query failed: %v", err)
+				}
+				if math.Abs(sAmount-100.00) > 0.001 {
+					t.Errorf("Expected amount 100.00, got %f", sAmount)
+				}
+				if sCatID != eatingOutCatID {
+					t.Errorf("Expected category ID %d (Eating Out), got %d", eatingOutCatID, sCatID)
 				}
 			},
 		},
@@ -1415,10 +1534,6 @@ func TestPay(t *testing.T) {
 			expectedStatus: http.StatusBadRequest,
 			expectedBody:   "Amount must be positive",
 		},
-		// Invalid amount format is now caught by JSON decoding
-		// {
-		// 	name:           "ErrorInvalidAmountFormat",
-		// },
 		{
 			name: "ErrorInvalidCategory",
 			payload: pay.PayPayload{
@@ -1429,6 +1544,17 @@ func TestPay(t *testing.T) {
 			},
 			expectedStatus: http.StatusBadRequest,
 			expectedBody:   "Category not found",
+		},
+		{
+			name: "ErrorMissingCategory", // Test missing category name in payload
+			payload: pay.PayPayload{
+				SharedStatus: "alone",
+				Amount:       25.0,
+				Category:     "", // Empty category name
+				PreSettled:   false,
+			},
+			expectedStatus: http.StatusBadRequest,
+			expectedBody:   "Category not found", // Backend treats empty string as category not found
 		},
 		// Note: Testing "Partner not configured" requires modifying test setup/auth logic.
 	}
@@ -1455,9 +1581,9 @@ func TestPay(t *testing.T) {
 	t.Run("Unauthorized", func(t *testing.T) {
 		url := "/v1/pay"
 		payload := pay.PayPayload{SharedStatus: "alone", Amount: 50, Category: "Shopping", PreSettled: false}
-		// Use an invalid user ID string as the token
-		req := testutil.NewAuthenticatedRequest(t, http.MethodPost, url, "invalid-user-id-string", payload)
+		req := testutil.NewAuthenticatedRequest(t, http.MethodPost, url, "invalid-token", payload)
 		rr := testutil.ExecuteRequest(t, env.Handler, req)
-		testutil.AssertStatusCode(t, rr, http.StatusUnauthorized) // Middleware should reject non-integer token
+		testutil.AssertStatusCode(t, rr, http.StatusUnauthorized)
+		testutil.AssertBodyContains(t, rr, "Invalid token")
 	})
 }

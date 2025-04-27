@@ -10,6 +10,7 @@ import (
 
 	"git.sr.ht/~relay/sapp-backend/auth"
 	"git.sr.ht/~relay/sapp-backend/category"
+	"git.sr.ht/~relay/sapp-backend/deposit" // Import deposit package
 	"git.sr.ht/~relay/sapp-backend/pay"
 	"git.sr.ht/~relay/sapp-backend/spendings" // Import the spendings package
 	"git.sr.ht/~relay/sapp-backend/transfer"  // Import the new transfer package
@@ -110,6 +111,8 @@ func main() {
 	getTransferStatusHandler := http.HandlerFunc(transfer.HandleGetTransferStatus(db)) // Create handler for transfer status
 	recordTransferHandler := http.HandlerFunc(transfer.HandleRecordTransfer(db))       // Create handler for recording transfer
 	deleteAIJobHandler := http.HandlerFunc(spendings.HandleDeleteAIJob(db))             // Create handler for deleting AI job
+	addDepositHandler := http.HandlerFunc(deposit.HandleAddDeposit(db))                 // Create handler for adding deposit
+	getDepositsHandler := http.HandlerFunc(deposit.HandleGetDeposits(db))               // Create handler for getting deposits
 
 	// Apply AuthMiddleware to protected handlers
 	// Changed /v1/pay to accept POST with body instead of path params
@@ -121,6 +124,8 @@ func main() {
 	mux.Handle("DELETE /v1/jobs/{job_id}", applyMiddleware(deleteAIJobHandler, auth.AuthMiddleware))       // Add route for deleting AI job
 	mux.Handle("GET /v1/transfer/status", applyMiddleware(getTransferStatusHandler, auth.AuthMiddleware)) // Add route for transfer status
 	mux.Handle("POST /v1/transfer/record", applyMiddleware(recordTransferHandler, auth.AuthMiddleware))   // Add route for recording transfer
+	mux.Handle("POST /v1/deposits", applyMiddleware(addDepositHandler, auth.AuthMiddleware))               // Add route for adding deposit
+	mux.Handle("GET /v1/deposits", applyMiddleware(getDepositsHandler, auth.AuthMiddleware))               // Add route for getting deposits
 
 	// CORS handler - Apply CORS *after* routing but *before* auth potentially
 	// Or apply CORS as the outermost layer if auth doesn't rely on headers modified by CORS

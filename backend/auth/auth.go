@@ -173,8 +173,9 @@ func AuthMiddleware(next http.Handler) http.Handler {
 		}
 
 		// Expecting "Bearer <token>"
-		parts := strings.Split(authHeader, " ")
-		if len(parts) != 2 || strings.ToLower(parts[0]) != "bearer" {
+		parts := strings.SplitN(authHeader, " ", 2) // Split into exactly 2 parts
+		if len(parts) != 2 || !strings.EqualFold(parts[0], "bearer") {
+			slog.Warn("Invalid Authorization header format", "url", r.URL, "header", authHeader)
 			http.Error(w, "Authorization header format must be Bearer {token}", http.StatusUnauthorized)
 			return
 		}
@@ -232,6 +233,13 @@ func AuthMiddleware(next http.Handler) http.Handler {
 func GetUserIDFromContext(ctx context.Context) (int64, bool) {
 	userID, ok := ctx.Value(userContextKey).(int64)
 	return userID, ok
+}
+
+// GenerateTestJWT is a helper function specifically for tests to generate a token.
+// It should NOT be used in production code.
+func GenerateTestJWT(userID int64) (string, error) {
+	// Use the same logic as generateJWT, potentially with shorter expiry for tests if desired
+	return generateJWT(userID)
 }
 
 // Querier defines an interface with the QueryRow method, satisfied by *sql.DB and *sql.Tx.

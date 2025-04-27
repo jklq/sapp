@@ -90,6 +90,7 @@ func (p CategorizingPool) worker(jobCh <-chan Job, errCh chan<- error) {
 			},
 			SharedWith: sharedWith, // Pass the Person struct (or nil)
 			Prompt:     job.Prompt,
+			PreSettled: job.PreSettled, // Pass the pre-settled flag from the job
 		}
 		result, err := ProcessCategorizationJob(p.db, p.api, params)
 

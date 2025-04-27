@@ -17,6 +17,7 @@ import (
 
 	"git.sr.ht/~relay/sapp-backend/auth"
 	"git.sr.ht/~relay/sapp-backend/category"
+	"git.sr.ht/~relay/sapp-backend/deposit" // Import deposit package
 	"git.sr.ht/~relay/sapp-backend/pay"
 	"git.sr.ht/~relay/sapp-backend/spendings"
 	"git.sr.ht/~relay/sapp-backend/transfer"
@@ -215,22 +216,25 @@ func SetupTestEnvironment(t *testing.T) *TestEnv {
 	payHandler := http.HandlerFunc(pay.HandlePayRoute(db))
 	getCategoriesHandler := http.HandlerFunc(category.HandleGetCategories(db))
 	categorizeHandler := http.HandlerFunc(category.HandleAICategorize(db, categorizationPool)) // Use pool with mock API
-	getSpendingsHandler := http.HandlerFunc(spendings.HandleGetSpendings(db))
+	getHistoryHandler := http.HandlerFunc(spendings.HandleGetHistory(db))                     // Renamed
 	updateSpendingHandler := http.HandlerFunc(spendings.HandleUpdateSpending(db))
 	getTransferStatusHandler := http.HandlerFunc(transfer.HandleGetTransferStatus(db))
 	recordTransferHandler := http.HandlerFunc(transfer.HandleRecordTransfer(db))
 	deleteAIJobHandler := http.HandlerFunc(spendings.HandleDeleteAIJob(db)) // Add handler for delete job
+	addDepositHandler := http.HandlerFunc(deposit.HandleAddDeposit(db))     // Add handler for adding deposit
+	getDepositsHandler := http.HandlerFunc(deposit.HandleGetDeposits(db))   // Add handler for getting deposits
 
 	// Apply AuthMiddleware to protected handlers
-	// Changed /v1/pay to accept POST with body instead of path params
 	mux.Handle("POST /v1/pay", applyMiddleware(payHandler, auth.AuthMiddleware))
 	mux.Handle("GET /v1/categories", applyMiddleware(getCategoriesHandler, auth.AuthMiddleware))
 	mux.Handle("POST /v1/categorize", applyMiddleware(categorizeHandler, auth.AuthMiddleware))
-	mux.Handle("GET /v1/spendings", applyMiddleware(getSpendingsHandler, auth.AuthMiddleware))
+	mux.Handle("GET /v1/history", applyMiddleware(getHistoryHandler, auth.AuthMiddleware)) // Updated route
 	mux.Handle("PUT /v1/spendings/{spending_id}", applyMiddleware(updateSpendingHandler, auth.AuthMiddleware))
 	mux.Handle("DELETE /v1/jobs/{job_id}", applyMiddleware(deleteAIJobHandler, auth.AuthMiddleware)) // Register delete job route
 	mux.Handle("GET /v1/transfer/status", applyMiddleware(getTransferStatusHandler, auth.AuthMiddleware))
 	mux.Handle("POST /v1/transfer/record", applyMiddleware(recordTransferHandler, auth.AuthMiddleware))
+	mux.Handle("POST /v1/deposits", applyMiddleware(addDepositHandler, auth.AuthMiddleware))   // Register add deposit route
+	mux.Handle("GET /v1/deposits", applyMiddleware(getDepositsHandler, auth.AuthMiddleware))   // Register get deposits route
 
 	// --- Apply Middleware (CORS, Logging) ---
 	corsHandler := cors.New(cors.Options{
@@ -269,10 +273,14 @@ func SetupTestEnvironment(t *testing.T) *TestEnv {
 		t.Fatalf("Failed to retrieve partner user's name (ID: %d): %v", partnerID, err)
 	}
 
-	// --- INSECURE: Use UserID string as token for Dev ---
-	// TODO: Replace with actual token generation/retrieval when JWT is implemented
-	userTokenString := strconv.FormatInt(userID, 10)
-	// --- End INSECURE ---
+	// --- Generate JWT Token for User 1 ---
+	userTokenString, err := auth.GenerateTestJWT(userID) // Use helper to generate token
+	if err != nil {
+		db.Close()
+		t.Fatalf("Failed to generate JWT for test user: %v", err)
+	}
+	slog.Debug("Generated JWT for test user", "user_id", userID)
+	// --- End JWT Generation ---
 
 	return &TestEnv{
 		DB:          db,
@@ -398,10 +406,8 @@ func NewAuthenticatedRequest(t *testing.T, method, path, token string, body inte
 		req.Header.Set("Content-Type", "application/json")
 	}
 	if token != "" {
-		// --- INSECURE: Sending UserID as raw token for Dev ---
-		// TODO: Update when JWT is implemented
-		req.Header.Set("Authorization", token) // Send raw token (user ID string)
-		// --- End INSECURE ---
+		// Set Authorization header in Bearer format
+		req.Header.Set("Authorization", "Bearer "+token)
 	}
 	return req
 }
