@@ -5,7 +5,11 @@ import { DepositTemplate, UpdateDepositPayload } from './types';
 // Helper to format date to YYYY-MM-DD for input[type=date]
 // Ensures that the date is treated as local time when extracting components.
 const formatDateForInput = (date: Date | string | null | undefined): string => {
-    if (!date) return '';
+    console.log("[formatDateForInput] Received date input:", date); // Log input
+    if (!date) {
+        console.log("[formatDateForInput] Input is null or empty, returning empty string.");
+        return '';
+    }
     try {
         // Attempt to create a Date object. If input is already a Date, this works fine.
         // If input is a string, it tries to parse it. Crucially, Date parsing can be timezone-sensitive.
@@ -17,7 +21,7 @@ const formatDateForInput = (date: Date | string | null | undefined): string => {
 
         // Check if 'd' is a valid Date object after potential parsing
         if (isNaN(d.getTime())) {
-            console.error("Invalid date value received:", date);
+            console.error("[formatDateForInput] Invalid Date object after parsing input:", date);
             return '';
         }
 
@@ -25,10 +29,11 @@ const formatDateForInput = (date: Date | string | null | undefined): string => {
         const year = d.getFullYear();
         const month = (d.getMonth() + 1).toString().padStart(2, '0'); // getMonth is 0-indexed
         const day = d.getDate().toString().padStart(2, '0');
-
-        return `${year}-${month}-${day}`;
+        const formatted = `${year}-${month}-${day}`;
+        console.log("[formatDateForInput] Successfully formatted:", date, "->", formatted); // Log output
+        return formatted;
     } catch (e) {
-        console.error("Error formatting date:", date, e);
+        console.error("[formatDateForInput] Error during formatting:", date, e);
         return '';
     }
 };
@@ -67,8 +72,11 @@ function EditDepositPage({ depositId, onBack }: EditDepositPageProps) {
         setSuccessMessage(null); // Clear success message on reload
         fetchDepositById(depositId)
             .then(data => {
+                console.log("[EditDepositPage loadDeposit] Received data from API:", JSON.stringify(data)); // Log raw data
                 const formattedStartDate = formatDateForInput(data.date);
                 const formattedEndDate = formatDateForInput(data.end_date);
+                console.log("[EditDepositPage loadDeposit] Formatted start date:", formattedStartDate); // Log formatted date
+                console.log("[EditDepositPage loadDeposit] Formatted end date:", formattedEndDate); // Log formatted date
 
                 setOriginalDepositDate(formattedStartDate); // Store original start date
 
