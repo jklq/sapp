@@ -5,7 +5,7 @@ import {
     AICategorizationPayload,
     LoginPayload,
     LoginResponse,
-    UserRegistrationDetails,
+    // UserRegistrationDetails is unused in this file
     PartnerRegistrationPayload,
     PartnerRegistrationResponse,
     AddDepositPayload,

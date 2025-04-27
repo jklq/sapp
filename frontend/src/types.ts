@@ -142,6 +142,12 @@ export interface AddDepositPayload {
   recurrence_period?: string | null; // Optional, required if is_recurring is true
 }
 
+// Response from adding a new deposit
+export interface AddDepositResponse {
+    message: string;
+    deposit_id: number;
+}
+
 // --- Type for Combined History ---
 
 // --- Type for Combined History ---
