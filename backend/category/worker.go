@@ -1,6 +1,7 @@
 package category
 
 import (
+	"database/sql"
 	"fmt" // Import fmt for error formatting
 	"log/slog"
 	"time"

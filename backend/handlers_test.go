@@ -457,7 +457,7 @@ func TestGetCategories(t *testing.T) {
 		req := testutil.NewAuthenticatedRequest(t, http.MethodGet, "/v1/categories", "invalid-user-id-string", nil)
 		rr := testutil.ExecuteRequest(t, env.Handler, req)
 
-		testutil.AssertStatusCode(t, rr, http.StatusUnauthorized) // Middleware should reject non-integer token
+		testutil.AssertStatusCode(t, rr, http.StatusUnauthorized)                // Middleware should reject non-integer token
 		testutil.AssertBodyContains(t, rr, "Invalid authorization token format") // Expect new error message
 	})
 }
@@ -543,7 +543,6 @@ func TestAICategorize(t *testing.T) {
 		// A separate integration test involving the worker would be needed for full verification.
 	})
 
-
 	// --- Test Cases: Bad Requests ---
 	t.Run("BadRequests", func(t *testing.T) {
 		testCases := []struct {
@@ -585,7 +584,7 @@ func TestAICategorize(t *testing.T) {
 					// Create request with invalid body manually
 					req = testutil.NewAuthenticatedRequest(t, http.MethodPost, "/v1/categorize", env.AuthToken, nil) // body=nil is fine
 					req.Body = io.NopCloser(strings.NewReader("{invalid json"))                                      // Set invalid body
-					req.Header.Set("Content-Type", "application/json") // Still need content type
+					req.Header.Set("Content-Type", "application/json")                                               // Still need content type
 				} else {
 					// Use env.AuthToken which is now the user ID string
 					req = testutil.NewAuthenticatedRequest(t, http.MethodPost, "/v1/categorize", env.AuthToken, tc.payload)
@@ -610,7 +609,6 @@ func TestAICategorize(t *testing.T) {
 	})
 }
 
-
 // TestAddDeposit tests the POST /v1/deposits endpoint.
 func TestAddDeposit(t *testing.T) {
 	env := testutil.SetupTestEnvironment(t)
@@ -621,7 +619,7 @@ func TestAddDeposit(t *testing.T) {
 		name           string
 		payload        deposit.AddDepositPayload
 		expectedStatus int
-		expectedBody   string // Substring for error messages or success message
+		expectedBody   string                       // Substring for error messages or success message
 		verifyFunc     func(t *testing.T, id int64) // Optional verification
 	}{
 		{
@@ -769,7 +767,6 @@ func Ptr(s string) *string {
 	return &s
 }
 
-
 // TestGetHistory tests the /v1/history endpoint (previously /v1/spendings).
 func TestGetHistory(t *testing.T) {
 	env := testutil.SetupTestEnvironment(t)
@@ -802,29 +799,36 @@ func TestGetHistory(t *testing.T) {
 	spending1_2 := testutil.InsertSpending(t, env.DB, env.UserID, nil, transportID, 25.0, "Bus Ticket", false, &job1ID, nil)
 	// Manually update job created_at time for sorting test
 	_, err := env.DB.Exec("UPDATE ai_categorization_jobs SET created_at = ? WHERE id = ?", job1Time, job1ID)
-	if err != nil { t.Fatalf("Failed to update job1 time: %v", err) }
+	if err != nil {
+		t.Fatalf("Failed to update job1 time: %v", err)
+	}
 
 	// Spending Job 2: Paid by partner (User submitted job)
 	job2Time := time.Now().Add(-1 * time.Hour) // Ensure distinct time
 	job2ID := testutil.InsertAIJob(t, env.DB, env.UserID, &env.PartnerID, "Gift for me from Partner", 100.0, "finished", true, false, nil)
 	spending2_1 := testutil.InsertSpending(t, env.DB, env.UserID, &env.PartnerID, groceriesID, 100.0, "Gift", true, &job2ID, nil)
 	_, err = env.DB.Exec("UPDATE ai_categorization_jobs SET created_at = ? WHERE id = ?", job2Time, job2ID)
-	if err != nil { t.Fatalf("Failed to update job2 time: %v", err) }
+	if err != nil {
+		t.Fatalf("Failed to update job2 time: %v", err)
+	}
 
 	// Deposit 1: Salary
 	deposit1Time := time.Now().Add(-3 * time.Hour) // Ensure distinct time
-	deposit1Date := time.Now().AddDate(0, 0, -10) // 10 days ago
+	deposit1Date := time.Now().AddDate(0, 0, -10)  // 10 days ago
 	deposit1ID := testutil.InsertDeposit(t, env.DB, env.UserID, 2000.0, "Salary May", deposit1Date, false, nil)
 	_, err = env.DB.Exec("UPDATE deposits SET created_at = ? WHERE id = ?", deposit1Time, deposit1ID) // Update created_at for sorting consistency if needed
-	if err != nil { t.Fatalf("Failed to update deposit1 time: %v", err) }
+	if err != nil {
+		t.Fatalf("Failed to update deposit1 time: %v", err)
+	}
 
 	// Deposit 2: Recurring
 	deposit2Time := time.Now().Add(-4 * time.Hour) // Ensure distinct time
-	deposit2Date := time.Now().AddDate(0, -1, 0) // 1 month ago
+	deposit2Date := time.Now().AddDate(0, -1, 0)   // 1 month ago
 	deposit2ID := testutil.InsertDeposit(t, env.DB, env.UserID, 50.0, "Pocket Money", deposit2Date, true, Ptr("monthly"))
 	_, err = env.DB.Exec("UPDATE deposits SET created_at = ? WHERE id = ?", deposit2Time, deposit2ID) // Update created_at for sorting consistency if needed
-	if err != nil { t.Fatalf("Failed to update deposit2 time: %v", err) }
-
+	if err != nil {
+		t.Fatalf("Failed to update deposit2 time: %v", err)
+	}
 
 	// --- Test Case: Fetch History (Combined) ---
 	t.Run("FetchHistoryCombined", func(t *testing.T) {
