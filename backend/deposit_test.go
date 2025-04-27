@@ -11,11 +11,6 @@ import (
 	"git.sr.ht/~relay/sapp-backend/types"    // Import shared types
 )
 
-// Helper function to create a pointer to a string
-func Ptr(s string) *string {
-	return &s
-}
-
 // TestAddDeposit tests the POST /v1/deposits endpoint.
 func TestAddDeposit(t *testing.T) {
 	env := testutil.SetupTestEnvironment(t)
