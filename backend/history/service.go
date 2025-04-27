@@ -37,7 +37,7 @@ func GenerateHistory(db *sql.DB, userID int64, endDate time.Time) ([]HistoryList
 		g := group
 		allHistoryItems = append(allHistoryItems, HistoryListItem{
 			Type:    "spending_group",
-			Date:    g.Date, // Use job creation time for sorting
+			Date:    g.TransactionDate, // Use job's transaction date for sorting
 			RawItem: g,
 		})
 	}
