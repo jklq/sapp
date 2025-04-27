@@ -15,12 +15,11 @@ type Job struct {
 	Status       string `json:"status"`
 	IsFinished   bool   `json:"isFinished"`
 	Prompt       string `json:"prompt"`
-	Buyer        int64  `json:"buyer_id"`
-	SharedWithId *int64 `json:"other_id"`
-	PreSettled   bool   `json:"pre_settled"` // Added: Pre-settled flag from the job table
-	Result       *JobResult
-	Result       *JobResult
-	SpendingDate *time.Time // Added: Store the specific spending date for the job
+	Buyer        int64      `json:"buyer_id"`
+	SharedWithId *int64     `json:"other_id"`
+	PreSettled   bool       `json:"pre_settled"` // Added: Pre-settled flag from the job table
+	Result       *JobResult `json:"result"`      // Removed duplicate Result field
+	SpendingDate *time.Time `json:"spending_date"` // Added: Store the specific spending date for the job
 }
 
 type CategorizingPoolStrategy interface {
@@ -304,15 +303,28 @@ func (p *CategorizingPool) worker(id int) {
 				var sharedWithID sql.NullInt64
 				sharedUserTakesAll := false // Default
 
-
-				if job.Params.SharedWith != nil {
-					sharedWithID = sql.NullInt64{Int64: job.Params.SharedWith.Id, Valid: true}
-					if spending.ApportionMode == "partner_pays_all" {
+				// Use job.SharedWithId directly instead of job.Params
+				if job.SharedWithId != nil {
+					sharedWithID = sql.NullInt64{Int64: *job.SharedWithId, Valid: true}
+					// Determine sharedUserTakesAll based on the validated apportion_mode
+					// The AI should return "other" if the partner pays all.
+					if spending.ApportionMode == "other" {
 						sharedUserTakesAll = true
 					}
+					// Note: If apportion_mode is "shared", sharedUserTakesAll remains false.
+					// If apportion_mode is "alone", this block shouldn't be reached if logic is correct,
+					// but sharedUserTakesAll would remain false anyway.
 				} else {
+					// If there's no shared partner, it must be 'alone'
 					sharedWithID = sql.NullInt64{Valid: false}
 					sharedUserTakesAll = false
+					// Add a check here? If spending.ApportionMode is not 'alone', it's an error state.
+					if spending.ApportionMode != "alone" {
+						err = fmt.Errorf("logic error: spending mode '%s' found but no partner associated with job %d", spending.ApportionMode, job.Id)
+						slog.Error("worker invalid spending mode for non-shared job", "worker_id", id, "job_id", job.Id, "mode", spending.ApportionMode, "err", err)
+						p.updateJobStatus(job.Id, "failed", err)
+						return // Error will trigger rollback
+					}
 				}
 
 
