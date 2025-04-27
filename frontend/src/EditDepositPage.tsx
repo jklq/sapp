@@ -213,8 +213,9 @@ function EditDepositPage({ depositId, onBack }: EditDepositPageProps) {
                         <label htmlFor="deposit-date" className="block text-sm font-medium text-gray-700">
                             {isRecurring ? 'Start Date' : 'Deposit Date'}
                         </label>
+                        {/* Ensure value passed to date input is always a string */}
                         <input
-                            type="date" id="deposit-date" value={depositDate || ''} {/* Ensure value is always a string */}
+                            type="date" id="deposit-date" value={depositDate || ''}
                             onChange={(e) => setDepositDate(e.target.value)} required
                             className="mt-1 block w-full input-style"
                         />
