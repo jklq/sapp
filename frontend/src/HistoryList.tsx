@@ -197,10 +197,12 @@ function HistoryList({ onBack }: HistoryListProps) {
     // --- Render Logic ---
     // The historyItems state already contains the sorted, combined list from the backend
 
-    // Helper to render a deposit item
-    const renderDepositItem = (item: DepositItem) => {
+    // Helper to render a deposit item (now receives DepositHistoryItem)
+    const renderDepositItem = (item: DepositHistoryItem) => {
+        // Key uses original template ID + occurrence date for uniqueness
+        const key = `dep-${item.id}-${item.date}`;
         return (
-            <div key={`dep-${item.id}`} className="border border-green-200 bg-green-50 rounded-lg shadow-sm overflow-hidden p-3">
+            <div key={key} className="border border-green-200 bg-green-50 rounded-lg shadow-sm overflow-hidden p-3">
                  <div className="flex justify-between items-center flex-wrap gap-2">
                     {/* Left side: Icon, Description, Date */}
                     <div className="flex items-center space-x-3 flex-1 min-w-0 mr-2">
