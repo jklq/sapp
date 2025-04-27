@@ -413,17 +413,20 @@ function HistoryList({ onBack }: HistoryListProps) { // Renamed component
             {deleteError && <div className="bg-red-100 border border-red-400 text-red-700 px-4 py-3 rounded relative mb-4" role="alert">Error deleting spending group: {deleteError}</div>}
 
 
-            {!isLoading && !error && sortedHistoryItems.length === 0 && (
+            {!isLoading && !error && historyItems.length === 0 && (
                 <div className="text-center text-gray-500 p-4">No history found. Try logging some expenses or deposits!</div>
             )}
 
-            {/* Render combined history items */}
-            {!isLoading && !error && sortedHistoryItems.length > 0 && (
-                <div className="space-y-4"> {/* Use less space between items */}
-                    {sortedHistoryItems.map((item) => {
-                        if (item.itemType === 'deposit') {
-                            // Render Deposit Item
-                            return renderDepositItem(item);
+            {/* Render combined history items from the flat list */}
+            {!isLoading && !error && historyItems.length > 0 && (
+                <div className="space-y-4">
+                    {historyItems.map((item) => {
+                        // Use unique key based on type and ID/date
+                        const key = `${item.type}-${item.id ?? item.job_id ?? 'new'}-${item.date}`;
+
+                        if (item.type === 'deposit') {
+                            // Render Deposit Item - Cast to DepositItem for type safety
+                            return renderDepositItem(item as DepositItem);
                         } else {
                             // Render Spending Group (TransactionGroup)
                             const group = item; // item is a TransactionGroup here
