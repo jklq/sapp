@@ -214,7 +214,7 @@ function EditDepositPage({ depositId, onBack }: EditDepositPageProps) {
                             {isRecurring ? 'Start Date' : 'Deposit Date'}
                         </label>
                         <input
-                            type="date" id="deposit-date" value={depositDate}
+                            type="date" id="deposit-date" value={depositDate || ''} {/* Ensure value is always a string */}
                             onChange={(e) => setDepositDate(e.target.value)} required
                             className="mt-1 block w-full input-style"
                         />
