@@ -3,13 +3,13 @@ package pay
 import (
 	"database/sql"
 	"encoding/json"
-	"errors" // Import errors package
+	"errors"
 	"log/slog"
 	"net/http"
-	"time" // Added time for potential use with settled_at
+	"time"
 
-	"git.sr.ht/~relay/sapp-backend/auth" // Import auth package
-	"git.sr.ht/~relay/sapp-backend/types" // Import shared types
+	"git.sr.ht/~relay/sapp-backend/auth"
+	"git.sr.ht/~relay/sapp-backend/types"
 )
 
 // PayPayload moved to types package
