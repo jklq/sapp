@@ -2,13 +2,14 @@ package main_test // Use main_test to avoid import cycles if needed, or backend_
 
 import (
 	"net/http"
+	"os"
 	"testing"
 
 	"database/sql"
-	"encoding/json" // Import json for decoding JWT claims
 	"fmt"
 	"io"
 	"math"
+
 	// "net/url" // No longer needed for pay test
 	// "strconv" // No longer needed for token check
 	"strings"
@@ -1396,7 +1397,7 @@ func TestPay(t *testing.T) {
 	// Get category IDs needed for verification
 	shoppingCatID := testutil.GetCategoryID(t, env.DB, "Shopping")
 	eatingOutCatID := testutil.GetCategoryID(t, env.DB, "Eating Out")
-	groceriesCatID := testutil.GetCategoryID(t, env.DB, "Groceries")
+	_ = testutil.GetCategoryID(t, env.DB, "Groceries")
 
 	// --- Test Cases ---
 	testCases := []struct {

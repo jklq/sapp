@@ -11,7 +11,6 @@ import (
 	"net/http/httptest"
 	"os"
 	"path/filepath"
-	"strconv" // Import strconv
 	"testing"
 	"time"
 
@@ -121,15 +120,15 @@ func runMigrations(db *sql.DB, schemaPath string) error {
 
 // TestEnv holds the components needed for running tests.
 type TestEnv struct {
-	DB         *sql.DB
-	Handler    http.Handler
-	MockAPI    *MockModelAPI // Expose mock API for test-specific configuration
-	AuthToken  string        // Store the auth token (user ID string) for User 1
-	UserID     int64         // Store the primary test user ID (User 1)
-	User1Name  string        // Store User 1's first name
-	PartnerID  int64         // Store the partner user ID (User 2)
-	PartnerName string       // Store User 2's first name
-	TearDownDB func()        // Function to close the DB connection
+	DB          *sql.DB
+	Handler     http.Handler
+	MockAPI     *MockModelAPI // Expose mock API for test-specific configuration
+	AuthToken   string        // Store the auth token (user ID string) for User 1
+	UserID      int64         // Store the primary test user ID (User 1)
+	User1Name   string        // Store User 1's first name
+	PartnerID   int64         // Store the partner user ID (User 2)
+	PartnerName string        // Store User 2's first name
+	TearDownDB  func()        // Function to close the DB connection
 }
 
 // SetupTestEnvironment initializes an in-memory DB, runs migrations,
@@ -216,7 +215,7 @@ func SetupTestEnvironment(t *testing.T) *TestEnv {
 	payHandler := http.HandlerFunc(pay.HandlePayRoute(db))
 	getCategoriesHandler := http.HandlerFunc(category.HandleGetCategories(db))
 	categorizeHandler := http.HandlerFunc(category.HandleAICategorize(db, categorizationPool)) // Use pool with mock API
-	getHistoryHandler := http.HandlerFunc(spendings.HandleGetHistory(db))                     // Renamed
+	getHistoryHandler := http.HandlerFunc(spendings.HandleGetHistory(db))                      // Renamed
 	updateSpendingHandler := http.HandlerFunc(spendings.HandleUpdateSpending(db))
 	getTransferStatusHandler := http.HandlerFunc(transfer.HandleGetTransferStatus(db))
 	recordTransferHandler := http.HandlerFunc(transfer.HandleRecordTransfer(db))
@@ -233,8 +232,8 @@ func SetupTestEnvironment(t *testing.T) *TestEnv {
 	mux.Handle("DELETE /v1/jobs/{job_id}", applyMiddleware(deleteAIJobHandler, auth.AuthMiddleware)) // Register delete job route
 	mux.Handle("GET /v1/transfer/status", applyMiddleware(getTransferStatusHandler, auth.AuthMiddleware))
 	mux.Handle("POST /v1/transfer/record", applyMiddleware(recordTransferHandler, auth.AuthMiddleware))
-	mux.Handle("POST /v1/deposits", applyMiddleware(addDepositHandler, auth.AuthMiddleware))   // Register add deposit route
-	mux.Handle("GET /v1/deposits", applyMiddleware(getDepositsHandler, auth.AuthMiddleware))   // Register get deposits route
+	mux.Handle("POST /v1/deposits", applyMiddleware(addDepositHandler, auth.AuthMiddleware)) // Register add deposit route
+	mux.Handle("GET /v1/deposits", applyMiddleware(getDepositsHandler, auth.AuthMiddleware)) // Register get deposits route
 
 	// --- Apply Middleware (CORS, Logging) ---
 	corsHandler := cors.New(cors.Options{
@@ -290,7 +289,7 @@ func SetupTestEnvironment(t *testing.T) *TestEnv {
 		UserID:      userID,          // User 1 ID
 		User1Name:   userName,        // User 1 Name
 		PartnerID:   partnerID,       // User 2 ID
-		PartnerName: partnerName,   // User 2 Name
+		PartnerName: partnerName,     // User 2 Name
 		TearDownDB:  func() { db.Close() },
 	}
 }
@@ -384,7 +383,6 @@ func InsertDeposit(t *testing.T, db *sql.DB, userID int64, amount float64, descr
 	}
 	return depositID
 }
-
 
 // Helper function to create a new request with JSON body and auth token.
 func NewAuthenticatedRequest(t *testing.T, method, path, token string, body interface{}) *http.Request {
