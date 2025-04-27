@@ -36,6 +36,7 @@ function EditDepositPage({ depositId, onBack }: EditDepositPageProps) {
     // UI states
     const [isLoading, setIsLoading] = useState<boolean>(true); // Loading initial data
     const [isSaving, setIsSaving] = useState<boolean>(false); // Saving changes
+    const [isEndingNow, setIsEndingNow] = useState<boolean>(false); // State for "End Now" action
     const [error, setError] = useState<string | null>(null);
     const [successMessage, setSuccessMessage] = useState<string | null>(null);
     const [originalDeposit, setOriginalDeposit] = useState<DepositTemplate | null>(null);
@@ -130,6 +131,32 @@ function EditDepositPage({ depositId, onBack }: EditDepositPageProps) {
             setIsSaving(false);
         }
     };
+
+    // Handler for the "End Now" button
+    const handleEndNow = async () => {
+        setError(null);
+        setSuccessMessage(null);
+        setIsEndingNow(true);
+
+        const today = formatDateForInput(new Date()); // Get today's date formatted
+
+        const payload: UpdateDepositPayload = {
+            end_date: today,
+        };
+
+        try {
+            await updateDeposit(depositId, payload);
+            setEndDate(today); // Update local state to reflect the change
+            setSuccessMessage('Recurring deposit set to end today.');
+            // Optionally: Keep the user on the page to see the change
+        } catch (err) {
+            console.error(`Failed to end deposit now:`, err);
+            setError(err instanceof Error ? err.message : 'An unknown error occurred while ending the deposit.');
+        } finally {
+            setIsEndingNow(false);
+        }
+    };
+
 
     if (isLoading) {
         return <div className="p-4 text-center">Loading deposit details...</div>;
@@ -236,6 +263,19 @@ function EditDepositPage({ depositId, onBack }: EditDepositPageProps) {
                                 min={depositDate} // Prevent end date before start date
                             />
                              <p className="text-xs text-gray-500 mt-1">Leave blank for indefinite recurrence.</p>
+                             {/* "End Now" Button */}
+                             <button
+                                type="button"
+                                onClick={handleEndNow}
+                                disabled={isEndingNow || isSaving || isLoading || (!!endDate && endDate <= formatDateForInput(new Date()))} // Disable if already ended, ending, saving, loading, or end date is today/past
+                                className={`mt-2 w-full flex justify-center py-1 px-3 border border-transparent rounded-md shadow-sm text-sm font-medium text-white ${
+                                    (isEndingNow || isSaving || isLoading || (!!endDate && endDate <= formatDateForInput(new Date())))
+                                        ? 'bg-red-300 cursor-not-allowed'
+                                        : 'bg-red-500 hover:bg-red-600 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-red-400'
+                                }`}
+                            >
+                                {isEndingNow ? 'Ending...' : 'End Recurring Deposit Today'}
+                            </button>
                         </div>
                     )}
 
@@ -243,8 +283,8 @@ function EditDepositPage({ depositId, onBack }: EditDepositPageProps) {
                     {/* Submit Button */}
                     <div className="pt-4">
                         <button
-                            type="submit" disabled={isSaving || isLoading}
-                            className={`w-full flex justify-center py-2 px-4 border border-transparent rounded-md shadow-sm text-sm font-medium text-white ${isSaving || isLoading ? 'bg-indigo-300 cursor-not-allowed' : 'bg-indigo-600 hover:bg-indigo-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500'}`}
+                            type="submit" disabled={isSaving || isLoading || isEndingNow} // Also disable while ending now
+                            className={`w-full flex justify-center py-2 px-4 border border-transparent rounded-md shadow-sm text-sm font-medium text-white ${isSaving || isLoading || isEndingNow ? 'bg-indigo-300 cursor-not-allowed' : 'bg-indigo-600 hover:bg-indigo-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500'}`}
                         >
                             {isSaving ? 'Saving...' : 'Save Changes'}
                         </button>
