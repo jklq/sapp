@@ -920,7 +920,8 @@ func TestGetHistory(t *testing.T) {
 
 	// Deposit 2: Recurring
 	deposit2Time := time.Now().Add(-4 * time.Hour) // Ensure distinct time
-	deposit2Date := time.Now().AddDate(0, -1, 0)   // 1 month ago
+	// Set start date 35 days ago to ensure the next monthly occurrence (approx T-5d) is before 'now'
+	deposit2Date := time.Now().AddDate(0, 0, -35)
 	deposit2ID := testutil.InsertDeposit(t, env.DB, env.UserID, 50.0, "Pocket Money", deposit2Date, true, Ptr("monthly"))
 	_, err = env.DB.Exec("UPDATE deposits SET created_at = ? WHERE id = ?", deposit2Time, deposit2ID) // Update created_at for sorting consistency if needed
 	if err != nil {
@@ -936,15 +937,12 @@ func TestGetHistory(t *testing.T) {
 		var resp spendings.HistoryResponse // Use spendings.HistoryResponse
 		testutil.DecodeJSONResponse(t, rr, &resp)
 
-		// Check total count (2 jobs + 1 non-recurring deposit + 1 recurring deposit occurrence = 4 items)
-		// Note: The recurring deposit generates occurrences up to 'now'. Since it started 1 month ago,
-		// and recurs monthly, it should have 2 occurrences: the initial one and the one for 'now'.
-		// Let's refine the deposit setup slightly for clarity.
-		// Deposit 1: 10 days ago (non-recurring)
-		// Deposit 2: 35 days ago (recurring monthly) -> Occurrences at T-35d, T-5d (approx)
-		// Job 1: 2 hours ago
-		// Job 2: 1 hour ago
-		// Expected order (newest first): Job2, Job1, Deposit2(T-5d), Deposit1(T-10d), Deposit2(T-35d)
+		// Check total count (2 jobs + 1 non-recurring deposit + 2 recurring deposit occurrences = 5 items)
+		// Deposit 1: T-10d (non-recurring)
+		// Deposit 2: T-35d (recurring monthly) -> Occurrences at T-35d, T-5d (approx, calculated from T-35d + 1 month)
+		// Job 1: T-2h
+		// Job 2: T-1h
+		// Expected order (newest first): Job2(T-1h), Job1(T-2h), Deposit2(T-5d), Deposit1(T-10d), Deposit2(T-35d)
 		// Total expected items = 5
 		if len(resp.History) != 5 {
 			t.Fatalf("Expected 5 history items, got %d", len(resp.History))
