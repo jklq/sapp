@@ -165,5 +165,6 @@ type DepositItem struct {
 	Date             time.Time  `json:"date"`              // The actual date of this occurrence
 	IsRecurring      bool       `json:"is_recurring"`      // Indicates if this is a generated occurrence from a template
 	RecurrencePeriod *string    `json:"recurrence_period"` // Period of the original template
+	EndDate          *time.Time `json:"end_date"`          // End date of the original template (pointer for nullable)
 	CreatedAt        time.Time  `json:"created_at"`        // Creation time of the original template
 }

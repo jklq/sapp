@@ -177,6 +177,7 @@ func fetchDeposits(db *sql.DB, userID int64) ([]types.DepositItem, error) {
 	fetchedDeposits := []types.DepositItem{} // Use types.DepositItem
 	// Fetch only templates, not individual occurrences here.
 	// The history service will generate occurrences based on these templates.
+	// Fetch deposit templates including the end_date
 	depositQuery := `
 		SELECT id, amount, description, deposit_date, is_recurring, recurrence_period, end_date, created_at
 		FROM deposits
@@ -192,7 +193,7 @@ func fetchDeposits(db *sql.DB, userID int64) ([]types.DepositItem, error) {
 
 	for depositRows.Next() {
 		var d types.DepositItem // Use types.DepositItem
-		// var depositDateDB time.Time // No longer needed, scan directly into d.Date
+		var endDate sql.NullTime // Need to scan nullable end_date
 
 		if err := depositRows.Scan(
 			&d.ID,
@@ -200,14 +201,17 @@ func fetchDeposits(db *sql.DB, userID int64) ([]types.DepositItem, error) {
 			&d.Description,
 			&d.Date, // Scan directly into d.Date
 			&d.IsRecurring,
-			&d.RecurrencePeriod,
-			&d.EndDate, // Scan the new end_date field
+			&d.RecurrencePeriod, // Scan directly into pointer field (driver handles null)
+			&endDate,           // Scan into sql.NullTime
 			&d.CreatedAt,
 		); err != nil {
 			slog.Error("failed to scan deposit template row for history service", "user_id", userID, "err", err)
 			return nil, err
 		}
-		// d.Date = depositDateDB // No longer needed
+		// Convert sql.NullTime to *time.Time
+		if endDate.Valid {
+			d.EndDate = &endDate.Time
+		}
 		fetchedDeposits = append(fetchedDeposits, d)
 	}
 	if err := depositRows.Err(); err != nil {
@@ -258,16 +262,17 @@ func generateDepositOccurrences(template types.DepositItem, generationLimitDate 
 	return occurrences
 }
 
-// createOccurrence creates a types.DepositItem instance for a specific occurrence date.
+// createOccurrence creates a types.DepositItem instance for a specific occurrence date,
+// including the EndDate from the template.
 func createOccurrence(template types.DepositItem, occurrenceDate time.Time) types.DepositItem {
 	return types.DepositItem{
-		ID:          template.ID, // Link back to the original template ID
-		Amount:      template.Amount,
+		ID:               template.ID, // Link back to the original template ID
+		Amount:           template.Amount,
 		Description:      template.Description,
 		Date:             occurrenceDate, // This specific occurrence's date
 		IsRecurring:      template.IsRecurring, // Keep original template flag
 		RecurrencePeriod: template.RecurrencePeriod,
-		EndDate:          template.EndDate, // Keep original template end date (might be useful info)
+		EndDate:          template.EndDate, // Keep original template end date
 		CreatedAt:        template.CreatedAt, // Keep original creation time
 	}
 }

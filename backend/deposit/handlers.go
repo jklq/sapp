@@ -7,9 +7,15 @@ import (
 	"net/http"
 	"time"
 
+	"database/sql"
+	"encoding/json"
 	"errors"
 	"fmt"
+	"log/slog"
+	"net/http"
 	"strconv"
+	"strings" // Import strings package
+	"time"
 
 	"git.sr.ht/~relay/sapp-backend/auth" // Import auth package
 	"git.sr.ht/~relay/sapp-backend/types" // Import shared types
@@ -400,9 +406,8 @@ func HandleUpdateDeposit(db *sql.DB) http.HandlerFunc {
 		args = append(args, depositID) // Add depositID for WHERE clause
 
 		updateQuery := fmt.Sprintf("UPDATE deposits SET %s WHERE id = $%d",
-			strings.Join(setClauses, ", "), argIdx)
+			strings.Join(setClauses, ", "), argIdx) // This was the unused PostgreSQL query string
 
-		// Use PostgreSQL specific query format ($1, $2...)
 		// Rebuild query and args for SQLite format (?)
 		setClausesSQLite := []string{}
 		argsSQLite := []interface{}{}
@@ -413,7 +418,6 @@ func HandleUpdateDeposit(db *sql.DB) http.HandlerFunc {
 		argsSQLite = append(argsSQLite, depositID) // Add depositID for WHERE clause
 		updateQuerySQLite := fmt.Sprintf("UPDATE deposits SET %s WHERE id = ?",
 			strings.Join(setClausesSQLite, ", "))
-
 
 		_, err = tx.Exec(updateQuerySQLite, argsSQLite...)
 		if err != nil {
