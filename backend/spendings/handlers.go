@@ -88,6 +88,7 @@ func HandleGetHistory(db *sql.DB) http.HandlerFunc {
 			switch typedItem := internalItem.RawItem.(type) {
 			case types.TransactionGroup:
 				// Populate fields specific to TransactionGroup
+				// Note: frontendItem.Date is already set from internalItem.Date which uses TransactionDate
 				frontendItem.JobID = &typedItem.JobID // Use pointers for optional fields
 				frontendItem.Prompt = &typedItem.Prompt
 				frontendItem.TotalAmount = &typedItem.TotalAmount
@@ -97,6 +98,7 @@ func HandleGetHistory(db *sql.DB) http.HandlerFunc {
 				frontendItem.Spendings = typedItem.Spendings
 			case types.DepositItem:
 				// Populate fields specific to DepositItem
+				// Note: frontendItem.Date is already set from internalItem.Date which uses DepositDate
 				frontendItem.ID = &typedItem.ID // Use pointers for optional fields
 				frontendItem.Amount = &typedItem.Amount
 				frontendItem.Description = &typedItem.Description

@@ -85,7 +85,7 @@ func fetchSpendingGroups(db *sql.DB, userID int64) ([]types.TransactionGroup, er
 	groups := []types.TransactionGroup{} // Use types.TransactionGroup
 	jobQuery := `
 		SELECT
-			j.id, j.prompt, j.total_amount, j.created_at AS date, j.is_ambiguity_flagged, j.ambiguity_flag_reason, u.first_name AS buyer_name
+			j.id, j.prompt, j.total_amount, j.transaction_date AS date, j.is_ambiguity_flagged, j.ambiguity_flag_reason, u.first_name AS buyer_name
 		FROM ai_categorization_jobs j
 		JOIN users u ON j.buyer = u.id
 		WHERE j.buyer = ?
@@ -124,7 +124,7 @@ func fetchSpendingGroups(db *sql.DB, userID int64) ([]types.TransactionGroup, er
 		var ambiguityReason sql.NullString
 
 		if err := jobRows.Scan(
-			&group.JobID, &group.Prompt, &group.TotalAmount, &group.Date, // Scan directly into Date field
+			&group.JobID, &group.Prompt, &group.TotalAmount, &group.TransactionDate, // Scan directly into TransactionDate field
 			&group.IsAmbiguityFlagged, &ambiguityReason, &group.BuyerName,
 		); err != nil {
 			slog.Error("failed to scan AI job row for history", "user_id", userID, "err", err)

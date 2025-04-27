@@ -158,7 +158,7 @@ type TransactionGroup struct {
 	JobID               int64          `json:"job_id"` // ai_categorization_jobs.id
 	Prompt              string         `json:"prompt"`
 	TotalAmount         float64        `json:"total_amount"`
-	Date                time.Time      `json:"date"` // Job creation time
+	TransactionDate     time.Time      `json:"date"` // Job's transaction date (or creation if not set)
 	BuyerName           string         `json:"buyer_name"`
 	IsAmbiguityFlagged  bool           `json:"is_ambiguity_flagged"`
 	AmbiguityFlagReason *string        `json:"ambiguity_flag_reason"` // Pointer to handle NULL/empty
