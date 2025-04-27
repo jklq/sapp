@@ -3,16 +3,16 @@ package deposit
 import (
 	"database/sql"
 	"encoding/json"
+	"errors"
+	"fmt"
 	"log/slog"
 	"net/http"
 	"strconv"
-	"strings" // Import strings package
+	"strings"
 	"time"
-	"errors"
-	"fmt"
 
-	"git.sr.ht/~relay/sapp-backend/auth" // Import auth package
-	"git.sr.ht/~relay/sapp-backend/types" // Import shared types
+	"git.sr.ht/~relay/sapp-backend/auth"
+	"git.sr.ht/~relay/sapp-backend/types"
 )
 
 // --- Helper Functions ---
@@ -82,7 +82,7 @@ func HandleAddDeposit(db *sql.DB) http.HandlerFunc {
 				return
 			}
 			// Basic validation for known periods
-			validPeriods := map[string]bool{"weekly": true, "monthly": true, "yearly": true} // Add more if needed
+			validPeriods := map[string]bool{"weekly": true, "monthly": true, "yearly": true}
 			if !validPeriods[*payload.RecurrencePeriod] {
 				slog.Warn("invalid add deposit payload: unsupported recurrence period", "url", r.URL, "user_id", userID, "period", *payload.RecurrencePeriod)
 				http.Error(w, "Bad Request: Unsupported recurrence period", http.StatusBadRequest)
@@ -406,7 +406,7 @@ func HandleUpdateDeposit(db *sql.DB) http.HandlerFunc {
 			args = append(args, val)
 			argIdx++
 		}
-		args = append(args, depositID) // Add depositID for WHERE clause
+		args = append(args, depositID)
 
 		// Rebuild query and args for SQLite format (?)
 		setClausesSQLite := []string{}
@@ -415,7 +415,7 @@ func HandleUpdateDeposit(db *sql.DB) http.HandlerFunc {
 			setClausesSQLite = append(setClausesSQLite, fmt.Sprintf("%s = ?", key))
 			argsSQLite = append(argsSQLite, val)
 		}
-		argsSQLite = append(argsSQLite, depositID) // Add depositID for WHERE clause
+		argsSQLite = append(argsSQLite, depositID)
 		updateQuerySQLite := fmt.Sprintf("UPDATE deposits SET %s WHERE id = ?",
 			strings.Join(setClausesSQLite, ", "))
 
@@ -512,7 +512,6 @@ func HandleDeleteDeposit(db *sql.DB) http.HandlerFunc {
 			return
 		}
 
-
 		// 4. Commit Transaction
 		if err = tx.Commit(); err != nil {
 			slog.Error("failed to commit transaction for delete deposit", "url", r.URL, "user_id", userID, "deposit_id", depositID, "err", err)
@@ -530,7 +529,6 @@ func HandleDeleteDeposit(db *sql.DB) http.HandlerFunc {
 		})
 	}
 }
-
 
 // HandleGetDeposits returns an http.HandlerFunc that fetches deposit templates for the logged-in user.
 func HandleGetDeposits(db *sql.DB) http.HandlerFunc {
