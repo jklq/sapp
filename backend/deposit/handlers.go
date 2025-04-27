@@ -113,8 +113,10 @@ func HandleAddDeposit(db *sql.DB) http.HandlerFunc {
 		`
 		// Use UTC time for consistency
 		now := time.Now().UTC()
-		// Format depositDate for storage (just date part is fine, but full timestamp is safer)
-		depositDateStr := depositDate.Format("2006-01-02 15:04:05")
+		// Format depositDate for storage using RFC3339 (YYYY-MM-DDTHH:MM:SSZ)
+		// Ensure the parsed date is treated as UTC midnight for consistency if only date was provided
+		depositDateUTC := depositDate.UTC()
+		depositDateStr := depositDateUTC.Format(time.RFC3339)
 
 		result, err := tx.Exec(insertQuery, userID, payload.Amount, payload.Description, depositDateStr, payload.IsRecurring, payload.RecurrencePeriod, now)
 		if err != nil {
@@ -314,7 +316,8 @@ func HandleUpdateDeposit(db *sql.DB) http.HandlerFunc {
 				return
 			}
 			newDepositDate = parsedDate
-			updateFields["deposit_date"] = newDepositDate.Format("2006-01-02 15:04:05")
+			// Format date using RFC3339 for storage
+			updateFields["deposit_date"] = newDepositDate.UTC().Format(time.RFC3339)
 			current.DepositDate = *newDepositDate // Update current state
 		}
 
@@ -365,8 +368,13 @@ func HandleUpdateDeposit(db *sql.DB) http.HandlerFunc {
 				return
 			}
 			newEndDate = parsedEndDate // Can be nil if payload.EndDate was "" or null
-			updateFields["end_date"] = newEndDate // Store *time.Time directly, driver handles nil
-			current.EndDate = newEndDate          // Update current state
+			// Format date using RFC3339 for storage, or store NULL
+			if newEndDate != nil {
+				updateFields["end_date"] = newEndDate.UTC().Format(time.RFC3339)
+			} else {
+				updateFields["end_date"] = nil // Ensure NULL is stored if date is cleared
+			}
+			current.EndDate = newEndDate // Update current state
 		}
 
 		// If not recurring, end_date should ideally be null (or maybe start date?)
