@@ -1,5 +1,6 @@
 import { useState, useEffect, useCallback } from 'react';
 import { fetchHistory, fetchCategories, updateSpendingItem, deleteAIJob, deleteDeposit } from './api';
+// Removed unused TransactionGroup import
 import { Category, UpdateSpendingPayload, EditableSharingStatus, HistoryListItem, SpendingItem, DepositItem } from './types';
 
 interface HistoryListProps {
