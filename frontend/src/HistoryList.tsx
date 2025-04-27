@@ -180,9 +180,6 @@ function HistoryList({ onBack }: HistoryListProps) {
             setDeleteError(err instanceof Error ? err.message : 'Failed to delete the spending group.');
         } finally {
             setDeletingJobId(null);
-            setDeleteError(err instanceof Error ? err.message : 'Failed to delete the spending group.');
-        } finally {
-            setDeletingJobId(null);
         }
     };
 
