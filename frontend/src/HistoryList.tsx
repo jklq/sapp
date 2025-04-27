@@ -194,6 +194,20 @@ function HistoryList({ onBack, onNavigateToEditDeposit }: HistoryListProps) {
         });
     };
 
+    // Toggle deposit item expansion
+    const toggleDepositExpansion = (key: string) => {
+        setExpandedDepositKeys(prev => {
+            const newSet = new Set(prev);
+            if (newSet.has(key)) {
+                newSet.delete(key);
+            } else {
+                newSet.add(key);
+            }
+            return newSet;
+        });
+    };
+
+
     // --- Delete Handler ---
     const handleDeleteJob = async (jobId: number) => {
         // Basic confirmation dialog
