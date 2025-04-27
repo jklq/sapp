@@ -16,13 +16,8 @@ import (
 	"time"
 
 	"git.sr.ht/~relay/sapp-backend/auth"     // Import auth for handlers and JWT
-	"git.sr.ht/~relay/sapp-backend/category" // Import category for handlers
-	"git.sr.ht/~relay/sapp-backend/deposit"  // Import deposit for handlers
-	"git.sr.ht/~relay/sapp-backend/history"  // Import history for service logic used by spendings handler
-	"git.sr.ht/~relay/sapp-backend/pay"      // Import pay for handlers
 	"git.sr.ht/~relay/sapp-backend/spendings" // Import spendings for handlers
 	"git.sr.ht/~relay/sapp-backend/testutil" // Import the new test utility package
-	"git.sr.ht/~relay/sapp-backend/transfer" // Import transfer for handlers
 	"git.sr.ht/~relay/sapp-backend/types"    // Import shared types
 	"github.com/golang-jwt/jwt/v5"           // Import JWT for token validation
 	"golang.org/x/crypto/bcrypt"             // Import bcrypt for password verification in registration test
