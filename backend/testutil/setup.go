@@ -16,12 +16,10 @@ import (
 
 	"git.sr.ht/~relay/sapp-backend/auth"
 	"git.sr.ht/~relay/sapp-backend/category"
-	"git.sr.ht/~relay/sapp-backend/deposit" // Import deposit package
-	"git.sr.ht/~relay/sapp-backend/history" // Import history package
+	"git.sr.ht/~relay/sapp-backend/deposit"
 	"git.sr.ht/~relay/sapp-backend/pay"
 	"git.sr.ht/~relay/sapp-backend/spendings"
 	"git.sr.ht/~relay/sapp-backend/transfer"
-	"git.sr.ht/~relay/sapp-backend/types" // Import shared types
 	"github.com/rs/cors"
 	_ "modernc.org/sqlite"
 )
@@ -221,9 +219,9 @@ func SetupTestEnvironment(t *testing.T) *TestEnv {
 	updateSpendingHandler := http.HandlerFunc(spendings.HandleUpdateSpending(db))
 	getTransferStatusHandler := http.HandlerFunc(transfer.HandleGetTransferStatus(db))
 	recordTransferHandler := http.HandlerFunc(transfer.HandleRecordTransfer(db))
-	deleteAIJobHandler := http.HandlerFunc(spendings.HandleDeleteAIJob(db)) // Add handler for delete job
-	addDepositHandler := http.HandlerFunc(deposit.HandleAddDeposit(db))     // Add handler for adding deposit
-	getDepositsHandler := http.HandlerFunc(deposit.HandleGetDeposits(db))   // Add handler for getting deposits
+	deleteAIJobHandler := http.HandlerFunc(spendings.HandleDeleteAIJob(db))
+	addDepositHandler := http.HandlerFunc(deposit.HandleAddDeposit(db))
+	getDepositsHandler := http.HandlerFunc(deposit.HandleGetDeposits(db))
 
 	// Apply AuthMiddleware to protected handlers
 	mux.Handle("POST /v1/pay", applyMiddleware(payHandler, auth.AuthMiddleware))
