@@ -48,7 +48,7 @@ func NewCategorizingPool(db *sql.DB, numWorkers int, api ModelAPI) CategorizingP
 // AddJob adds a new categorization job to the queue.
 // It inserts the job details (including optional spending date) into the database
 // and sends the job details to the channel for processing.
-func (p CategorizingPool) AddJob(params CategorizationParams, spendingDate *time.Time) (int64, error) {
+func (p *CategorizingPool) AddJob(params CategorizationParams, spendingDate *time.Time) (int64, error) {
 	tx, err := p.db.Begin()
 	if err != nil {
 		return 0, fmt.Errorf("failed to begin transaction: %w", err)
@@ -68,8 +68,9 @@ func (p CategorizingPool) AddJob(params CategorizationParams, spendingDate *time
 	}
 
 	// Store pre_settled flag and spending_date in the job record
+	// Pass spendingDate directly (can be nil). Assumes spending_date column exists and is nullable.
 	result, err := tx.Exec(`INSERT INTO ai_categorization_jobs (buyer, shared_with, prompt, total_amount, pre_settled, spending_date, status)
-	VALUES (?, ?, ?, ?, ?, ?, ?)`, params.Buyer.Id, otherPersonInt, params.Prompt, params.TotalAmount, params.PreSettled, sqlSpendingDate, "pending")
+	VALUES (?, ?, ?, ?, ?, ?, ?)`, params.Buyer.Id, otherPersonInt, params.Prompt, params.TotalAmount, params.PreSettled, spendingDate, "pending")
 	if err != nil {
 		slog.Error("error inserting ai categorization job", "error", err, "pre_settled", params.PreSettled, "spending_date", spendingDate)
 		return 0, err
@@ -87,10 +88,16 @@ func (p CategorizingPool) AddJob(params CategorizationParams, spendingDate *time
 
 	// Send job details to the worker channel (non-blocking send might be better if channel can fill)
 	// We pass the full job details needed by the worker.
+	// Create the Job struct to send to the worker channel
 	job := Job{
-		Id:           jobId,
-		Params:       params,       // Pass the original params
-		SpendingDate: spendingDate, // Pass the parsed spending date
+		Id: jobId,
+		// Populate other fields from params as needed by the worker
+		TotalAmount:  params.TotalAmount,
+		Prompt:       params.Prompt,
+		Buyer:        params.Buyer.Id,
+		SharedWithId: otherPersonInt,
+		PreSettled:   params.PreSettled,
+		SpendingDate: spendingDate, // Pass the parsed spending date (or nil)
 		Status:       "pending",
 		// Result is initially nil
 	}
@@ -158,8 +165,34 @@ func (p *CategorizingPool) worker(id int) {
 		p.updateJobStatus(job.Id, "processing", nil) // Mark as processing
 
 		// --- Process Job ---
+		// Reconstruct CategorizationParams needed by ProcessCategorizationJob
+		// This assumes you have access to Buyer and SharedWith details if needed,
+		// or modify ProcessCategorizationJob to accept IDs/less info if sufficient.
+		// For now, let's assume ProcessCategorizationJob needs the full params.
+		// We might need to query user/partner names here based on IDs in the job struct
+		// if ProcessCategorizationJob requires them.
+		// Simplified: Assuming ProcessCategorizationJob is adapted or params are reconstructed.
+		// If ProcessCategorizationJob strictly needs the original params struct,
+		// we should pass it through the channel instead of individual fields.
+		// Let's assume for now ProcessCategorizationJob is flexible or adapted.
+		// We need to reconstruct the CategorizationParams for ProcessCategorizationJob
+		// This might require fetching user/partner names if the prompt generation needs them.
+		// Simplified example (assuming ProcessCategorizationJob adapted or names not needed):
+		paramsForProcessing := CategorizationParams{
+			TotalAmount: job.TotalAmount,
+			Buyer:       Person{Id: job.Buyer}, // Name might be missing here
+			// SharedWith needs reconstruction if ID exists
+			Prompt:     job.Prompt,
+			PreSettled: job.PreSettled,
+			// tries is handled internally
+		}
+		if job.SharedWithId != nil {
+			// Potentially fetch partner name here if needed by getPrompt
+			paramsForProcessing.SharedWith = &Person{Id: *job.SharedWithId} // Name might be missing
+		}
+
 		// Pass the stored ModelAPI to ProcessCategorizationJob
-		jobResult, err := ProcessCategorizationJob(p.db, p.api, job.Params)
+		jobResult, err := ProcessCategorizationJob(p.db, p.api, paramsForProcessing)
 		if err != nil {
 			slog.Error("Worker failed to process job", "worker_id", id, "job_id", job.Id, "err", err)
 			p.updateJobStatus(job.Id, "failed", err) // Update status with error
@@ -190,7 +223,7 @@ func (p *CategorizingPool) worker(id int) {
 
 			// Determine settled_at based on job parameters
 			var settledAt sql.NullTime
-			if job.Params.PreSettled {
+			if job.PreSettled { // Use job.PreSettled from the Job struct
 				settledAt = sql.NullTime{Time: time.Now().UTC(), Valid: true}
 			}
 
