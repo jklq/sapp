@@ -1,16 +1,17 @@
-import { useState, useEffect, useCallback } from 'react'; // Removed useMemo
-import { fetchHistory, fetchCategories, updateSpendingItem, deleteAIJob } from './api';
+import { useState, useEffect, useCallback } from 'react';
+import { fetchHistory, fetchCategories, updateSpendingItem, deleteAIJob, deleteDeposit } from './api'; // Added deleteDeposit
 // Import types. HistoryListItem now contains flattened data.
-// Removed unused HistoryResponse import
-import { Category, UpdateSpendingPayload, EditableSharingStatus, HistoryListItem, SpendingItem } from './types';
+import { Category, UpdateSpendingPayload, EditableSharingStatus, HistoryListItem, SpendingItem, DepositItem } from './types'; // Added DepositItem
 
 interface HistoryListProps {
     onBack: () => void;
+    // Add callback to navigate to edit page
+    onNavigateToEditDeposit: (depositId: number) => void;
 }
 
 // No longer need local casting types like SpendingGroupItem, DepositHistoryItem
 
-function HistoryList({ onBack }: HistoryListProps) {
+function HistoryList({ onBack, onNavigateToEditDeposit }: HistoryListProps) {
     // Data states
     const [historyItems, setHistoryItems] = useState<HistoryListItem[]>([]); // Store the flat list
     const [categories, setCategories] = useState<Category[]>([]); // Still needed for editing spendings
@@ -26,10 +27,14 @@ function HistoryList({ onBack }: HistoryListProps) {
     const [editFormData, setEditFormData] = useState<UpdateSpendingPayload | null>(null);
     const [isSaving, setIsSaving] = useState<boolean>(false);
     const [deletingJobId, setDeletingJobId] = useState<number | null>(null); // Track which job is being deleted
-    const [deleteError, setDeleteError] = useState<string | null>(null); // Separate error state for deletion
+    const [deletingDepositId, setDeletingDepositId] = useState<number | null>(null); // Track which deposit is being deleted
+    const [deleteError, setDeleteError] = useState<string | null>(null); // Combined error state for deletion
 
     // Expansion state
     const [expandedGroupIds, setExpandedGroupIds] = useState<Set<number>>(new Set()); // Keep for spending groups
+
+    // Navigation state (passed up to App) - Placeholder, needs implementation in App.tsx
+    const [editingDepositId, setEditingDepositId] = useState<number | null>(null);
 
     // Fetch history and categories
     const loadData = useCallback(() => {
@@ -141,6 +146,40 @@ function HistoryList({ onBack }: HistoryListProps) {
         }
     };
 
+    // --- Deposit Action Handlers ---
+
+    const handleEditDepositClick = (depositId: number) => {
+        // Call the callback passed from App.tsx to handle navigation
+        onNavigateToEditDeposit(depositId);
+    };
+
+    const handleDeleteDepositClick = async (depositId: number, isRecurring: boolean) => {
+        let confirmMessage = "Are you sure you want to delete this deposit?";
+        if (isRecurring) {
+            confirmMessage = "This is a recurring deposit template. Deleting it will remove the template and prevent future occurrences. Existing past occurrences in this list will remain visible until the next refresh. Are you sure you want to delete the template?";
+        }
+
+        if (!window.confirm(confirmMessage)) {
+            return;
+        }
+
+        setDeletingDepositId(depositId);
+        setDeleteError(null);
+
+        try {
+            await deleteDeposit(depositId);
+            // Reload data to reflect deletion
+            loadData();
+            // Optionally show a success message briefly
+        } catch (err) {
+            console.error("Failed to delete deposit:", err);
+            setDeleteError(err instanceof Error ? err.message : 'Failed to delete the deposit.');
+        } finally {
+            setDeletingDepositId(null);
+        }
+    };
+
+
     // Toggle spending group expansion
     const toggleGroupExpansion = (jobId: number) => {
         setExpandedGroupIds(prev => {
@@ -186,15 +225,16 @@ function HistoryList({ onBack }: HistoryListProps) {
 
     // --- Render Logic ---
 
-    // Helper to render a deposit item (receives a HistoryListItem of type 'deposit')
-    const renderDepositItem = (item: HistoryListItem) => {
+    // Helper to render a deposit item (receives a HistoryListItem which is a DepositItem occurrence)
+    const renderDepositItem = (item: DepositItem) => { // Use DepositItem type directly
         // Key uses original template ID + occurrence date for uniqueness
-        // Use optional chaining and provide defaults
-        const key = `dep-${item.id ?? 'new'}-${item.date}`;
+        const depositId = item.id; // This is the template ID
+        const key = `dep-${depositId}-${item.date}`;
         const description = item.description ?? 'N/A';
         const amount = item.amount ?? 0;
-        const isRecurring = item.is_recurring ?? false;
+        const isRecurring = item.is_recurring ?? false; // From the template
         const recurrencePeriod = item.recurrence_period;
+        const isDeleting = deletingDepositId === depositId;
 
         return (
             <div key={key} className="border border-green-200 bg-green-50 rounded-lg shadow-sm overflow-hidden p-3">
@@ -203,27 +243,51 @@ function HistoryList({ onBack }: HistoryListProps) {
                     <div className="flex items-center space-x-3 flex-1 min-w-0 mr-2">
                          {/* Deposit Icon */}
                          {/* Deposit Icon */}
-                         <svg xmlns="http://www.w3.org/2000/svg" className="h-6 w-6 text-green-600 flex-shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                        <svg xmlns="http://www.w3.org/2000/svg" className="h-6 w-6 text-green-600 flex-shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
                             <path strokeLinecap="round" strokeLinejoin="round" d="M17 9V7a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2m2 4h10a2 2 0 002-2v-6a2 2 0 00-2-2H9a2 2 0 00-2 2v6a2 2 0 002 2zm7-5l-3 3m0 0l-3-3m3 3V8" />
                         </svg>
-                        <div>
+                        <div className="flex-1 min-w-0">
                             <p className="text-sm font-medium text-green-800 break-words">
                                 Deposit: <span className="text-gray-700 font-normal">{description}</span>
                             </p>
                             <p className="text-xs text-gray-500">
                                 {formatDate(item.date, { hour: undefined, minute: undefined })} {/* Show only date of this occurrence */}
-                                {/* Optionally indicate if it's part of a recurring series */}
+                                {/* Indicate if it's part of a recurring series */}
                                 {isRecurring && <span className="ml-2 text-xs italic">({recurrencePeriod || 'Recurring'})</span>}
                             </p>
                         </div>
                     </div>
-                    {/* Right side: Amount */}
-                    <div className="flex-shrink-0">
+                    {/* Right side: Amount & Actions */}
+                    <div className="flex items-center space-x-2 flex-shrink-0">
+                        {/* Amount */}
                         <p className="text-lg font-semibold text-green-700">
                             +{formatCurrency(amount)}
                         </p>
+                        {/* Edit Button */}
+                        <button
+                            onClick={() => handleEditDepositClick(depositId)}
+                            disabled={isDeleting || deletingJobId !== null || editingItemId !== null} // Disable if any delete/edit is happening
+                            className="text-indigo-600 hover:text-indigo-800 disabled:opacity-50 disabled:cursor-not-allowed p-1 rounded focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:ring-offset-1"
+                            title="Edit this deposit template"
+                        >
+                            <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                                <path strokeLinecap="round" strokeLinejoin="round" d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" />
+                            </svg>
+                        </button>
+                        {/* Delete Button */}
+                        <button
+                            onClick={() => handleDeleteDepositClick(depositId, isRecurring)}
+                            disabled={isDeleting || deletingJobId !== null || editingItemId !== null} // Disable if any delete/edit is happening
+                            className="text-red-600 hover:text-red-800 disabled:opacity-50 disabled:cursor-not-allowed p-1 rounded focus:outline-none focus:ring-2 focus:ring-red-500 focus:ring-offset-1"
+                            title={isRecurring ? "Delete recurring deposit template" : "Delete this deposit"}
+                        >
+                            <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                                <path strokeLinecap="round" strokeLinejoin="round" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
+                            </svg>
+                            {isDeleting && <span className="ml-1 text-xs">(Deleting...)</span>}
+                        </button>
                     </div>
-                 </div>
+                </div>
             </div>
         );
     };
@@ -417,10 +481,10 @@ function HistoryList({ onBack }: HistoryListProps) {
             {isLoading && <div className="text-center p-4">Loading history...</div>}
             {/* Display general loading/fetch error */}
             {error && !isLoading && <div className="bg-red-100 border border-red-400 text-red-700 px-4 py-3 rounded relative mb-4" role="alert">Error loading history: {error}</div>}
-            {/* Display edit error */}
-            {editError && <div className="bg-red-100 border border-red-400 text-red-700 px-4 py-3 rounded relative mb-4" role="alert">Error saving changes: {editError}</div>}
-            {/* Display delete error */}
-            {deleteError && <div className="bg-red-100 border border-red-400 text-red-700 px-4 py-3 rounded relative mb-4" role="alert">Error deleting spending group: {deleteError}</div>}
+            {/* Display edit error (for spendings) */}
+            {editError && <div className="bg-red-100 border border-red-400 text-red-700 px-4 py-3 rounded relative mb-4" role="alert">Error saving spending changes: {editError}</div>}
+            {/* Display delete error (combined for jobs and deposits) */}
+            {deleteError && <div className="bg-red-100 border border-red-400 text-red-700 px-4 py-3 rounded relative mb-4" role="alert">Error during deletion: {deleteError}</div>}
 
 
             {!isLoading && !error && historyItems.length === 0 && (
@@ -430,10 +494,13 @@ function HistoryList({ onBack }: HistoryListProps) {
             {/* Render combined history items from the flat list */}
             {!isLoading && !error && historyItems.length > 0 && (
                 <div className="space-y-4"> {/* Use less space between items */}
-                    {historyItems.map((item) => { // Use unique key based on type and ID/date
+                    {historyItems.map((item) => {
+                        // Use unique key based on type and ID/date
+                        const key = `${item.type}-${item.id ?? item.job_id ?? 'new'}-${item.date}`;
+
                         if (item.type === 'deposit') {
-                            // Render Deposit Item
-                            return renderDepositItem(item);
+                            // Render Deposit Item - Cast to DepositItem for type safety
+                            return renderDepositItem(item as DepositItem);
                         } else if (item.type === 'spending_group') {
                             // Render Spending Group
                             // Use optional chaining and provide defaults for safety
@@ -492,8 +559,12 @@ function HistoryList({ onBack }: HistoryListProps) {
                                                     </svg>
                                                     {deletingJobId === jobId && <span className="ml-1 text-xs">(Deleting...)</span>}
                                                 </button>
-                                                <span className="text-gray-500 text-lg cursor-pointer">
-                                                    {expandedGroupIds.has(jobId) ? '▲' : '▼'}
+                                                {/* Expander Icon */}
+                                                <span className="text-gray-400 hover:text-gray-600 cursor-pointer p-1" onClick={(e) => { e.stopPropagation(); toggleGroupExpansion(jobId); }}>
+                                                    {expandedGroupIds.has(jobId) ?
+                                                        <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}><path strokeLinecap="round" strokeLinejoin="round" d="M5 15l7-7 7 7" /></svg> :
+                                                        <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}><path strokeLinecap="round" strokeLinejoin="round" d="M19 9l-7 7-7-7" /></svg>
+                                                    }
                                                 </span>
                                             </div>
                                         </div>
@@ -537,8 +608,7 @@ function HistoryList({ onBack }: HistoryListProps) {
                         } else {
                             // Handle unknown item types if necessary
                             console.warn("Unknown history item type:", item.type);
-                            // Use a unique key for unknown items
-                            return <div key={`unknown-${item.date}-${Math.random()}`} className="text-red-500">Unknown item type encountered</div>;
+                            return <div key={key} className="text-red-500">Unknown item type encountered</div>;
                         }
                     })}
                 </div> // Close history items container

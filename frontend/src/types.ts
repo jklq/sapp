@@ -121,16 +121,19 @@ export interface PartnerRegistrationResponse {
 
 // --- Types for Deposits ---
 
-// Represents a deposit item fetched from the backend history endpoint
+// Represents a deposit item (occurrence) fetched from the backend history endpoint
+// Note: This represents an *occurrence*, not the template itself.
+// It includes the original template ID.
 export interface DepositItem {
-  id: number;
+  id: number; // ID of the original template
   type: 'deposit'; // Identifier
   amount: number;
   description: string;
   date: string; // ISO date string
-  is_recurring: boolean;
-  recurrence_period: string | null;
-  created_at: string; // ISO date string
+  is_recurring: boolean; // True if generated from a recurring template
+  recurrence_period: string | null; // Period of the template
+  end_date?: string | null; // Optional: End date of the template (ISO date string or null)
+  created_at: string; // ISO date string of the template creation
 }
 
 // Payload for adding a new deposit
@@ -147,6 +150,28 @@ export interface AddDepositResponse {
     message: string;
     deposit_id: number;
 }
+
+// Payload for updating an existing deposit template
+export interface UpdateDepositPayload {
+    amount?: number; // Optional fields
+    description?: string;
+    deposit_date?: string; // Format: "YYYY-MM-DD"
+    is_recurring?: boolean;
+    recurrence_period?: string | null; // Can be nullified
+    end_date?: string | null; // Format: "YYYY-MM-DD" or null to clear
+}
+
+// Response from deleting a deposit
+export interface DeleteDepositResponse {
+    message: string;
+}
+
+// Represents the full deposit template details (used for editing)
+export interface DepositTemplate extends DepositItem {
+    // Inherits fields from DepositItem (representing the template itself)
+    // Add any fields specific to the template view if needed
+}
+
 
 // --- Type for Combined History ---
 

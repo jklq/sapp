@@ -172,12 +172,15 @@ func fetchSpendingGroups(db *sql.DB, userID int64) ([]types.TransactionGroup, er
 }
 
 // fetchDeposits fetches all deposit records (as types.DepositItem) for the user.
+// fetchDeposits fetches all active deposit templates (as types.DepositItem) for the user.
 func fetchDeposits(db *sql.DB, userID int64) ([]types.DepositItem, error) {
 	fetchedDeposits := []types.DepositItem{} // Use types.DepositItem
+	// Fetch only templates, not individual occurrences here.
+	// The history service will generate occurrences based on these templates.
 	depositQuery := `
-		SELECT id, amount, description, deposit_date, is_recurring, recurrence_period, created_at
+		SELECT id, amount, description, deposit_date, is_recurring, recurrence_period, end_date, created_at
 		FROM deposits
-		WHERE user_id = ?
+		WHERE user_id = ? -- Removed is_active filter, assuming hard delete for now
 		ORDER BY deposit_date DESC, created_at DESC;
 	`
 	depositRows, err := db.Query(depositQuery, userID)
@@ -198,9 +201,10 @@ func fetchDeposits(db *sql.DB, userID int64) ([]types.DepositItem, error) {
 			&d.Date, // Scan directly into d.Date
 			&d.IsRecurring,
 			&d.RecurrencePeriod,
+			&d.EndDate, // Scan the new end_date field
 			&d.CreatedAt,
 		); err != nil {
-			slog.Error("failed to scan deposit row for history service", "user_id", userID, "err", err)
+			slog.Error("failed to scan deposit template row for history service", "user_id", userID, "err", err)
 			return nil, err
 		}
 		// d.Date = depositDateDB // No longer needed
@@ -213,25 +217,39 @@ func fetchDeposits(db *sql.DB, userID int64) ([]types.DepositItem, error) {
 	return fetchedDeposits, nil
 }
 
-// generateDepositOccurrences calculates future dates for a recurring deposit.
-func generateDepositOccurrences(template types.DepositItem, endDate time.Time) []types.DepositItem {
+// generateDepositOccurrences calculates occurrence dates for a deposit template up to a given limit.
+// It respects the template's end_date if set.
+func generateDepositOccurrences(template types.DepositItem, generationLimitDate time.Time) []types.DepositItem {
 	occurrences := []types.DepositItem{} // Use types.DepositItem
 	currentDate := template.Date         // Start from the initial deposit date
 
-	// Ensure we don't generate occurrences before the template start date
-	// and include the initial date itself if it's within range (it always should be based on fetch logic)
-	if currentDate.After(endDate) {
-		return occurrences // Template starts after the end date
+	// Determine the effective end date for generation: the earlier of the template's end_date or the overall generation limit.
+	effectiveEndDate := generationLimitDate
+	if template.EndDate != nil && template.EndDate.Before(generationLimitDate) {
+		effectiveEndDate = *template.EndDate
 	}
 
-	// Add the initial occurrence
+	// Ensure we don't generate occurrences before the template start date
+	// and include the initial date itself if it's within the effective range.
+	if currentDate.After(effectiveEndDate) {
+		return occurrences // Template starts after the effective end date
+	}
+
+	// Add the initial occurrence if it's on or before the effective end date
+	// (The check above already ensures currentDate <= effectiveEndDate if we reach here)
 	occurrences = append(occurrences, createOccurrence(template, currentDate))
 
-	// Generate subsequent occurrences
+	// If not recurring, we are done after adding the initial one (if applicable)
+	if !template.IsRecurring || template.RecurrencePeriod == nil {
+		return occurrences
+	}
+
+	// Generate subsequent occurrences for recurring deposits
 	for {
 		nextDate := calculateNextDate(currentDate, *template.RecurrencePeriod)
-		if nextDate.IsZero() || nextDate.After(endDate) {
-			break // Stop if next date is invalid or past the end date
+		// Stop if next date is invalid or after the effective end date
+		if nextDate.IsZero() || nextDate.After(effectiveEndDate) {
+			break
 		}
 		occurrences = append(occurrences, createOccurrence(template, nextDate))
 		currentDate = nextDate
@@ -245,10 +263,11 @@ func createOccurrence(template types.DepositItem, occurrenceDate time.Time) type
 	return types.DepositItem{
 		ID:          template.ID, // Link back to the original template ID
 		Amount:      template.Amount,
-		Description: template.Description,
-		Date:        occurrenceDate, // This specific occurrence's date
-		IsRecurring:      true,           // Mark as generated from a recurring template
+		Description:      template.Description,
+		Date:             occurrenceDate, // This specific occurrence's date
+		IsRecurring:      template.IsRecurring, // Keep original template flag
 		RecurrencePeriod: template.RecurrencePeriod,
+		EndDate:          template.EndDate, // Keep original template end date (might be useful info)
 		CreatedAt:        template.CreatedAt, // Keep original creation time
 	}
 }

@@ -96,6 +96,7 @@ CREATE TABLE IF NOT EXISTS deposits (
     deposit_date DATETIME NOT NULL, -- Date the deposit was received/effective
     is_recurring BOOLEAN DEFAULT 0,
     recurrence_period TEXT, -- e.g., 'monthly', 'weekly', 'yearly', NULL if not recurring
+    end_date DATETIME DEFAULT NULL, -- Date after which recurring deposit should stop generating occurrences, NULL if indefinite or not recurring
     created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
     FOREIGN KEY(user_id) REFERENCES users(id) ON UPDATE CASCADE ON DELETE CASCADE
 );

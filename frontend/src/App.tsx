@@ -6,9 +6,10 @@ import LogSpendingForm from './LogSpendingForm';
 import HistoryList from './HistoryList'; // Renamed import
 import TransferPage from './TransferPage';
 import PartnerRegistrationForm from './PartnerRegistrationForm';
-import AddDepositForm from './AddDepositForm'; // Import the new deposit form
+import AddDepositForm from './AddDepositForm';
+import EditDepositPage from './EditDepositPage'; // Import the new edit page
 
-type View = 'login' | 'register' | 'logSpending' | 'addDeposit' | 'viewHistory' | 'transfer'; // Added 'addDeposit', renamed 'viewSpendings' to 'viewHistory'
+type View = 'login' | 'register' | 'logSpending' | 'addDeposit' | 'viewHistory' | 'transfer' | 'editDeposit'; // Added 'editDeposit'
 
 interface UserInfo {
   userId: number;
@@ -22,8 +23,9 @@ function App() {
   const [userInfo, setUserInfo] = useState<UserInfo | null>(null);
   const [isLoadingAuth, setIsLoadingAuth] = useState<boolean>(true);
 
-  // View state (determines which component to show: login, register, or one of the authenticated views)
-  const [currentView, setCurrentView] = useState<View>('login'); // Start at login by default
+  // View state
+  const [currentView, setCurrentView] = useState<View>('login');
+  const [editingDepositId, setEditingDepositId] = useState<number | null>(null); // State to hold ID for edit view
 
   // Effect to check token validity or fetch user info on load
   useEffect(() => {
@@ -73,6 +75,12 @@ function App() {
     setCurrentView('login');
   };
 
+  // Navigate to Edit Deposit page
+  const showEditDeposit = (depositId: number) => {
+    setEditingDepositId(depositId);
+    setCurrentView('editDeposit');
+  };
+
 
   // Determine which component to render based on auth and view state
   const renderContent = () => {
@@ -100,11 +108,23 @@ function App() {
 
         {/* Render the selected view */}
         {currentView === 'logSpending' && <LogSpendingForm />}
-        {currentView === 'addDeposit' && <AddDepositForm />} {/* Render AddDepositForm */}
-        {currentView === 'viewHistory' && <HistoryList onBack={() => setCurrentView('logSpending')} />} {/* Use HistoryList */}
+        {currentView === 'addDeposit' && <AddDepositForm />}
+        {currentView === 'viewHistory' && (
+            <HistoryList
+                onBack={() => setCurrentView('logSpending')}
+                onNavigateToEditDeposit={showEditDeposit} // Pass navigation handler
+            />
+        )}
         {currentView === 'transfer' && <TransferPage onBack={() => setCurrentView('logSpending')} />}
+        {currentView === 'editDeposit' && editingDepositId !== null && (
+            <EditDepositPage
+                depositId={editingDepositId}
+                onBack={() => setCurrentView('viewHistory')} // Go back to history after edit/cancel
+            />
+        )}
 
-        {/* Bottom Navigation Bar */}
+
+        {/* Bottom Navigation Bar (Only show if not editing a deposit) */}
         {/* Fixed positioning, background, border-top, rounded-top */}
         <header className="fixed bottom-0 left-0 right-0 w-full bg-white border-t border-gray-200 rounded-t-lg p-3 z-50 max-w-4xl mx-auto">
           <div className="flex justify-between items-center">
@@ -205,9 +225,10 @@ function App() {
                </svg>
                {/* Optional: Add text label for larger screens */}
                {/* <span className="hidden md:inline ml-1">Logout</span> */}
-            </button>
-          </div>
-        </header> {/* End Bottom Nav Bar */}
+              </button>
+            </div>
+          </header> /* End Bottom Nav Bar */
+        )}
       </div>
     );
   };

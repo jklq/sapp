@@ -110,9 +110,13 @@ func main() {
 	updateSpendingHandler := http.HandlerFunc(spendings.HandleUpdateSpending(db))
 	getTransferStatusHandler := http.HandlerFunc(transfer.HandleGetTransferStatus(db)) // Create handler for transfer status
 	recordTransferHandler := http.HandlerFunc(transfer.HandleRecordTransfer(db))       // Create handler for recording transfer
-	deleteAIJobHandler := http.HandlerFunc(spendings.HandleDeleteAIJob(db))            // Create handler for deleting AI job
-	addDepositHandler := http.HandlerFunc(deposit.HandleAddDeposit(db))                // Create handler for adding deposit
-	getDepositsHandler := http.HandlerFunc(deposit.HandleGetDeposits(db))              // Create handler for getting deposits
+	deleteAIJobHandler := http.HandlerFunc(spendings.HandleDeleteAIJob(db)) // Create handler for deleting AI job
+	// Deposit Handlers
+	addDepositHandler := http.HandlerFunc(deposit.HandleAddDeposit(db))          // Create handler for adding deposit
+	getDepositsHandler := http.HandlerFunc(deposit.HandleGetDeposits(db))        // Create handler for getting deposit templates
+	getDepositByIDHandler := http.HandlerFunc(deposit.HandleGetDepositByID(db))  // Create handler for getting single deposit template
+	updateDepositHandler := http.HandlerFunc(deposit.HandleUpdateDeposit(db))    // Create handler for updating deposit template
+	deleteDepositHandler := http.HandlerFunc(deposit.HandleDeleteDeposit(db))    // Create handler for deleting deposit template
 
 	// Apply AuthMiddleware to protected handlers
 	// Changed /v1/pay to accept POST with body instead of path params
@@ -121,11 +125,16 @@ func main() {
 	mux.Handle("POST /v1/categorize", applyMiddleware(categorizeHandler, auth.AuthMiddleware))
 	mux.Handle("GET /v1/history", applyMiddleware(getHistoryHandler, auth.AuthMiddleware)) // Updated route and handler
 	mux.Handle("PUT /v1/spendings/{spending_id}", applyMiddleware(updateSpendingHandler, auth.AuthMiddleware))
-	mux.Handle("DELETE /v1/jobs/{job_id}", applyMiddleware(deleteAIJobHandler, auth.AuthMiddleware))      // Add route for deleting AI job
+	mux.Handle("DELETE /v1/jobs/{job_id}", applyMiddleware(deleteAIJobHandler, auth.AuthMiddleware)) // Add route for deleting AI job
+	// Transfer Routes
 	mux.Handle("GET /v1/transfer/status", applyMiddleware(getTransferStatusHandler, auth.AuthMiddleware)) // Add route for transfer status
 	mux.Handle("POST /v1/transfer/record", applyMiddleware(recordTransferHandler, auth.AuthMiddleware))   // Add route for recording transfer
-	mux.Handle("POST /v1/deposits", applyMiddleware(addDepositHandler, auth.AuthMiddleware))              // Add route for adding deposit
-	mux.Handle("GET /v1/deposits", applyMiddleware(getDepositsHandler, auth.AuthMiddleware))              // Add route for getting deposits
+	// Deposit Routes
+	mux.Handle("POST /v1/deposits", applyMiddleware(addDepositHandler, auth.AuthMiddleware))                // Add route for adding deposit
+	mux.Handle("GET /v1/deposits", applyMiddleware(getDepositsHandler, auth.AuthMiddleware))                // Add route for getting deposit templates
+	mux.Handle("GET /v1/deposits/{deposit_id}", applyMiddleware(getDepositByIDHandler, auth.AuthMiddleware)) // Add route for getting single deposit template
+	mux.Handle("PUT /v1/deposits/{deposit_id}", applyMiddleware(updateDepositHandler, auth.AuthMiddleware))  // Add route for updating deposit template
+	mux.Handle("DELETE /v1/deposits/{deposit_id}", applyMiddleware(deleteDepositHandler, auth.AuthMiddleware)) // Add route for deleting deposit template
 
 	// CORS handler - Apply CORS *after* routing but *before* auth potentially
 	// Or apply CORS as the outermost layer if auth doesn't rely on headers modified by CORS

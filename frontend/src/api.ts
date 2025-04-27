@@ -239,6 +239,79 @@ export async function addDeposit(payload: AddDepositPayload): Promise<AddDeposit
     return data;
 }
 
+// Fetches details for a single deposit template
+export async function fetchDepositById(depositId: number): Promise<DepositTemplate> { // Use DepositTemplate type
+    const url = `${API_BASE_URL}/v1/deposits/${depositId}`;
+    const response = await fetchWithAuth(url); // GET request
+
+    if (!response.ok) {
+        const errorBody = await response.text();
+        let errorMessage = `Failed to fetch deposit details: ${response.statusText}`;
+        try {
+            const errData = JSON.parse(errorBody);
+            errorMessage = errData.message || errData.error || errorMessage;
+        } catch (e) {
+            errorMessage += ` - ${errorBody}`;
+        }
+        throw new Error(errorMessage);
+    }
+
+    const data: DepositTemplate = await response.json(); // Expect DepositTemplate structure
+    console.log("Fetched Deposit Details:", data); // Debug log
+    return data;
+}
+
+
+// Updates an existing deposit template
+export async function updateDeposit(depositId: number, payload: UpdateDepositPayload): Promise<DepositTemplate> { // Return updated template
+    const url = `${API_BASE_URL}/v1/deposits/${depositId}`;
+    const response = await fetchWithAuth(url, {
+        method: "PUT",
+        body: JSON.stringify(payload),
+        // fetchWithAuth will set Content-Type: application/json
+    });
+
+     if (!response.ok) {
+        const errorBody = await response.text();
+        let errorMessage = `Failed to update deposit: ${response.statusText}`;
+        try {
+            const errData = JSON.parse(errorBody);
+            errorMessage = errData.message || errData.error || errorMessage;
+        } catch (e) {
+            errorMessage += ` - ${errorBody}`;
+        }
+        throw new Error(errorMessage);
+    }
+
+    // Expecting 200 OK with JSON body containing the updated deposit
+    const data: { message: string, deposit: DepositTemplate } = await response.json();
+    return data.deposit;
+}
+
+// Deletes a deposit template
+export async function deleteDeposit(depositId: number): Promise<DeleteDepositResponse> {
+    const url = `${API_BASE_URL}/v1/deposits/${depositId}`;
+    const response = await fetchWithAuth(url, {
+        method: "DELETE",
+    });
+
+    if (!response.ok) {
+        const errorBody = await response.text();
+        let errorMessage = `Failed to delete deposit: ${response.statusText}`;
+        try {
+            const errData = JSON.parse(errorBody);
+            errorMessage = errData.message || errData.error || errorMessage;
+        } catch (e) {
+            errorMessage += ` - ${errorBody}`;
+        }
+        throw new Error(errorMessage);
+    }
+
+    // Expecting 200 OK with JSON body on success
+    const data: DeleteDepositResponse = await response.json();
+    return data;
+}
+
 
 // --- History API Functions ---
 
