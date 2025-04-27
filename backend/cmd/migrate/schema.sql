@@ -21,7 +21,8 @@ CREATE TABLE IF NOT EXISTS spendings (
     description TEXT,
     category INTEGER NOT NULL,
     made_by INTEGER NOT NULL, -- References the user who made the purchase
-    created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+    spending_date DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP, -- Date the spending actually occurred
+    created_at DATETIME DEFAULT CURRENT_TIMESTAMP, -- Date the record was created
     FOREIGN KEY(category) REFERENCES categories(id) ON UPDATE CASCADE ON DELETE RESTRICT,
     FOREIGN KEY(made_by) REFERENCES users(id) ON UPDATE CASCADE ON DELETE CASCADE
 );
@@ -52,6 +53,7 @@ CREATE TABLE IF NOT EXISTS ai_categorization_jobs (
     is_ambiguity_flagged BOOLEAN DEFAULT 0,
     ambiguity_flag_reason TEXT,
     pre_settled BOOLEAN DEFAULT 0, -- Added: Flag to indicate if the job's spendings should be settled immediately
+    transaction_date DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP, -- Date the transaction(s) in the prompt occurred
     created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
     status_updated_at DATETIME DEFAULT CURRENT_TIMESTAMP,
     FOREIGN KEY(buyer) REFERENCES users(id) ON UPDATE CASCADE ON DELETE CASCADE,

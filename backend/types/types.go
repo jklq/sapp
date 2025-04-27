@@ -19,8 +19,9 @@ const (
 type PayPayload struct {
 	SharedStatus string  `json:"shared_status"` // 'alone' or 'shared'
 	Amount       float64 `json:"amount"`
-	Category     string  `json:"category"`    // Category name
-	PreSettled   bool    `json:"pre_settled"` // New flag
+	Category     string  `json:"category"`              // Category name
+	SpendingDate *string `json:"spending_date,omitempty"` // Optional: Date of spending "YYYY-MM-DD"
+	PreSettled   bool    `json:"pre_settled"`           // New flag
 }
 
 // LoginRequest defines the structure for the login request body

@@ -40,6 +40,26 @@ func HandlePayRoute(db *sql.DB) http.HandlerFunc { // Return http.HandlerFunc di
 			return
 		}
 
+		// --- Parse Spending Date ---
+		var spendingDate time.Time
+		if payload.SpendingDate != nil && *payload.SpendingDate != "" {
+			parsedDate, err := time.Parse("2006-01-02", *payload.SpendingDate)
+			if err != nil {
+				slog.Warn("invalid spending_date format received, using current date", "url", r.URL, "user_id", userID, "date_string", *payload.SpendingDate, "err", err)
+				// Don't fail the request, just use the current time
+				spendingDate = time.Now().UTC()
+			} else {
+				// Use the start of the day in UTC for consistency
+				spendingDate = time.Date(parsedDate.Year(), parsedDate.Month(), parsedDate.Day(), 0, 0, 0, 0, time.UTC)
+			}
+		} else {
+			// Default to current time if not provided
+			spendingDate = time.Now().UTC()
+			slog.Debug("spending_date not provided, using current time", "url", r.URL, "user_id", userID)
+		}
+		// --- End Parse Spending Date ---
+
+
 		tx, err := db.Begin()
 		if err != nil {
 			slog.Error("failed to begin transaction", "url", r.URL, "user_id", userID, "err", err)
@@ -99,10 +119,10 @@ func HandlePayRoute(db *sql.DB) http.HandlerFunc { // Return http.HandlerFunc di
 
 		// Insert into spendings table (assuming manual pay creates a single 'spending')
 		spendingDesc := "Manual Entry" // Or potentially get description from frontend if added later
-		res, err := tx.Exec(`INSERT INTO spendings (amount, description, category, made_by)
-		VALUES (?,?,?,?)`, payload.Amount, spendingDesc, category_id, userID)
+		res, err := tx.Exec(`INSERT INTO spendings (amount, description, category, made_by, spending_date)
+		VALUES (?,?,?,?,?)`, payload.Amount, spendingDesc, category_id, userID, spendingDate)
 		if err != nil {
-			slog.Error("inserting spending failed", "url", r.URL, "user_id", userID, "err", err)
+			slog.Error("inserting spending failed", "url", r.URL, "user_id", userID, "spending_date", spendingDate, "err", err)
 			http.Error(w, "Internal server error", http.StatusInternalServerError)
 			return
 		}
