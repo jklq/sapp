@@ -94,9 +94,18 @@ function App() {
     return (
       // Use w-full and max-w-4xl for content consistency, add padding here
       // Make this a flex container to center the view component inside
-      <div className="w-full max-w-4xl p-4 flex flex-col items-center">
-        {/* Header: Wrap in w-full div to prevent centering, add padding and background */}
-        <header className="w-full mb-6 bg-white shadow-sm rounded-lg p-3">
+      // Add padding-bottom to prevent content being hidden by fixed bottom nav (pb-20 is example, adjust as needed)
+      <div className="w-full max-w-4xl p-4 flex flex-col items-center pb-20">
+
+        {/* Render the selected view - these components now manage their own internal padding */}
+        {/* The flex container above will center these components horizontally */}
+        {currentView === 'logSpending' && <LogSpendingForm />}
+        {currentView === 'viewSpendings' && <SpendingsList onBack={() => setCurrentView('logSpending')} />}
+        {currentView === 'transfer' && <TransferPage onBack={() => setCurrentView('logSpending')} />}
+
+        {/* Bottom Navigation Bar (Moved Header) */}
+        {/* Fixed positioning, background, border-top, rounded-top */}
+        <header className="fixed bottom-0 left-0 right-0 w-full bg-white border-t border-gray-200 rounded-t-lg p-3 z-50 max-w-4xl mx-auto">
           <div className="flex justify-between items-center">
             {/* Welcome Message (visible on larger screens) */}
             <div className="hidden md:block">
@@ -175,13 +184,7 @@ function App() {
                {/* <span className="hidden md:inline ml-1">Logout</span> */}
             </button>
           </div>
-        </header> {/* End Header */}
-
-        {/* Render the selected view - these components now manage their own internal padding */}
-        {/* The flex container above will center these components horizontally */}
-        {currentView === 'logSpending' && <LogSpendingForm />}
-        {currentView === 'viewSpendings' && <SpendingsList onBack={() => setCurrentView('logSpending')} />}
-        {currentView === 'transfer' && <TransferPage onBack={() => setCurrentView('logSpending')} />}
+        </header> {/* End Bottom Nav Bar */}
       </div>
     );
   };
