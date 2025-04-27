@@ -7,8 +7,8 @@ import (
 	"strings"
 	"testing"
 
-	"git.sr.ht/~relay/sapp-backend/testutil" // Import the new test utility package
-	"git.sr.ht/~relay/sapp-backend/types"    // Import shared types
+	"git.sr.ht/~relay/sapp-backend/testutil"
+	"git.sr.ht/~relay/sapp-backend/types"
 )
 
 // TestGetCategories tests the /v1/categories endpoint.
