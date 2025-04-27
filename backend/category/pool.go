@@ -29,7 +29,7 @@ type CategorizingPool struct {
 	db            *sql.DB
 	numWorkers    int
 	unhandledJobs chan Job
-	api           ModelAPI // Add ModelAPI dependency
+	api           ModelAPI
 }
 
 // NewCategorizingPool now accepts a ModelAPI implementation.
@@ -55,7 +55,6 @@ func (p CategorizingPool) AddJob(params CategorizationParams) (int64, error) {
 		otherPersonInt = &params.SharedWith.Id
 	}
 
-	// Added pre_settled to INSERT statement
 	result, err := tx.Exec(`INSERT INTO ai_categorization_jobs (buyer, shared_with, prompt, total_amount, pre_settled)
 	VALUES (?, ?, ?, ?, ?)`, params.Buyer.Id, otherPersonInt, params.Prompt, params.TotalAmount, params.PreSettled)
 	if err != nil {

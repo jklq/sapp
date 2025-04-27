@@ -4,12 +4,12 @@ import (
 	"database/sql"
 
 	"encoding/json"
-	"errors" // Import errors
+	"errors"
 	"log/slog"
 	"net/http"
 
-	"git.sr.ht/~relay/sapp-backend/auth" // Import auth package
-	"git.sr.ht/~relay/sapp-backend/types" // Import shared types
+	"git.sr.ht/~relay/sapp-backend/auth"
+	"git.sr.ht/~relay/sapp-backend/types"
 )
 
 // APICategory moved to types package
@@ -137,7 +137,6 @@ func HandleAICategorize(db *sql.DB, pool CategorizingPoolStrategy) http.HandlerF
 		} else {
 			slog.Info("No partner configured for user (AI categorization)", "user_id", userID)
 		}
-
 
 		// 4. Prepare parameters for the categorization job
 		// SharedMode is removed
