@@ -18,9 +18,11 @@ function LogSpendingForm({ }: LogSpendingFormProps) { // Destructure props if ad
     const [selectedCategory, setSelectedCategory] = useState<string>('');
     const [amount, setAmount] = useState<string>('');
     const [prompt, setPrompt] = useState<string>(''); // Used in AI mode
-    const [sharedStatus, setSharedStatus] = useState<PayPayload['shared_status']>('alone');
+    const [sharedStatus, setSharedStatus] = useState<PayPayload['shared_status']>('alone'); // Manual mode only
+    const [preSettled, setPreSettled] = useState<boolean>(false); // Common advanced option
 
     // UI states
+    const [showAdvanced, setShowAdvanced] = useState<boolean>(false); // Toggle for advanced options
     const [isLoading, setIsLoading] = useState<boolean>(false);
     const [error, setError] = useState<string | null>(null);
     const [successMessage, setSuccessMessage] = useState<string | null>(null);
@@ -92,19 +94,19 @@ function LogSpendingForm({ }: LogSpendingFormProps) { // Destructure props if ad
                     return;
                 }
 
-                // shared_status is removed, AI infers it
                 const aiPayload: AICategorizationPayload = {
                     amount: numericAmount,
                     prompt: prompt,
+                    pre_settled: preSettled, // Include pre-settled flag
                 };
                 console.log("Submitting AI Payload:", aiPayload); // Debug log
                 await submitAICategorization(aiPayload);
-                setSuccessMessage('Spending submitted for AI categorization!');
+                setSuccessMessage(`Spending submitted for AI categorization ${preSettled ? '(pre-settled)' : ''}!`);
                 // Reset form for AI mode
                 setAmount('');
                 setPrompt('');
-                // Optionally reset shared status or keep it
-                // setSharedStatus('alone');
+                setPreSettled(false); // Reset pre-settled
+                setShowAdvanced(false); // Hide advanced options
 
             } else { // mode === 'manual'
                 // Manual Mode Validation
@@ -117,14 +119,16 @@ function LogSpendingForm({ }: LogSpendingFormProps) { // Destructure props if ad
                 const manualPayload: PayPayload = {
                     amount: numericAmount,
                     category: selectedCategory,
-                    shared_status: sharedStatus, // Use sharedStatus state here
-                    prompt: '', // Prompt is not used in manual mode submission
+                    shared_status: sharedStatus,
+                    pre_settled: preSettled, // Include pre-settled flag
                 };
                 console.log("Submitting Manual Payload:", manualPayload); // Debug log
                 await submitManualPayment(manualPayload);
-                setSuccessMessage('Manual payment submitted successfully!');
+                setSuccessMessage(`Manual payment submitted successfully ${preSettled ? '(pre-settled)' : ''}!`);
                 // Reset form for Manual mode
                 setAmount('');
+                setPreSettled(false); // Reset pre-settled
+                setShowAdvanced(false); // Hide advanced options
                 // Keep selected category and shared status? Or reset?
                 // setSelectedCategory(categories.length > 0 ? categories[0].name : '');
                 // setSharedStatus('alone');

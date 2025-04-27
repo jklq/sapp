@@ -15,6 +15,7 @@ type Job struct {
 	Prompt       string `json:"prompt"`
 	Buyer        int64  `json:"buyer_id"`
 	SharedWithId *int64 `json:"other_id"`
+	PreSettled   bool   `json:"pre_settled"` // Added: Pre-settled flag from the job table
 	Result       *JobResult
 }
 
@@ -54,11 +55,11 @@ func (p CategorizingPool) AddJob(params CategorizationParams) (int64, error) {
 		otherPersonInt = &params.SharedWith.Id
 	}
 
-	// shared_mode removed from INSERT statement
-	result, err := tx.Exec(`INSERT INTO ai_categorization_jobs (buyer, shared_with, prompt, total_amount)
-	VALUES (?, ?, ?, ?)`, params.Buyer.Id, otherPersonInt, params.Prompt, params.TotalAmount)
+	// Added pre_settled to INSERT statement
+	result, err := tx.Exec(`INSERT INTO ai_categorization_jobs (buyer, shared_with, prompt, total_amount, pre_settled)
+	VALUES (?, ?, ?, ?, ?)`, params.Buyer.Id, otherPersonInt, params.Prompt, params.TotalAmount, params.PreSettled)
 	if err != nil {
-		slog.Error("error inserting ai categorization job", "error", err)
+		slog.Error("error inserting ai categorization job", "error", err, "pre_settled", params.PreSettled)
 		return 0, err
 	}
 

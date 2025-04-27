@@ -61,14 +61,15 @@ export async function fetchCategories(): Promise<Category[]> {
   return await response.json();
 }
 
+// Refactored to send JSON body instead of using path parameters
 export async function submitManualPayment(payload: PayPayload): Promise<void> {
-  const { shared_status, amount, category } = payload;
-  if (!category) {
-    throw new Error("Category is required for manual payment submission.");
-  }
-  const url = `${API_BASE_URL}/v1/pay/${shared_status}/${amount}/${encodeURIComponent(category)}`;
+  const url = `${API_BASE_URL}/v1/pay`; // Use base path
 
-  const response = await fetchWithAuth(url, { method: "POST" });
+  const response = await fetchWithAuth(url, {
+    method: "POST",
+    body: JSON.stringify(payload), // Send payload as JSON body
+    // fetchWithAuth will set Content-Type: application/json
+  });
 
   if (!response.ok) {
     const errorBody = await response.text();
@@ -88,15 +89,13 @@ export async function submitManualPayment(payload: PayPayload): Promise<void> {
 }
 
 
-// shared_status is removed from the payload
 export async function submitAICategorization(payload: AICategorizationPayload): Promise<void> {
   const url = `${API_BASE_URL}/v1/categorize`;
 
   const response = await fetchWithAuth(url, {
     method: "POST",
-    // fetchWithAuth will set Content-Type: application/json if needed
-    body: JSON.stringify(payload),
-    // fetchWithAuth will set Content-Type: application/json if needed
+    body: JSON.stringify(payload), // Include pre_settled flag if present
+    // fetchWithAuth will set Content-Type: application/json
   });
 
   if (!response.ok) {

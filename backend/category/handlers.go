@@ -74,10 +74,10 @@ func HandleAICategorize(db *sql.DB, pool CategorizingPoolStrategy) http.HandlerF
 		}
 
 		// 1. Decode the JSON payload from the request body
-		// shared_status is removed from the payload
 		var payload struct {
-			Amount float64 `json:"amount"`
-			Prompt string  `json:"prompt"`
+			Amount     float64 `json:"amount"`
+			Prompt     string  `json:"prompt"`
+			PreSettled bool    `json:"pre_settled"` // Added: Flag for pre-settled status
 		}
 
 		if err := json.NewDecoder(r.Body).Decode(&payload); err != nil {
@@ -148,18 +148,19 @@ func HandleAICategorize(db *sql.DB, pool CategorizingPoolStrategy) http.HandlerF
 			Buyer:       buyer,      // Use authenticated buyer object
 			SharedWith:  sharedWith, // Use determined sharedWith object (or nil)
 			Prompt:      payload.Prompt,
+			PreSettled:  payload.PreSettled, // Pass the pre-settled flag
 			// 'tries' is handled internally by ProcessCategorizationJob
 		}
 
 		// 5. Add the job to the pool
-		jobID, err := pool.AddJob(params) // AddJob uses the pool's db connection
+		jobID, err := pool.AddJob(params) // AddJob now takes the params including PreSettled
 		if err != nil {
-			slog.Error("failed to add AI categorization job to pool", "url", r.URL, "user_id", userID, "err", err)
+			slog.Error("failed to add AI categorization job to pool", "url", r.URL, "user_id", userID, "pre_settled", payload.PreSettled, "err", err)
 			http.Error(w, "Internal Server Error", http.StatusInternalServerError)
 			return
 		}
 
-		slog.Info("AI categorization job added", "url", r.URL, "user_id", userID, "job_id", jobID, "amount", payload.Amount) // Removed shared_status log
+		slog.Info("AI categorization job added", "url", r.URL, "user_id", userID, "job_id", jobID, "amount", payload.Amount, "pre_settled", payload.PreSettled)
 
 		// 6. Respond with 202 Accepted
 		w.Header().Set("Content-Type", "application/json")

@@ -10,8 +10,8 @@ func (w CategorizingPool) jobDbPoller(errCh chan<- error) {
 	for {
 		time.Sleep(2 * time.Second)
 
-		// shared_mode removed from SELECT query
-		rows, err := w.db.Query(`SELECT id, status, prompt, buyer, shared_with, total_amount
+		// Added pre_settled to SELECT query
+		rows, err := w.db.Query(`SELECT id, status, prompt, buyer, shared_with, total_amount, pre_settled
 		FROM ai_categorization_jobs WHERE status="queued"`)
 
 		if err != nil {
@@ -24,10 +24,10 @@ func (w CategorizingPool) jobDbPoller(errCh chan<- error) {
 		for rows.Next() {
 			var job Job = Job{}
 
-			// shared_mode removed from Scan
-			err := rows.Scan(&job.Id, &job.Status, &job.Prompt, &job.Buyer, &job.SharedWithId, &job.TotalAmount)
+			// Added job.PreSettled to Scan
+			err := rows.Scan(&job.Id, &job.Status, &job.Prompt, &job.Buyer, &job.SharedWithId, &job.TotalAmount, &job.PreSettled)
 			if err != nil {
-				slog.Error("polling error", "error", err)
+				slog.Error("polling error scanning job row", "error", err)
 
 				rows.Close()
 				errCh <- err

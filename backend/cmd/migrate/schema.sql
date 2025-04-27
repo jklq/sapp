@@ -51,6 +51,7 @@ CREATE TABLE IF NOT EXISTS ai_categorization_jobs (
     is_finished BOOLEAN DEFAULT 0,
     is_ambiguity_flagged BOOLEAN DEFAULT 0,
     ambiguity_flag_reason TEXT,
+    pre_settled BOOLEAN DEFAULT 0, -- Added: Flag to indicate if the job's spendings should be settled immediately
     created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
     status_updated_at DATETIME DEFAULT CURRENT_TIMESTAMP,
     FOREIGN KEY(buyer) REFERENCES users(id) ON UPDATE CASCADE ON DELETE CASCADE,

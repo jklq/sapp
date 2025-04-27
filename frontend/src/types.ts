@@ -3,22 +3,19 @@ export interface Category {
   name: string;
 }
 
+// Payload for manual payment submission (now uses JSON body)
 export interface PayPayload {
-  shared_status: 'alone' | 'shared' | 'mix'; // Assuming 'mix' might be added later based on backend code
+  shared_status: 'alone' | 'shared'; // Backend currently only supports these
   amount: number;
   category: string; // Category name
-  // The backend category worker uses a 'prompt', let's add a field for that.
-  // The current pay endpoint doesn't take it, but the categorization likely needs it.
-  // We might need to adjust the backend pay endpoint later or add a new one.
-  // For now, let's collect it in the UI.
-  prompt: string;
+  pre_settled?: boolean; // Optional: Flag to mark as settled immediately
 }
 
 // Payload specifically for triggering AI categorization
-// shared_status is removed, AI will infer this from the prompt
 export interface AICategorizationPayload {
   amount: number;
   prompt: string;
+  pre_settled?: boolean; // Optional: Flag to mark as settled immediately
   // Note: category is NOT included here as the AI determines it.
 }
 

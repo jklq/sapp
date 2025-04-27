@@ -112,7 +112,8 @@ func main() {
 	deleteAIJobHandler := http.HandlerFunc(spendings.HandleDeleteAIJob(db))             // Create handler for deleting AI job
 
 	// Apply AuthMiddleware to protected handlers
-	mux.Handle("POST /v1/pay/{shared_status}/{amount}/{category}", applyMiddleware(payHandler, auth.AuthMiddleware))
+	// Changed /v1/pay to accept POST with body instead of path params
+	mux.Handle("POST /v1/pay", applyMiddleware(payHandler, auth.AuthMiddleware))
 	mux.Handle("GET /v1/categories", applyMiddleware(getCategoriesHandler, auth.AuthMiddleware))
 	mux.Handle("POST /v1/categorize", applyMiddleware(categorizeHandler, auth.AuthMiddleware))
 	mux.Handle("GET /v1/spendings", applyMiddleware(getSpendingsHandler, auth.AuthMiddleware))

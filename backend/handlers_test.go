@@ -467,11 +467,12 @@ func TestAICategorize(t *testing.T) {
 	env := testutil.SetupTestEnvironment(t)
 	defer env.TearDownDB()
 
-	// --- Test Case: Successful Submission ---
-	t.Run("Success", func(t *testing.T) {
+	// --- Test Case: Successful Submission (Not Pre-settled) ---
+	t.Run("SuccessNotPreSettled", func(t *testing.T) {
 		payload := map[string]interface{}{
-			"amount": 123.45,
-			"prompt": "Groceries from Rema",
+			"amount":      123.45,
+			"prompt":      "Groceries from Rema",
+			"pre_settled": false, // Explicitly false
 		}
 		// Use env.AuthToken which is now the user ID string
 		req := testutil.NewAuthenticatedRequest(t, http.MethodPost, "/v1/categorize", env.AuthToken, payload)
@@ -491,7 +492,8 @@ func TestAICategorize(t *testing.T) {
 		var dbPrompt string
 		var dbBuyerID int64
 		var dbPartnerID sql.NullInt64
-		err := env.DB.QueryRow("SELECT prompt, buyer, shared_with FROM ai_categorization_jobs WHERE id = ?", jobID).Scan(&dbPrompt, &dbBuyerID, &dbPartnerID)
+		var dbPreSettled bool
+		err := env.DB.QueryRow("SELECT prompt, buyer, shared_with, pre_settled FROM ai_categorization_jobs WHERE id = ?", jobID).Scan(&dbPrompt, &dbBuyerID, &dbPartnerID, &dbPreSettled)
 		if err != nil {
 			t.Fatalf("Failed to query created job: %v", err)
 		}
@@ -504,7 +506,43 @@ func TestAICategorize(t *testing.T) {
 		if !dbPartnerID.Valid || dbPartnerID.Int64 != env.PartnerID {
 			t.Errorf("DB partner ID mismatch: got %v, want %d", dbPartnerID, env.PartnerID)
 		}
+		if dbPreSettled != false {
+			t.Errorf("DB pre_settled mismatch: got %v, want false", dbPreSettled)
+		}
 	})
+
+	// --- Test Case: Successful Submission (Pre-settled) ---
+	t.Run("SuccessPreSettled", func(t *testing.T) {
+		payload := map[string]interface{}{
+			"amount":      50.00,
+			"prompt":      "Pre-settled lunch",
+			"pre_settled": true, // Explicitly true
+		}
+		req := testutil.NewAuthenticatedRequest(t, http.MethodPost, "/v1/categorize", env.AuthToken, payload)
+		rr := testutil.ExecuteRequest(t, env.Handler, req)
+		testutil.AssertStatusCode(t, rr, http.StatusAccepted)
+
+		var respBody map[string]int64
+		testutil.DecodeJSONResponse(t, rr, &respBody)
+		jobID, ok := respBody["job_id"]
+		if !ok || jobID <= 0 {
+			t.Errorf("handler returned invalid job_id: got %v", respBody)
+		}
+
+		// Verify job exists in DB and pre_settled is true
+		var dbPreSettled bool
+		err := env.DB.QueryRow("SELECT pre_settled FROM ai_categorization_jobs WHERE id = ?", jobID).Scan(&dbPreSettled)
+		if err != nil {
+			t.Fatalf("Failed to query created job for pre_settled flag: %v", err)
+		}
+		if dbPreSettled != true {
+			t.Errorf("DB pre_settled mismatch: got %v, want true", dbPreSettled)
+		}
+		// Note: Verifying the actual spending item's settled_at requires the worker to run.
+		// This test only verifies the job flag is set correctly.
+		// A separate integration test involving the worker would be needed for full verification.
+	})
+
 
 	// --- Test Cases: Bad Requests ---
 	t.Run("BadRequests", func(t *testing.T) {
@@ -1065,7 +1103,7 @@ func TestRecordTransfer(t *testing.T) {
 	// Note: Testing the "No partner configured" case requires modifying the test setup or auth logic.
 }
 
-// TestPay tests the POST /v1/pay/{shared_status}/{amount}/{category} endpoint.
+// TestPay tests the POST /v1/pay endpoint (now expects JSON body).
 func TestPay(t *testing.T) {
 	env := testutil.SetupTestEnvironment(t)
 	defer env.TearDownDB()
@@ -1073,24 +1111,26 @@ func TestPay(t *testing.T) {
 	// --- Test Cases ---
 	testCases := []struct {
 		name           string
-		sharedStatus   string
-		amount         string
-		category       string
+		payload        pay.PayPayload // Use the struct for payload
 		expectedStatus int
 		expectedBody   string             // Substring for error messages
 		verifyFunc     func(t *testing.T) // Optional verification
 	}{
 		{
-			name:           "SuccessAlone",
-			sharedStatus:   "alone",
-			amount:         "42.50",
-			category:       "Shopping",
+			name: "SuccessAloneNotPreSettled",
+			payload: pay.PayPayload{
+				SharedStatus: "alone",
+				Amount:       42.50,
+				Category:     "Shopping",
+				PreSettled:   false,
+			},
 			expectedStatus: http.StatusCreated,
 			verifyFunc: func(t *testing.T) {
 				var spendingID, buyerID int64
 				var sharedWith sql.NullInt64
 				var takesAll bool
-				err := env.DB.QueryRow("SELECT spending_id, buyer, shared_with, shared_user_takes_all FROM user_spendings ORDER BY id DESC LIMIT 1").Scan(&spendingID, &buyerID, &sharedWith, &takesAll)
+				var settledAt sql.NullTime // Check settled_at
+				err := env.DB.QueryRow("SELECT spending_id, buyer, shared_with, shared_user_takes_all, settled_at FROM user_spendings ORDER BY id DESC LIMIT 1").Scan(&spendingID, &buyerID, &sharedWith, &takesAll, &settledAt)
 				if err != nil {
 					t.Fatalf("Verification query failed: %v", err)
 				}
@@ -1102,6 +1142,9 @@ func TestPay(t *testing.T) {
 				}
 				if takesAll {
 					t.Error("Expected shared_user_takes_all false")
+				}
+				if settledAt.Valid { // Should NOT be settled
+					t.Errorf("Expected settled_at NULL, got %v", settledAt.Time)
 				}
 				// Verify spending details
 				var sAmount float64
@@ -1120,16 +1163,20 @@ func TestPay(t *testing.T) {
 			},
 		},
 		{
-			name:           "SuccessShared",
-			sharedStatus:   "shared",
-			amount:         "100.00",
-			category:       "Eating Out",
+			name: "SuccessSharedPreSettled",
+			payload: pay.PayPayload{
+				SharedStatus: "shared",
+				Amount:       100.00,
+				Category:     "Eating Out",
+				PreSettled:   true, // Mark as pre-settled
+			},
 			expectedStatus: http.StatusCreated,
 			verifyFunc: func(t *testing.T) {
 				var buyerID int64
 				var sharedWith sql.NullInt64
 				var takesAll bool
-				err := env.DB.QueryRow("SELECT buyer, shared_with, shared_user_takes_all FROM user_spendings ORDER BY id DESC LIMIT 1").Scan(&buyerID, &sharedWith, &takesAll)
+				var settledAt sql.NullTime // Check settled_at
+				err := env.DB.QueryRow("SELECT buyer, shared_with, shared_user_takes_all, settled_at FROM user_spendings ORDER BY id DESC LIMIT 1").Scan(&buyerID, &sharedWith, &takesAll, &settledAt)
 				if err != nil {
 					t.Fatalf("Verification query failed: %v", err)
 				}
@@ -1142,45 +1189,61 @@ func TestPay(t *testing.T) {
 				if takesAll {
 					t.Error("Expected shared_user_takes_all false")
 				}
+				if !settledAt.Valid { // Should BE settled
+					t.Errorf("Expected settled_at to be non-NULL, got NULL")
+				} else {
+					// Check if the time is recent (e.g., within the last 5 seconds)
+					if time.Since(settledAt.Time.UTC()) > 5*time.Second {
+						t.Errorf("Expected recent settled_at time, got %v", settledAt.Time)
+					}
+				}
 			},
 		},
 		{
-			name:           "ErrorInvalidStatus",
-			sharedStatus:   "mixed", // Invalid status
-			amount:         "10.0",
-			category:       "Groceries",
+			name: "ErrorInvalidStatus",
+			payload: pay.PayPayload{
+				SharedStatus: "mixed", // Invalid status
+				Amount:       10.0,
+				Category:     "Groceries",
+				PreSettled:   false,
+			},
 			expectedStatus: http.StatusBadRequest,
 			expectedBody:   "Invalid shared status",
 		},
 		{
-			name:           "ErrorInvalidAmountZero",
-			sharedStatus:   "alone",
-			amount:         "0",
-			category:       "Groceries",
+			name: "ErrorInvalidAmountZero",
+			payload: pay.PayPayload{
+				SharedStatus: "alone",
+				Amount:       0,
+				Category:     "Groceries",
+				PreSettled:   false,
+			},
 			expectedStatus: http.StatusBadRequest,
 			expectedBody:   "Amount must be positive",
 		},
 		{
-			name:           "ErrorInvalidAmountNegative",
-			sharedStatus:   "alone",
-			amount:         "-10.5",
-			category:       "Groceries",
+			name: "ErrorInvalidAmountNegative",
+			payload: pay.PayPayload{
+				SharedStatus: "alone",
+				Amount:       -10.5,
+				Category:     "Groceries",
+				PreSettled:   false,
+			},
 			expectedStatus: http.StatusBadRequest,
 			expectedBody:   "Amount must be positive",
 		},
+		// Invalid amount format is now caught by JSON decoding
+		// {
+		// 	name:           "ErrorInvalidAmountFormat",
+		// },
 		{
-			name:           "ErrorInvalidAmountFormat",
-			sharedStatus:   "alone",
-			amount:         "ten",
-			category:       "Groceries",
-			expectedStatus: http.StatusBadRequest,
-			expectedBody:   "Invalid amount format",
-		},
-		{
-			name:           "ErrorInvalidCategory",
-			sharedStatus:   "alone",
-			amount:         "20.0",
-			category:       "NonExistent",
+			name: "ErrorInvalidCategory",
+			payload: pay.PayPayload{
+				SharedStatus: "alone",
+				Amount:       20.0,
+				Category:     "NonExistent",
+				PreSettled:   false,
+			},
 			expectedStatus: http.StatusBadRequest,
 			expectedBody:   "Category not found",
 		},
@@ -1189,11 +1252,10 @@ func TestPay(t *testing.T) {
 
 	for _, tc := range testCases {
 		t.Run(tc.name, func(t *testing.T) {
-			// URL encode category name just in case
-			encodedCategory := url.PathEscape(tc.category)
-			url := fmt.Sprintf("/v1/pay/%s/%s/%s", tc.sharedStatus, tc.amount, encodedCategory)
+			url := "/v1/pay" // Use the base path now
 			// Use env.AuthToken which is now the user ID string
-			req := testutil.NewAuthenticatedRequest(t, http.MethodPost, url, env.AuthToken, nil) // No body needed
+			// Pass the payload as the body
+			req := testutil.NewAuthenticatedRequest(t, http.MethodPost, url, env.AuthToken, tc.payload)
 			rr := testutil.ExecuteRequest(t, env.Handler, req)
 
 			testutil.AssertStatusCode(t, rr, tc.expectedStatus)
@@ -1208,9 +1270,10 @@ func TestPay(t *testing.T) {
 
 	// --- Test Case: Unauthorized ---
 	t.Run("Unauthorized", func(t *testing.T) {
-		url := "/v1/pay/alone/50/Shopping"
+		url := "/v1/pay"
+		payload := pay.PayPayload{SharedStatus: "alone", Amount: 50, Category: "Shopping", PreSettled: false}
 		// Use an invalid user ID string as the token
-		req := testutil.NewAuthenticatedRequest(t, http.MethodPost, url, "invalid-user-id-string", nil)
+		req := testutil.NewAuthenticatedRequest(t, http.MethodPost, url, "invalid-user-id-string", payload)
 		rr := testutil.ExecuteRequest(t, env.Handler, req)
 		testutil.AssertStatusCode(t, rr, http.StatusUnauthorized) // Middleware should reject non-integer token
 	})
