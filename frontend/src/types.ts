@@ -5,7 +5,7 @@ export interface Category {
 
 // Payload for manual payment submission
 export interface PayPayload {
-  shared_status: 'alone' | 'shared'; // Backend currently only supports these
+  shared_status: "alone" | "shared"; // Backend currently only supports these
   amount: number;
   category: string;
   pre_settled?: boolean; // Optional: Flag to mark as settled immediately
@@ -45,7 +45,6 @@ export interface SpendingDetail {
   sharing_status: string; // Derived status: "Alone", "Shared with X", "Paid by X"
 }
 
-
 // --- Types for Grouped Spending View ---
 
 // Represents a single spending item within a transaction group
@@ -78,7 +77,7 @@ export type GroupedSpendingsResponse = TransactionGroup[];
 // --- Types for Editing Spendings ---
 
 // Represents the possible sharing states a user can select when editing
-export type EditableSharingStatus = 'Alone' | 'Shared' | 'Paid by Partner';
+export type EditableSharingStatus = "Alone" | "Shared" | "Paid by Partner";
 
 // Payload for updating a spending item (excluding amount for now)
 export interface UpdateSpendingPayload {
@@ -126,7 +125,7 @@ export interface PartnerRegistrationResponse {
 // It includes the original template ID.
 export interface DepositItem {
   id: number; // ID of the original template
-  type: 'deposit';
+  type: "deposit";
   amount: number;
   description: string;
   date: string;
@@ -147,45 +146,42 @@ export interface AddDepositPayload {
 
 // Response from adding a new deposit
 export interface AddDepositResponse {
-    message: string;
-    deposit_id: number;
+  message: string;
+  deposit_id: number;
 }
 
 // Payload for updating an existing deposit template
 export interface UpdateDepositPayload {
-    amount?: number;
-    description?: string;
-    deposit_date?: string; // Format: "YYYY-MM-DD"
-    is_recurring?: boolean;
-    recurrence_period?: string | null; // Can be nullified
-    end_date?: string | null; // Format: "YYYY-MM-DD" or null to clear
+  amount?: number;
+  description?: string;
+  deposit_date?: string; // Format: "YYYY-MM-DD"
+  is_recurring?: boolean;
+  recurrence_period?: string | null; // Can be nullified
+  end_date?: string | null; // Format: "YYYY-MM-DD" or null to clear
 }
 
 // Response from deleting a deposit
 export interface DeleteDepositResponse {
-    message: string;
+  message: string;
 }
 
 // Represents the full deposit template details (used for editing)
 export interface DepositTemplate extends DepositItem {
-    // Inherits fields from DepositItem (representing the template itself)
-    // Add any fields specific to the template view if needed
+  // Inherits fields from DepositItem (representing the template itself)
 }
-
 
 // --- Type for Combined History ---
 
 // Represents a generic history item from the backend
 // The actual data is nested within based on the 'type' field
 export interface HistoryListItem {
-  type: 'spending_group' | 'deposit';
+  type: "spending_group" | "deposit";
   date: string; // ISO date string for sorting (job creation or deposit occurrence)
   // The rest of the fields depend on the 'type'
   // We use 'any' here for simplicity, but discriminated unions are better if feasible
   // Or the component can cast based on 'type'
   [key: string]: any; // Allow other properties
 }
-
 
 // Response from the GET /v1/history endpoint
 export interface HistoryResponse {
