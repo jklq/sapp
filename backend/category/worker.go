@@ -180,8 +180,17 @@ func (p CategorizingPool) worker(jobCh <-chan Job, errCh chan<- error) {
 				break
 			}
 
-			_, err = tx.Exec(`INSERT INTO user_spendings (spending_id, buyer, shared_with, shared_user_takes_all)
-			VALUES (?,?,?,?)`, id, job.Buyer, sharedWithId, sharedUserTakesAll)
+			// Determine settled_at based on job's pre_settled flag
+			var settledAt sql.NullTime
+			if job.PreSettled {
+				settledAt = sql.NullTime{Time: time.Now().UTC(), Valid: true}
+				slog.Debug("Marking spending as pre-settled", "job_id", job.Id, "spending_id", id)
+			} else {
+				settledAt = sql.NullTime{Valid: false} // Explicitly NULL
+			}
+
+			_, err = tx.Exec(`INSERT INTO user_spendings (spending_id, buyer, shared_with, shared_user_takes_all, settled_at)
+			VALUES (?,?,?,?,?)`, id, job.Buyer, sharedWithId, sharedUserTakesAll, settledAt)
 
 			if err != nil {
 				tx.Rollback()

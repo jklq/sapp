@@ -280,9 +280,43 @@ function LogSpendingForm({ }: LogSpendingFormProps) { // Destructure props if ad
                   </div>
                 )}
 
+                 {/* --- Advanced Options Toggle --- */}
+                 <div className="pt-2">
+                    <button
+                        type="button"
+                        onClick={() => setShowAdvanced(!showAdvanced)}
+                        className="text-sm text-indigo-600 hover:text-indigo-800 focus:outline-none"
+                    >
+                        {showAdvanced ? 'Hide' : 'Show'} Advanced Options {showAdvanced ? '▲' : '▼'}
+                    </button>
+                </div>
+
+                {/* --- Advanced Options Section --- */}
+                {showAdvanced && (
+                    <div className="mt-4 p-3 border border-gray-200 rounded bg-gray-50 space-y-3">
+                        {/* Pre-settled Checkbox */}
+                        <div className="flex items-start">
+                            <div className="flex items-center h-5">
+                                <input
+                                    id="pre-settled"
+                                    name="pre-settled"
+                                    type="checkbox"
+                                    checked={preSettled}
+                                    onChange={(e) => setPreSettled(e.target.checked)}
+                                    className="focus:ring-indigo-500 h-4 w-4 text-indigo-600 border-gray-300 rounded"
+                                />
+                            </div>
+                            <div className="ml-3 text-sm">
+                                <label htmlFor="pre-settled" className="font-medium text-gray-700">Mark as Pre-settled</label>
+                                <p className="text-xs text-gray-500">Check this if the cost is already accounted for and should not affect the transfer balance with your partner.</p>
+                            </div>
+                        </div>
+                    </div>
+                )}
+
 
                 {/* Submit Button (Common) */}
-                <div>
+                <div className="pt-4"> {/* Add padding top */}
                     <button
                         type="submit"
                         disabled={isSubmitDisabled}

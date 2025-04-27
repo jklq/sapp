@@ -2,13 +2,23 @@ package pay
 
 import (
 	"database/sql"
+	"encoding/json"
 	"errors" // Import errors package
 	"log/slog"
 	"net/http"
-	"strconv"
+	"time" // Added time for potential use with settled_at
 
 	"git.sr.ht/~relay/sapp-backend/auth" // Import auth package
 )
+
+// PayPayload defines the structure for the manual payment request body.
+// This matches the frontend type.
+type PayPayload struct {
+	SharedStatus string  `json:"shared_status"` // 'alone' or 'shared'
+	Amount       float64 `json:"amount"`
+	Category     string  `json:"category"` // Category name
+	PreSettled   bool    `json:"pre_settled"` // New flag
+}
 
 func HandlePayRoute(db *sql.DB) http.HandlerFunc { // Return http.HandlerFunc directly
 	return func(w http.ResponseWriter, r *http.Request) {
@@ -113,8 +123,17 @@ func HandlePayRoute(db *sql.DB) http.HandlerFunc { // Return http.HandlerFunc di
 
 		// Insert into user_spendings
 		// For manual pay, shared_user_takes_all is always false.
-		_, err = tx.Exec(`INSERT INTO user_spendings (spending_id, buyer, shared_with, shared_user_takes_all)
-		VALUES (?,?,?,?)`, spendingID, userID, shared_with_id, false)
+		// Determine settled_at based on payload.PreSettled
+		var settledAt sql.NullTime
+		if payload.PreSettled {
+			settledAt = sql.NullTime{Time: time.Now().UTC(), Valid: true}
+			slog.Debug("Marking manual spending as pre-settled", "user_id", userID, "spending_id", spendingID)
+		} else {
+			settledAt = sql.NullTime{Valid: false} // Explicitly NULL
+		}
+
+		_, err = tx.Exec(`INSERT INTO user_spendings (spending_id, buyer, shared_with, shared_user_takes_all, settled_at)
+		VALUES (?,?,?,?,?)`, spendingID, userID, shared_with_id, false, settledAt)
 		if err != nil {
 			slog.Error("inserting user_spending failed", "url", r.URL, "user_id", userID, "spending_id", spendingID, "err", err)
 			http.Error(w, "Internal server error", http.StatusInternalServerError)
