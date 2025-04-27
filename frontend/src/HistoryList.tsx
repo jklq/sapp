@@ -4,7 +4,7 @@ import { Category, UpdateSpendingPayload, EditableSharingStatus, HistoryListItem
 
 interface HistoryListProps {
     onBack: () => void;
-    // Add callback to navigate to edit page
+    
     onNavigateToEditDeposit: (depositId: number) => void;
 }
 

@@ -1,6 +1,6 @@
 import { useState, useEffect, useCallback, useMemo } from 'react';
 import { fetchHistory, fetchCategories, updateSpendingItem, deleteAIJob } from './api'; // Use fetchHistory
-import { SpendingItem, TransactionGroup, Category, UpdateSpendingPayload, EditableSharingStatus, HistoryResponse, DepositItem } from './types'; // Import HistoryResponse, DepositItem
+import { SpendingItem, TransactionGroup, Category, UpdateSpendingPayload, EditableSharingStatus, HistoryResponse, DepositItem } from './types'; 
 
 interface HistoryListProps { // Renamed props interface
     onBack: () => void;
@@ -246,7 +246,7 @@ function HistoryList({ onBack }: HistoryListProps) { // Renamed component
         const isEditing = editingItemId === item.id && editFormData;
 
         // Common classes for the container (card on mobile, table row on md+)
-        const containerClasses = `block md:table-row ${isEditing ? 'bg-yellow-50' : 'bg-white'} border-b border-gray-200 md:border-none`; // Add border for mobile cards
+        const containerClasses = `block md:table-row ${isEditing ? 'bg-yellow-50' : 'bg-white'} border-b border-gray-200 md:border-none`; 
 
         if (isEditing) {
             // --- Render Edit Form (Responsive) ---
@@ -328,7 +328,7 @@ function HistoryList({ onBack }: HistoryListProps) { // Renamed component
             // --- Render Display Row/Card (Responsive) ---
             return (
                 // Container for one item: block on mobile, table-row on md+
-                // Add padding and border for mobile card appearance
+                
                 <div key={item.id} className={`${containerClasses} p-3 md:p-0 md:border-b md:border-gray-200`}>
 
                     {/* Mobile View Structure (md:hidden) */}
