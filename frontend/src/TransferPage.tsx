@@ -76,13 +76,11 @@ function TransferPage({ onBack }: TransferPageProps) {
         if (status.owed_by && status.owed_to) {
             // Someone owes someone
             statusText = `${status.owed_by} owes ${status.owed_to} ${formatCurrency(status.amount_owed)}`;
-            // Check if the current user (assuming 'You' if name matches, needs user info from App context ideally) owes money
-            // For now, we just display the names from the backend.
-            // You might want to pass the current user's name from App.tsx to display "You owe..." or "...owes you"
+            // Status text now uses names directly from backend response
             statusColor = 'text-orange-600'; // Indicate money needs to change hands
         } else {
             // Settled up
-            statusText = `Settled up with ${status.partner_name}. No transfer needed.`;
+            statusText = `Settled up with ${status.partner_name || 'your partner'}. No transfer needed.`; // Use partner name
             statusColor = 'text-green-600'; // Indicate settled state
         }
 
@@ -127,7 +125,7 @@ function TransferPage({ onBack }: TransferPageProps) {
                 )}
             </div>
                 <p className="text-xs text-gray-500 mt-4 text-center italic">
-                    This action marks all currently shared expenses between you and {status?.partner_name || 'your partner'} as settled. It assumes the necessary bank transfer has been made outside of this app.
+                    This action marks all currently shared expenses between you and {status?.partner_name || 'your partner'} as settled. It assumes the necessary bank transfer has been made outside of this app. {/* Use partner name */}
                 </p>
             </div> {/* Close inner padding div */}
         </div>

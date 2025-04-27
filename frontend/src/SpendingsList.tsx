@@ -233,9 +233,10 @@ function SpendingsList({ onBack }: SpendingsListProps) {
                             onChange={(e) => handleEditFormChange('sharing_status', e.target.value)}
                             className="mt-1 md:mt-0 w-full px-2 py-1 border border-gray-300 rounded text-sm bg-white"
                         >
+                            {/* Dynamically display partner name if available */}
                             <option value="Alone">Alone</option>
-                            <option value="Shared">Shared</option>
-                            <option value="Paid by Partner">Paid by Partner</option>
+                            <option value="Shared">Shared {item.partner_name ? `with ${item.partner_name}` : ''}</option>
+                            <option value="Paid by Partner">Paid by {item.partner_name || 'Partner'}</option>
                         </select>
                     </div>
                     {/* Actions (Save/Cancel) - Moved below other fields on mobile */}
