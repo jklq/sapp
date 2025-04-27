@@ -132,32 +132,29 @@ func HandleGetDeposits(db *sql.DB) http.HandlerFunc {
 		deposits := []Deposit{}
 		for rows.Next() {
 			var d Deposit
-			var depositDateStr string // Read date as string first
+			// Scan deposit_date directly into time.Time field
 			if err := rows.Scan(
 				&d.ID,
 				&d.UserID,
 				&d.Amount,
 				&d.Description,
-				&depositDateStr, // Scan into string
+				&d.DepositDate, // Scan directly into time.Time
 				&d.IsRecurring,
 				&d.RecurrencePeriod,
 				&d.CreatedAt,
 			); err != nil {
+				// Log the error, including the specific row data if possible (might require more complex scanning)
 				slog.Error("failed to scan deposit row", "url", r.URL, "user_id", userID, "err", err)
-				http.Error(w, "Internal server error", http.StatusInternalServerError)
+				// If scanning fails, we might get a zero time. Consider how to handle this.
+				// For now, let the loop continue, but the specific item might be incomplete.
+				// Depending on requirements, you might want to return an error immediately.
+				// Let's return an error to be safe.
+				http.Error(w, "Internal server error during data retrieval", http.StatusInternalServerError)
 				return
 			}
-			// Parse the date string (assuming format 'YYYY-MM-DD HH:MM:SS' from DB)
-			// Parse the date string (expecting format 'YYYY-MM-DD HH:MM:SS' from DB)
-			parsedDate, parseErr := time.Parse("2006-01-02 15:04:05", depositDateStr)
-			if parseErr != nil {
-				// Log the specific error and the string that failed parsing
-				slog.Error("failed to parse deposit date from DB", "url", r.URL, "user_id", userID, "date_string", depositDateStr, "expected_format", "2006-01-02 15:04:05", "err", parseErr)
-				// Assign zero time on error, as the date is unusable
-				d.DepositDate = time.Time{}
-			} else {
-				d.DepositDate = parsedDate
-			}
+
+			// No manual parsing needed anymore. The driver handles the conversion.
+			// If the scan failed above, d.DepositDate might be zero, but the error would have been caught.
 
 			deposits = append(deposits, d)
 		}
