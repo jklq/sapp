@@ -992,12 +992,15 @@ func TestGetHistory(t *testing.T) {
 		if item2.IsRecurring == nil || !*item2.IsRecurring || item2.RecurrencePeriod == nil || *item2.RecurrencePeriod != "monthly" {
 			t.Errorf("Expected item 2 to be recurring monthly, got recurring=%v, period=%v", item2.IsRecurring, item2.RecurrencePeriod)
 		}
-		// Check date is recent (approx T-5d) - compare date part only
-		if item2.Date.Format("2006-01-02") != time.Now().AddDate(0, 0, -5).Format("2006-01-02") {
-			// Allow for slight variation due to AddDate(0, 1, 0) behavior
-			t.Logf("Warning: Item 2 date (%s) doesn't exactly match expected T-5d (%s), possibly due to AddDate month calculation.", item2.Date.Format("2006-01-02"), time.Now().AddDate(0, 0, -5).Format("2006-01-02"))
+		// Check date is the calculated next occurrence after deposit2Date (T-35d)
+		// Use the same logic as the history service's calculateNextDate
+		expectedNextDate := deposit2Date.AddDate(0, 1, 0) // Add 1 month
+		if item2.Date.Format("2006-01-02") != expectedNextDate.Format("2006-01-02") {
+			t.Errorf("Expected item 2 date to be %s (1 month after %s), got %s",
+				expectedNextDate.Format("2006-01-02"),
+				deposit2Date.Format("2006-01-02"),
+				item2.Date.Format("2006-01-02"))
 		}
-
 
 		// Item 3: Should be Deposit 1 (non-recurring)
 		item3 := resp.History[3]
@@ -1377,29 +1380,45 @@ func TestRecordTransfer(t *testing.T) {
 	})
 
 	// --- Test Case: Record Again (Idempotency Check) ---
-	// Should succeed, but not create duplicate transfer or update already settled items
+	// Should succeed, create a new transfer record, but not update already settled items
 	t.Run("RecordAgain", func(t *testing.T) {
-		// First record (already done in previous test, but run again for isolation if needed)
-		// req1 := testutil.NewAuthenticatedRequest(t, http.MethodPost, "/v1/transfer/record", env.AuthToken, nil)
-		// rr1 := testutil.ExecuteRequest(t, env.Handler, req1)
-		// testutil.AssertStatusCode(t, rr1, http.StatusOK)
+		// Get initial transfer count
+		var initialTransferCount int
+		err := env.DB.QueryRow("SELECT COUNT(*) FROM transfers WHERE settled_by_user_id = ? AND settled_with_user_id = ?", env.UserID, env.PartnerID).Scan(&initialTransferCount)
+		if err != nil {
+			t.Fatalf("Failed to get initial transfer count: %v", err)
+		}
+		// Ensure the first call happened (from the Success test case)
+		if initialTransferCount == 0 {
+			t.Log("Warning: Initial transfer count was 0, running first record call.")
+			req1 := testutil.NewAuthenticatedRequest(t, http.MethodPost, "/v1/transfer/record", env.AuthToken, nil)
+			rr1 := testutil.ExecuteRequest(t, env.Handler, req1)
+			testutil.AssertStatusCode(t, rr1, http.StatusOK)
+			// Re-query count
+			err = env.DB.QueryRow("SELECT COUNT(*) FROM transfers WHERE settled_by_user_id = ? AND settled_with_user_id = ?", env.UserID, env.PartnerID).Scan(&initialTransferCount)
+			if err != nil || initialTransferCount == 0 {
+				t.Fatalf("Failed to get transfer count after first call: %v (count: %d)", err, initialTransferCount)
+			}
+		}
+
 
 		// Record again
-		// Use env.AuthToken which is now the user ID string
 		req2 := testutil.NewAuthenticatedRequest(t, http.MethodPost, "/v1/transfer/record", env.AuthToken, nil)
 		rr2 := testutil.ExecuteRequest(t, env.Handler, req2)
 		testutil.AssertStatusCode(t, rr2, http.StatusOK)
 
-		// Verify still only one transfer record (or two if run in isolation)
-		var transferCount int
-		// Count transfers within the last minute (using UTC) to avoid counting transfers from previous runs if tests are slow
-		oneMinuteAgoUTC := time.Now().UTC().Add(-1 * time.Minute)
-		err := env.DB.QueryRow("SELECT COUNT(*) FROM transfers WHERE settled_by_user_id = ? AND settled_with_user_id = ? AND settlement_time > ?", env.UserID, env.PartnerID, oneMinuteAgoUTC).Scan(&transferCount)
-		// Expecting 1 new transfer record from this test run (or potentially 2 if the first call was also in this run and within the minute)
-		// The handler always inserts a transfer record, even if no spendings were updated.
-		if err != nil || transferCount < 1 { // We expect at least one record from the second call within the last minute.
-			t.Errorf("Expected at least 1 recent transfer record after second call, found %d (err: %v)", transferCount, err)
+		// Verify transfer count increased by exactly one
+		var finalTransferCount int
+		err = env.DB.QueryRow("SELECT COUNT(*) FROM transfers WHERE settled_by_user_id = ? AND settled_with_user_id = ?", env.UserID, env.PartnerID).Scan(&finalTransferCount)
+		if err != nil {
+			t.Fatalf("Failed to get final transfer count: %v", err)
 		}
+		if finalTransferCount != initialTransferCount+1 {
+			t.Errorf("Expected transfer count to increase by 1 (from %d to %d), but got %d", initialTransferCount, initialTransferCount+1, finalTransferCount)
+		}
+
+		// Optional: Verify that the settled_at timestamps of the spendings did not change after the second call
+		// (Requires storing the initial settled_at times from the 'Success' test)
 	})
 
 	// --- Test Case: Unauthorized ---

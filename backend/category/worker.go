@@ -216,9 +216,17 @@ func (p CategorizingPool) worker(jobCh <-chan Job, errCh chan<- error) {
 		}
 
 		if failed {
-			continue
+			// If any spending processing failed, the transaction was rolled back.
+			// Update the job status to 'failed' before continuing.
+			_, updateErr := p.db.Exec("UPDATE ai_categorization_jobs SET status = 'failed', status_updated_at = ? WHERE id = ?", time.Now().UTC(), job.Id)
+			if updateErr != nil {
+				// Log this error, but the original error was already sent to errCh
+				slog.Error("failed to update job status to 'failed' after spending processing error", "job_id", job.Id, "update_error", updateErr, "original_error", err)
+			}
+			continue // Move to the next job
 		}
 
+		// If loop completed without failure, commit the transaction
 		if err := tx.Commit(); err != nil {
 			slog.Error("commiting transaction failed", "error", err)
 			errCh <- err

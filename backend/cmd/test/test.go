@@ -182,12 +182,15 @@ func main() {
 	updateSpendingHandler := http.HandlerFunc(spendings.HandleUpdateSpending(db))
 	getTransferStatusHandler := http.HandlerFunc(transfer.HandleGetTransferStatus(db))
 	recordTransferHandler := http.HandlerFunc(transfer.HandleRecordTransfer(db))
+	deleteAIJobHandler := http.HandlerFunc(spendings.HandleDeleteAIJob(db)) // Add handler for delete job
+	addDepositHandler := http.HandlerFunc(deposit.HandleAddDeposit(db))     // Add handler for adding deposit
+	getDepositsHandler := http.HandlerFunc(deposit.HandleGetDeposits(db))   // Add handler for getting deposits
 
 	// Apply AuthMiddleware to protected handlers
-	mux.Handle("POST /v1/pay/{shared_status}/{amount}/{category}", applyMiddleware(payHandler, auth.AuthMiddleware))
+	mux.Handle("POST /v1/pay", applyMiddleware(payHandler, auth.AuthMiddleware)) // Correct path for pay handler
 	mux.Handle("GET /v1/categories", applyMiddleware(getCategoriesHandler, auth.AuthMiddleware))
 	mux.Handle("POST /v1/categorize", applyMiddleware(categorizeHandler, auth.AuthMiddleware))
-	mux.Handle("GET /v1/spendings", applyMiddleware(getSpendingsHandler, auth.AuthMiddleware))
+	mux.Handle("GET /v1/history", applyMiddleware(getHistoryHandler, auth.AuthMiddleware)) // Updated route
 	mux.Handle("PUT /v1/spendings/{spending_id}", applyMiddleware(updateSpendingHandler, auth.AuthMiddleware))
 	mux.Handle("GET /v1/transfer/status", applyMiddleware(getTransferStatusHandler, auth.AuthMiddleware))
 	mux.Handle("POST /v1/transfer/record", applyMiddleware(recordTransferHandler, auth.AuthMiddleware))

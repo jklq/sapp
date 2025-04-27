@@ -88,13 +88,14 @@ func (p CategorizingPool) GetStatus(id int64) (Job, error) {
 		return jobStatus, nil
 	}
 
-	// TODO: legg til JobStatus. da må en joine ai_categorized_spendings og user_spendings for å finne
-	// riktig spendings og hvilke status de har (alene, mix eller other)
+	// TODO: Populate JobResult more completely by joining user_spendings as well
+	// to determine sharing status etc., if needed by the GetStatus consumer.
+	// Currently, this function is not used by tested handlers.
 
-	rows, err := p.db.Query(`SELECT id, amount, description
-	FROM spendings INNER JOIN ai_categorized_spendings 
-	AT spendings.id = ai_categorized_spendings.spending_id 
-	WHERE ai_categorized_spendings.job_id = ?`, jobStatus.Id)
+	rows, err := p.db.Query(`SELECT s.id, s.amount, s.description
+	FROM spendings s
+	INNER JOIN ai_categorized_spendings acs ON s.id = acs.spending_id
+	WHERE acs.job_id = ?`, jobStatus.Id)
 
 	if err != nil {
 		return jobStatus, err
