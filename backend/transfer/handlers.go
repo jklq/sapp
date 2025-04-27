@@ -9,9 +9,8 @@ import (
 	"time"
 
 	"git.sr.ht/~relay/sapp-backend/auth"
+	"git.sr.ht/~relay/sapp-backend/types" // Import shared types
 )
-
-// TransferStatusResponse moved to types package
 
 // HandleGetTransferStatus calculates and returns the net balance between the user and their partner.
 func HandleGetTransferStatus(db *sql.DB) http.HandlerFunc {
@@ -114,7 +113,7 @@ func HandleGetTransferStatus(db *sql.DB) http.HandlerFunc {
 		}
 
 		// Determine response fields based on balance
-		resp := TransferStatusResponse{
+		resp := types.TransferStatusResponse{ // Use types.TransferStatusResponse
 			PartnerName: partnerName,
 			AmountOwed:  math.Abs(userNetBalance), // Always positive amount
 			OwedBy:      nil,
