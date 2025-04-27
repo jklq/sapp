@@ -183,31 +183,8 @@ function HistoryList({ onBack }: HistoryListProps) { // Renamed component
         }
     };
 
-    // --- Combined and Sorted History List ---
-    const sortedHistoryItems = useMemo((): HistoryListItem[] => {
-        if (!historyData) return [];
-
-        const combined: HistoryListItem[] = [
-            ...historyData.spending_groups.map(group => ({
-                ...group,
-                itemType: 'spending_group' as const,
-                sortDate: new Date(group.date) // Use the common 'date' field
-            })),
-            ...historyData.deposits.map(deposit => ({
-                ...deposit,
-                itemType: 'deposit' as const,
-                sortDate: new Date(deposit.date) // Use the common 'date' field
-            }))
-        ];
-
-        // Sort by date descending (most recent first)
-        combined.sort((a, b) => b.sortDate.getTime() - a.sortDate.getTime());
-
-        return combined;
-    }, [historyData]);
-
-
     // --- Render Logic ---
+    // NOTE: sortedHistoryItems useMemo hook removed as historyItems state is already sorted and flat.
 
     // Helper to render a deposit item
     const renderDepositItem = (item: DepositItem) => {

@@ -8,6 +8,7 @@ export interface PayPayload {
   shared_status: "alone" | "shared"; // Backend currently only supports these
   amount: number;
   category: string;
+  spending_date?: string | null; // Optional: Date of spending "YYYY-MM-DD" (matches backend)
   pre_settled?: boolean; // Optional: Flag to mark as settled immediately
 }
 

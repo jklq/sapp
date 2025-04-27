@@ -50,7 +50,7 @@ function EditDepositPage({ depositId, onBack }: EditDepositPageProps) {
             .then((data: DepositTemplate) => {
                 setAmount(data.amount.toString());
                 setDescription(data.description);
-                setDepositDate(formatDateForInput(data.deposit_date));
+                setDepositDate(formatDateForInput(data.date)); // Use 'date' field
                 setIsRecurring(data.is_recurring);
                 setRecurrencePeriod(data.recurrence_period || 'monthly');
                 setEndDate(formatDateForInput(data.end_date));
@@ -126,7 +126,7 @@ function EditDepositPage({ depositId, onBack }: EditDepositPageProps) {
             // Optionally update form state again with potentially cleaned data from backend response
             setAmount(updatedDeposit.amount.toString());
             setDescription(updatedDeposit.description);
-            setDepositDate(formatDateForInput(updatedDeposit.deposit_date));
+            setDepositDate(formatDateForInput(updatedDeposit.date)); // Use 'date' field
             setIsRecurring(updatedDeposit.is_recurring);
             setRecurrencePeriod(updatedDeposit.recurrence_period || 'monthly');
             setEndDate(formatDateForInput(updatedDeposit.end_date));
