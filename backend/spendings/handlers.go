@@ -12,8 +12,8 @@ import (
 	"strconv"
 	"strings"
 
-	"git.sr.ht/~relay/sapp-backend/auth"
-	// "git.sr.ht/~relay/sapp-backend/deposit" // Removed unused import
+	"git.sr.ht/~relay/sapp-backend/auth" // Import auth package
+	"git.sr.ht/~relay/sapp-backend/history" // Import the new history service package
 )
 
 // EditableSharingStatus defines the possible states the frontend can send for updates.
@@ -77,15 +77,14 @@ type TransactionGroup struct {
 // type HistoryItem interface{} // Could be TransactionGroup or DepositItem
 
 // HistoryResponse defines the structure for the combined history endpoint.
+// It now directly returns a flat list of sorted history items.
 type HistoryResponse struct {
-	SpendingGroups []TransactionGroup `json:"spending_groups"`
-	Deposits       []DepositItem      `json:"deposits"` // Use local type
+	History []history.HistoryListItem `json:"history"`
 }
 
-// HandleGetHistory returns an http.HandlerFunc that fetches both spendings (grouped by AI job)
-// and deposits for the logged-in user, ordered chronologically.
-// TODO: Add handling for manual spendings not linked to an AI job.
-// TODO: Implement combined chronological sorting if needed, currently returns separate lists.
+
+// HandleGetHistory returns an http.HandlerFunc that fetches combined and sorted history items
+// using the history service.
 func HandleGetHistory(db *sql.DB) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		userID, ok := auth.GetUserIDFromContext(r.Context())
@@ -95,32 +94,151 @@ func HandleGetHistory(db *sql.DB) http.HandlerFunc {
 			return
 		}
 
-		historyResponse := HistoryResponse{
-			SpendingGroups: []TransactionGroup{},
-			Deposits:       []DepositItem{}, // Use local type
+		// Use the new history service to generate the combined history
+		// Generate history up to the current time
+		combinedHistory, err := history.GenerateHistory(db, userID, time.Now().UTC())
+		if err != nil {
+			slog.Error("failed to generate history using service", "url", r.URL, "user_id", userID, "err", err)
+			http.Error(w, "Internal server error", http.StatusInternalServerError)
+			return
 		}
+
+		// Prepare the response structure
+		// The response now contains the flat, sorted list directly
+		historyResponse := HistoryResponse{
+			History: make([]history.HistoryListItem, 0, len(combinedHistory)), // Initialize slice
+		}
+
+		// Populate the response by extracting the RawItem from each HistoryListItem
+		for _, item := range combinedHistory {
+			// Create a new map or struct for the final JSON output for each item
+			// This ensures the correct structure based on the item type.
+			outputItem := map[string]interface{}{
+				"type": item.Type,
+				"date": item.Date, // Include the common sort date
+			}
+
+			switch typedItem := item.RawItem.(type) {
+			case TransactionGroup:
+				// Embed fields from TransactionGroup
+				outputItem["job_id"] = typedItem.JobID
+				outputItem["prompt"] = typedItem.Prompt
+				outputItem["total_amount"] = typedItem.TotalAmount
+				outputItem["buyer_name"] = typedItem.BuyerName
+				outputItem["is_ambiguity_flagged"] = typedItem.IsAmbiguityFlagged
+				outputItem["ambiguity_flag_reason"] = typedItem.AmbiguityFlagReason
+				outputItem["spendings"] = typedItem.Spendings
+			case history.DepositItem:
+				// Embed fields from DepositItem
+				outputItem["id"] = typedItem.ID
+				outputItem["amount"] = typedItem.Amount
+				outputItem["description"] = typedItem.Description
+				// 'date' is already included
+				outputItem["is_recurring"] = typedItem.IsRecurring
+				outputItem["recurrence_period"] = typedItem.RecurrencePeriod
+				outputItem["created_at"] = typedItem.CreatedAt
+			default:
+				slog.Warn("Unknown item type encountered in history list", "type", item.Type)
+				continue // Skip unknown types
+			}
+			// Append the structured item to the response history
+			// Need to convert map to HistoryListItem or adjust response structure
+			// For simplicity, let's adjust the response structure slightly or marshal the map directly.
+			// Let's marshal the combinedHistory directly, relying on the RawItem being marshaled correctly.
+			// This requires RawItem to have appropriate json tags or be marshaled manually.
+			// --- Reverting to simpler approach: Send the combined list as is ---
+			// The frontend will need to handle the different structures based on 'type'.
+			historyResponse.History = append(historyResponse.History, item)
+
+		}
+
+
+		/*
+		// --- Old logic replaced by history.GenerateHistory ---
 
 		// 1. Fetch AI Categorization Jobs (Spending Groups) initiated by the user
 		jobQuery := `
 			SELECT
 				j.id, j.prompt, j.total_amount, j.created_at, j.is_ambiguity_flagged, j.ambiguity_flag_reason, u.first_name AS buyer_name
-			FROM ai_categorization_jobs j
-			JOIN users u ON j.buyer = u.id
-			WHERE j.buyer = ?
-			ORDER BY j.created_at DESC;
+		// ... (rest of the old fetching logic for jobs and spendings) ...
+
+		// 3. Fetch Deposits for the user
+		depositQuery := `
+			SELECT id, user_id, amount, description, deposit_date, is_recurring, recurrence_period, created_at
+			FROM deposits
+			WHERE user_id = ?
+			ORDER BY deposit_date DESC, created_at DESC;
 		`
-		jobRows, err := db.Query(jobQuery, userID)
+		depositRows, err := db.Query(depositQuery, userID)
 		if err != nil {
-			slog.Error("failed to query AI categorization jobs", "url", r.URL, "user_id", userID, "err", err)
+			slog.Error("failed to query deposits for history", "url", r.URL, "user_id", userID, "err", err)
 			http.Error(w, "Internal server error", http.StatusInternalServerError)
 			return
 		}
-		defer jobRows.Close()
+		defer depositRows.Close()
 
-		// Prepare spending query statement outside the loop
-		spendingQuery := `
-			SELECT
-				s.id,
+		for depositRows.Next() {
+			var d DepositItem         // Use local type
+			d.Type = "deposit"        // Set type identifier
+			var depositDateStr string // Read date as string first
+			var userIDIgnored int64   // Variable to scan user_id into, but ignore
+
+			if err := depositRows.Scan(
+				&d.ID,
+				&userIDIgnored, // Scan UserID from DB into ignored variable
+				&d.Amount,
+				&d.Description,
+				&depositDateStr, // Scan into string
+				&d.IsRecurring,
+				&d.RecurrencePeriod,
+				&d.CreatedAt,
+			); err != nil {
+				slog.Error("failed to scan deposit row for history", "url", r.URL, "user_id", userID, "err", err)
+				http.Error(w, "Internal server error", http.StatusInternalServerError)
+				return
+			}
+			// Parse the date string (assuming format 'YYYY-MM-DD HH:MM:SS' from DB)
+			// Adjust format if DB stores it differently
+			parsedDate, parseErr := time.Parse("2006-01-02 15:04:05", depositDateStr)
+			if parseErr != nil {
+				// Fallback or log error - maybe try just date?
+				parsedDate, parseErr = time.Parse("2006-01-02", depositDateStr)
+				if parseErr != nil {
+					slog.Error("failed to parse deposit date from DB for history", "url", r.URL, "user_id", userID, "date_string", depositDateStr, "err", parseErr)
+					d.Date = time.Time{} // Use zero time on error
+				} else {
+					d.Date = parsedDate
+				}
+			} else {
+				d.Date = parsedDate
+			}
+
+			historyResponse.Deposits = append(historyResponse.Deposits, d)
+		}
+
+		if err := depositRows.Err(); err != nil {
+			slog.Error("error iterating deposit rows for history", "url", r.URL, "user_id", userID, "err", err)
+			http.Error(w, "Internal server error", http.StatusInternalServerError)
+			return
+		}
+
+		// TODO: Query and append manual spendings separately if needed
+
+		// 4. Encode and send the combined response
+		w.Header().Set("Content-Type", "application/json")
+		if err := json.NewEncoder(w).Encode(historyResponse); err != nil {
+			slog.Error("failed to encode history response to JSON", "url", r.URL, "user_id", userID, "err", err)
+			// Avoid writing header again if already written
+		}
+		*/
+		// --- End of replaced old logic ---
+
+		// Encode and send the response generated by the history service
+		w.Header().Set("Content-Type", "application/json")
+		if err := json.NewEncoder(w).Encode(historyResponse); err != nil {
+			slog.Error("failed to encode history response to JSON", "url", r.URL, "user_id", userID, "err", err)
+			// Avoid writing header again if already written
+		}
 				s.amount,
 				s.description,
 				c.name AS category_name,

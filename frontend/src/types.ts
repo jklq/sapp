@@ -144,8 +144,21 @@ export interface AddDepositPayload {
 
 // --- Type for Combined History ---
 
+// --- Type for Combined History ---
+
+// Represents a generic history item from the backend
+// The actual data is nested within based on the 'type' field
+export interface HistoryListItem {
+  type: 'spending_group' | 'deposit';
+  date: string; // ISO date string for sorting (job creation or deposit occurrence)
+  // The rest of the fields depend on the 'type'
+  // We use 'any' here for simplicity, but discriminated unions are better if feasible
+  // Or the component can cast based on 'type'
+  [key: string]: any; // Allow other properties
+}
+
+
 // Response from the GET /v1/history endpoint
 export interface HistoryResponse {
-  spending_groups: TransactionGroup[];
-  deposits: DepositItem[];
+  history: HistoryListItem[]; // A flat, sorted list of items
 }

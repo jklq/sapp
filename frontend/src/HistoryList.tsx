@@ -1,18 +1,26 @@
 import { useState, useEffect, useCallback, useMemo } from 'react';
-import { fetchHistory, fetchCategories, updateSpendingItem, deleteAIJob } from './api'; // Use fetchHistory
-import { SpendingItem, TransactionGroup, Category, UpdateSpendingPayload, EditableSharingStatus, HistoryResponse, DepositItem } from './types'; // Import HistoryResponse, DepositItem
+import { fetchHistory, fetchCategories, updateSpendingItem, deleteAIJob } from './api';
+// Import specific types needed, HistoryResponse now contains HistoryListItem
+import { SpendingItem, TransactionGroup, Category, UpdateSpendingPayload, EditableSharingStatus, HistoryResponse, HistoryListItem } from './types';
 
-interface HistoryListProps { // Renamed props interface
+interface HistoryListProps {
     onBack: () => void;
-}
 
-// Combine spending groups and deposits into a single list with type and date for sorting
-type HistoryListItem = (TransactionGroup & { itemType: 'spending_group'; sortDate: Date }) | (DepositItem & { itemType: 'deposit'; sortDate: Date });
+// Define local types for casting within the component for better type safety
+type SpendingGroupItem = HistoryListItem & TransactionGroup;
+type DepositHistoryItem = HistoryListItem & { // Based on history.DepositItem in Go
+    id: number;
+    amount: number;
+    description: string;
+    is_recurring: boolean;
+    recurrence_period: string | null;
+    created_at: string;
+};
 
 
-function HistoryList({ onBack }: HistoryListProps) { // Renamed component
+function HistoryList({ onBack }: HistoryListProps) {
     // Data states
-    const [historyData, setHistoryData] = useState<HistoryResponse | null>(null); // Store the raw response
+    const [historyItems, setHistoryItems] = useState<HistoryListItem[]>([]); // Store the flat list
     const [categories, setCategories] = useState<Category[]>([]); // Still needed for editing spendings
 
     // UI states
@@ -42,16 +50,16 @@ function HistoryList({ onBack }: HistoryListProps) { // Renamed component
         const historyPromise = fetchHistory(); // Use fetchHistory
         const categoriesPromise = fetchCategories(); // Still fetch categories
 
-        Promise.all([historyPromise, categoriesPromise])
+        Promise.all([historyPromise, categoriesPromise]) // Fetch history and categories concurrently
             .then(([historyResponse, categoriesData]) => {
-                setHistoryData(historyResponse); // Store the combined history response
+                // The response now has a flat 'history' array
+                setHistoryItems(historyResponse.history || []); // Store the flat list
                 setCategories(categoriesData); // Store categories
             })
             .catch(err => {
                 console.error("Failed to load history or categories:", err);
                 setError(err instanceof Error ? err.message : 'Failed to load history or categories.');
-                // Set null/empty on error
-                setHistoryData(null);
+                setHistoryItems([]); // Set empty on error
                 setCategories([]); // Ensure categories is empty on error
             })
             .finally(() => {
@@ -180,34 +188,14 @@ function HistoryList({ onBack }: HistoryListProps) { // Renamed component
             setDeleteError(err instanceof Error ? err.message : 'Failed to delete the spending group.');
         } finally {
             setDeletingJobId(null);
+            setDeleteError(err instanceof Error ? err.message : 'Failed to delete the spending group.');
+        } finally {
+            setDeletingJobId(null);
         }
     };
 
-    // --- Combined and Sorted History List ---
-    const sortedHistoryItems = useMemo((): HistoryListItem[] => {
-        if (!historyData) return [];
-
-        const combined: HistoryListItem[] = [
-            ...historyData.spending_groups.map(group => ({
-                ...group,
-                itemType: 'spending_group' as const,
-                sortDate: new Date(group.date) // Use the common 'date' field
-            })),
-            ...historyData.deposits.map(deposit => ({
-                ...deposit,
-                itemType: 'deposit' as const,
-                sortDate: new Date(deposit.date) // Use the common 'date' field
-            }))
-        ];
-
-        // Sort by date descending (most recent first)
-        combined.sort((a, b) => b.sortDate.getTime() - a.sortDate.getTime());
-
-        return combined;
-    }, [historyData]);
-
-
     // --- Render Logic ---
+    // The historyItems state already contains the sorted, combined list from the backend
 
     // Helper to render a deposit item
     const renderDepositItem = (item: DepositItem) => {
@@ -225,7 +213,8 @@ function HistoryList({ onBack }: HistoryListProps) { // Renamed component
                                 Deposit: <span className="text-gray-700 font-normal">{item.description}</span>
                             </p>
                             <p className="text-xs text-gray-500">
-                                {formatDate(item.date, { hour: undefined, minute: undefined })} {/* Show only date */}
+                                {formatDate(item.date, { hour: undefined, minute: undefined })} {/* Show only date of this occurrence */}
+                                {/* Optionally indicate if it's part of a recurring series */}
                                 {item.is_recurring && <span className="ml-2 text-xs italic">({item.recurrence_period || 'Recurring'})</span>}
                             </p>
                         </div>
@@ -436,20 +425,20 @@ function HistoryList({ onBack }: HistoryListProps) { // Renamed component
             {deleteError && <div className="bg-red-100 border border-red-400 text-red-700 px-4 py-3 rounded relative mb-4" role="alert">Error deleting spending group: {deleteError}</div>}
 
 
-            {!isLoading && !error && sortedHistoryItems.length === 0 && (
+            {!isLoading && !error && historyItems.length === 0 && (
                 <div className="text-center text-gray-500 p-4">No history found. Try logging some expenses or deposits!</div>
             )}
 
-            {/* Render combined history items */}
-            {!isLoading && !error && sortedHistoryItems.length > 0 && (
+            {/* Render combined history items from the flat list */}
+            {!isLoading && !error && historyItems.length > 0 && (
                 <div className="space-y-4"> {/* Use less space between items */}
-                    {sortedHistoryItems.map((item) => {
-                        if (item.itemType === 'deposit') {
-                            // Render Deposit Item
-                            return renderDepositItem(item);
-                        } else {
-                            // Render Spending Group (TransactionGroup)
-                            const group = item; // item is a TransactionGroup here
+                    {historyItems.map((item, index) => { // Use index for key if IDs aren't unique across types
+                        if (item.type === 'deposit') {
+                            // Render Deposit Item - Cast to the specific type
+                            return renderDepositItem(item as DepositHistoryItem);
+                        } else if (item.type === 'spending_group') {
+                            // Render Spending Group (TransactionGroup) - Cast to the specific type
+                            const group = item as SpendingGroupItem;
                             return (
                                 <div key={`sg-${group.job_id}`} className="border border-gray-200 rounded-lg shadow-sm overflow-hidden">
                                     {/* Transaction Group Header - Make clickable */}
@@ -532,11 +521,15 @@ function HistoryList({ onBack }: HistoryListProps) { // Renamed component
                                             </div>
                                         </div>
                                     )}
-                                </div>
+                                </div> // Close spending group div
                             );
+                        } else {
+                            // Handle unknown item types if necessary
+                            console.warn("Unknown history item type:", item.type);
+                            return <div key={`unknown-${index}`} className="text-red-500">Unknown item type encountered</div>;
                         }
                     })}
-                </div>
+                </div> // Close history items container
             )}
             </div> {/* Close inner padding div */}
         </div>

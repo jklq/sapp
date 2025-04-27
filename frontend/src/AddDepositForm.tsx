@@ -8,7 +8,7 @@ function AddDepositForm() {
     const [description, setDescription] = useState<string>('');
     const [depositDate, setDepositDate] = useState<string>(new Date().toISOString().split('T')[0]); // Default to today
     const [isRecurring, setIsRecurring] = useState<boolean>(false);
-    const [recurrencePeriod, setRecurrencePeriod] = useState<string>(''); // e.g., 'monthly', 'weekly'
+    const [recurrencePeriod, setRecurrencePeriod] = useState<string>('monthly'); // Default to monthly
 
     // UI states
     const [isLoading, setIsLoading] = useState<boolean>(false);
@@ -37,11 +37,12 @@ function AddDepositForm() {
             setIsLoading(false);
             return;
         }
-        if (isRecurring && !recurrencePeriod.trim()) {
-            setError('Please specify the recurrence period (e.g., monthly, weekly) for recurring deposits.');
-            setIsLoading(false);
-            return;
-        }
+        // Validation for recurrencePeriod selection is implicitly handled by the dropdown having a default value
+        // if (isRecurring && !recurrencePeriod) { // Check if it's empty, though default prevents this
+        //     setError('Please select the recurrence period for recurring deposits.');
+        //     setIsLoading(false);
+        //     return;
+        // }
 
         const payload: AddDepositPayload = {
             amount: numericAmount,
@@ -59,7 +60,7 @@ function AddDepositForm() {
             setDescription('');
             setDepositDate(new Date().toISOString().split('T')[0]); // Reset date to today
             setIsRecurring(false);
-            setRecurrencePeriod('');
+            setRecurrencePeriod('monthly'); // Reset period to default
         } catch (err) {
             console.error(`Failed to add deposit:`, err);
             setError(err instanceof Error ? err.message : 'An unknown error occurred.');
@@ -137,19 +138,22 @@ function AddDepositForm() {
                         </div>
                     </div>
 
-                    {/* Recurrence Period Input (Conditional) */}
+                    {/* Recurrence Period Select (Conditional) */}
                     {isRecurring && (
                         <div>
                             <label htmlFor="recurrence-period" className="block text-sm font-medium text-gray-700">Recurrence Period</label>
-                            <input
-                                type="text"
+                            <select
                                 id="recurrence-period"
                                 value={recurrencePeriod}
                                 onChange={(e) => setRecurrencePeriod(e.target.value)}
-                                placeholder="e.g., monthly, weekly, yearly"
                                 required={isRecurring} // Required only if checkbox is checked
-                                className="mt-1 block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-indigo-500 focus:border-indigo-500 sm:text-sm"
-                            />
+                                className="mt-1 block w-full px-3 py-2 border border-gray-300 bg-white rounded-md shadow-sm focus:outline-none focus:ring-indigo-500 focus:border-indigo-500 sm:text-sm"
+                            >
+                                <option value="weekly">Weekly</option>
+                                <option value="monthly">Monthly</option>
+                                <option value="yearly">Yearly</option>
+                                {/* Add other options like 'bi-weekly' if needed */}
+                            </select>
                         </div>
                     )}
 
