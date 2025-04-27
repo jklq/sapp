@@ -4,6 +4,8 @@ import (
 	"database/sql"
 	"fmt"
 	"log/slog"
+	"strings"
+	"time" // Added time import
 )
 
 // SharedMode removed from Job struct
@@ -61,13 +63,8 @@ func (p *CategorizingPool) AddJob(params CategorizationParams, spendingDate *tim
 		otherPersonInt = &params.SharedWith.Id
 	}
 
-	// Convert *time.Time to sql.NullTime for insertion
-	var sqlSpendingDate sql.NullTime
-	if spendingDate != nil {
-		sqlSpendingDate = sql.NullTime{Time: *spendingDate, Valid: true}
-	}
-
 	// Store pre_settled flag and spending_date in the job record
+	// Removed unused sqlSpendingDate variable declaration
 	// Pass spendingDate directly (can be nil). Assumes spending_date column exists and is nullable.
 	result, err := tx.Exec(`INSERT INTO ai_categorization_jobs (buyer, shared_with, prompt, total_amount, pre_settled, spending_date, status)
 	VALUES (?, ?, ?, ?, ?, ?, ?)`, params.Buyer.Id, otherPersonInt, params.Prompt, params.TotalAmount, params.PreSettled, spendingDate, "pending")

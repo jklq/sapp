@@ -87,6 +87,14 @@ type TransferStatusResponse struct {
 	OwedTo      *string `json:"owed_to"`     // Name of the person who is owed money (null if settled)
 }
 
+// AICategorizationPayload defines the structure for the AI categorization request body.
+type AICategorizationPayload struct {
+	Amount       float64 `json:"amount"`
+	Prompt       string  `json:"prompt"`
+	SpendingDate *string `json:"spending_date,omitempty"` // Optional: Date of spending "YYYY-MM-DD"
+	PreSettled   bool    `json:"pre_settled"`           // Flag to mark as settled immediately
+}
+
 // --- Core Data Structures ---
 
 // Category represents a category record in the database.
