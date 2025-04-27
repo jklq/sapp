@@ -105,7 +105,7 @@ func main() {
 	// Create handlers for protected routes
 	payHandler := http.HandlerFunc(pay.HandlePayRoute(db))
 	getCategoriesHandler := http.HandlerFunc(category.HandleGetCategories(db))
-	categorizeHandler := http.HandlerFunc(category.HandleAICategorize(db, categorizationPool))
+	categorizeHandler := http.HandlerFunc(category.HandleAICategorize(db, &categorizationPool)) // Pass pointer to pool
 	getHistoryHandler := http.HandlerFunc(spendings.HandleGetHistory(db)) // Use spendings.HandleGetHistory which internally uses history service
 	updateSpendingHandler := http.HandlerFunc(spendings.HandleUpdateSpending(db))
 	getTransferStatusHandler := http.HandlerFunc(transfer.HandleGetTransferStatus(db)) // Create handler for transfer status
