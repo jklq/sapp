@@ -89,10 +89,10 @@ type TransferStatusResponse struct {
 
 // AICategorizationPayload defines the structure for the AI categorization request body.
 type AICategorizationPayload struct {
-	Amount       float64 `json:"amount"`
-	Prompt       string  `json:"prompt"`
-	SpendingDate *string `json:"spending_date,omitempty"` // Optional: Date of spending "YYYY-MM-DD"
-	PreSettled   bool    `json:"pre_settled"`           // Flag to mark as settled immediately
+	Amount          float64 `json:"amount"`
+	Prompt          string  `json:"prompt"`
+	TransactionDate *string `json:"transaction_date,omitempty"` // Optional: Date of transaction "YYYY-MM-DD"
+	PreSettled      bool    `json:"pre_settled"`                // Flag to mark as settled immediately
 }
 
 // --- Core Data Structures ---

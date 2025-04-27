@@ -83,23 +83,23 @@ func HandleAICategorize(db *sql.DB, pool CategorizingPoolStrategy) http.HandlerF
 		}
 		defer r.Body.Close()
 
-		// --- Parse Optional Spending Date ---
-		var spendingDateTime *time.Time // Use pointer to handle optional date
-		if payload.SpendingDate != nil && *payload.SpendingDate != "" {
-			parsedDate, err := time.Parse("2006-01-02", *payload.SpendingDate)
+		// --- Parse Optional Transaction Date ---
+		var transactionDateTime *time.Time // Use pointer to handle optional date
+		if payload.TransactionDate != nil && *payload.TransactionDate != "" {
+			parsedDate, err := time.Parse("2006-01-02", *payload.TransactionDate)
 			if err != nil {
-				slog.Warn("invalid spending_date format received for AI job, ignoring", "url", r.URL, "user_id", userID, "date_string", *payload.SpendingDate, "err", err)
+				slog.Warn("invalid transaction_date format received for AI job, ignoring", "url", r.URL, "user_id", userID, "date_string", *payload.TransactionDate, "err", err)
 				// Don't fail, just proceed without a specific date (pool will handle nil)
 			} else {
 				// Use the start of the day in UTC for consistency
 				t := time.Date(parsedDate.Year(), parsedDate.Month(), parsedDate.Day(), 0, 0, 0, 0, time.UTC)
-				spendingDateTime = &t
-				slog.Debug("Using provided spending_date for AI job", "user_id", userID, "date", *spendingDateTime)
+				transactionDateTime = &t
+				slog.Debug("Using provided transaction_date for AI job", "user_id", userID, "date", *transactionDateTime)
 			}
 		} else {
-			slog.Debug("spending_date not provided for AI job, will use current time on insertion", "user_id", userID)
+			slog.Debug("transaction_date not provided for AI job, will use current time on insertion", "user_id", userID)
 		}
-		// --- End Parse Optional Spending Date ---
+		// --- End Parse Optional Transaction Date ---
 
 		// 2. Validate payload
 		// shared_status validation is removed
@@ -165,15 +165,15 @@ func HandleAICategorize(db *sql.DB, pool CategorizingPoolStrategy) http.HandlerF
 			// 'tries' is handled internally by ProcessCategorizationJob
 		}
 
-		// 5. Add the job to the pool, passing the parsed spendingDate
-		jobID, err := pool.AddJob(params, spendingDateTime) // Pass parsed date (or nil)
+		// 5. Add the job to the pool, passing the parsed transactionDate
+		jobID, err := pool.AddJob(params, transactionDateTime) // Pass parsed date (or nil)
 		if err != nil {
-			slog.Error("failed to add AI categorization job to pool", "url", r.URL, "user_id", userID, "pre_settled", payload.PreSettled, "spending_date", spendingDateTime, "err", err)
+			slog.Error("failed to add AI categorization job to pool", "url", r.URL, "user_id", userID, "pre_settled", payload.PreSettled, "transaction_date", transactionDateTime, "err", err)
 			http.Error(w, "Internal Server Error", http.StatusInternalServerError)
 			return
 		}
 
-		slog.Info("AI categorization job added", "url", r.URL, "user_id", userID, "job_id", jobID, "amount", payload.Amount, "pre_settled", payload.PreSettled, "spending_date", spendingDateTime)
+		slog.Info("AI categorization job added", "url", r.URL, "user_id", userID, "job_id", jobID, "amount", payload.Amount, "pre_settled", payload.PreSettled, "transaction_date", transactionDateTime)
 
 		// 6. Respond with 202 Accepted
 		w.Header().Set("Content-Type", "application/json")

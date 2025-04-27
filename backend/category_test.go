@@ -75,6 +75,7 @@ func TestAICategorize(t *testing.T) {
 			"amount":      123.45,
 			"prompt":      "Groceries from Rema",
 			"pre_settled": false, // Explicitly false
+			// "transaction_date": "2024-05-20", // Optional: Add date if needed
 		}
 		// Use env.AuthToken which is now the user ID string
 		req := testutil.NewAuthenticatedRequest(t, http.MethodPost, "/v1/categorize", env.AuthToken, payload)
@@ -113,12 +114,13 @@ func TestAICategorize(t *testing.T) {
 		}
 	})
 
-	// --- Test Case: Successful Submission (Pre-settled) ---
-	t.Run("SuccessPreSettled", func(t *testing.T) {
+	// --- Test Case: Successful Submission (Pre-settled with Date) ---
+	t.Run("SuccessPreSettledWithDate", func(t *testing.T) {
 		payload := map[string]interface{}{
-			"amount":      50.00,
-			"prompt":      "Pre-settled lunch",
-			"pre_settled": true, // Explicitly true
+			"amount":           50.00,
+			"prompt":           "Pre-settled lunch",
+			"pre_settled":      true, // Explicitly true
+			"transaction_date": "2024-05-21", // Add a date
 		}
 		req := testutil.NewAuthenticatedRequest(t, http.MethodPost, "/v1/categorize", env.AuthToken, payload)
 		rr := testutil.ExecuteRequest(t, env.Handler, req)
@@ -139,6 +141,15 @@ func TestAICategorize(t *testing.T) {
 		}
 		if dbPreSettled != true {
 			t.Errorf("DB pre_settled mismatch: got %v, want true", dbPreSettled)
+		}
+		// Verify transaction_date was stored correctly
+		var dbDate sql.NullTime
+		err = env.DB.QueryRow("SELECT transaction_date FROM ai_categorization_jobs WHERE id = ?", jobID).Scan(&dbDate)
+		if err != nil {
+			t.Fatalf("Failed to query created job for transaction_date: %v", err)
+		}
+		if !dbDate.Valid || dbDate.Time.Format("2006-01-02") != "2024-05-21" {
+			t.Errorf("DB transaction_date mismatch: got %v, want 2024-05-21", dbDate)
 		}
 		// Note: Verifying the actual spending item's settled_at requires the worker to run.
 		// This test only verifies the job flag is set correctly.

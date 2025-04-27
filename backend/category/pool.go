@@ -15,16 +15,16 @@ type Job struct {
 	Status       string `json:"status"`
 	IsFinished   bool   `json:"isFinished"`
 	Prompt       string `json:"prompt"`
-	Buyer        int64      `json:"buyer_id"`
-	SharedWithId *int64     `json:"other_id"`
-	PreSettled   bool       `json:"pre_settled"` // Added: Pre-settled flag from the job table
-	Result       *JobResult `json:"result"`      // Removed duplicate Result field
-	SpendingDate *time.Time `json:"spending_date"` // Added: Store the specific spending date for the job
+	Buyer           int64      `json:"buyer_id"`
+	SharedWithId    *int64     `json:"other_id"`
+	PreSettled      bool       `json:"pre_settled"` // Added: Pre-settled flag from the job table
+	Result          *JobResult `json:"result"`      // Removed duplicate Result field
+	TransactionDate *time.Time `json:"transaction_date"` // Renamed from SpendingDate to match DB schema
 }
 
 type CategorizingPoolStrategy interface {
-	// AddJob adds a new categorization job with optional spending date.
-	AddJob(params CategorizationParams, spendingDate *time.Time) (int64, error)
+	// AddJob adds a new categorization job with optional transaction date.
+	AddJob(params CategorizationParams, transactionDate *time.Time) (int64, error)
 	StartPool()
 	GetStatus(int64) (Job, error)
 }
@@ -47,9 +47,9 @@ func NewCategorizingPool(db *sql.DB, numWorkers int, api ModelAPI) CategorizingP
 }
 
 // AddJob adds a new categorization job to the queue.
-// It inserts the job details (including optional spending date) into the database
+// It inserts the job details (including optional transaction date) into the database
 // and sends the job details to the channel for processing.
-func (p *CategorizingPool) AddJob(params CategorizationParams, spendingDate *time.Time) (int64, error) {
+func (p *CategorizingPool) AddJob(params CategorizationParams, transactionDate *time.Time) (int64, error) {
 	tx, err := p.db.Begin()
 	if err != nil {
 		return 0, fmt.Errorf("failed to begin transaction: %w", err)
@@ -62,13 +62,12 @@ func (p *CategorizingPool) AddJob(params CategorizationParams, spendingDate *tim
 		otherPersonInt = &params.SharedWith.Id
 	}
 
-	// Store pre_settled flag and spending_date in the job record
-	// Removed unused sqlSpendingDate variable declaration
-	// Pass spendingDate directly (can be nil). Assumes spending_date column exists and is nullable.
-	result, err := tx.Exec(`INSERT INTO ai_categorization_jobs (buyer, shared_with, prompt, total_amount, pre_settled, spending_date, status)
-	VALUES (?, ?, ?, ?, ?, ?, ?)`, params.Buyer.Id, otherPersonInt, params.Prompt, params.TotalAmount, params.PreSettled, spendingDate, "pending")
+	// Store pre_settled flag and transaction_date in the job record
+	// Pass transactionDate directly (can be nil). DB column is transaction_date.
+	result, err := tx.Exec(`INSERT INTO ai_categorization_jobs (buyer, shared_with, prompt, total_amount, pre_settled, transaction_date, status)
+	VALUES (?, ?, ?, ?, ?, ?, ?)`, params.Buyer.Id, otherPersonInt, params.Prompt, params.TotalAmount, params.PreSettled, transactionDate, "pending")
 	if err != nil {
-		slog.Error("error inserting ai categorization job", "error", err, "pre_settled", params.PreSettled, "spending_date", spendingDate)
+		slog.Error("error inserting ai categorization job", "error", err, "pre_settled", params.PreSettled, "transaction_date", transactionDate)
 		return 0, err
 	}
 
@@ -90,11 +89,11 @@ func (p *CategorizingPool) AddJob(params CategorizationParams, spendingDate *tim
 		// Populate other fields from params as needed by the worker
 		TotalAmount:  params.TotalAmount,
 		Prompt:       params.Prompt,
-		Buyer:        params.Buyer.Id,
-		SharedWithId: otherPersonInt,
-		PreSettled:   params.PreSettled,
-		SpendingDate: spendingDate, // Pass the parsed spending date (or nil)
-		Status:       "pending",
+		Buyer:           params.Buyer.Id,
+		SharedWithId:    otherPersonInt,
+		PreSettled:      params.PreSettled,
+		TransactionDate: transactionDate, // Pass the parsed transaction date (or nil)
+		Status:          "pending",
 		// Result is initially nil
 	}
 	// Consider adding a timeout or select with a default case for non-blocking send
@@ -128,11 +127,11 @@ func (p *CategorizingPool) GetStatus(id int64) (Job, error) {
 
 	// TODO: Populate JobResult more completely if needed by the GetStatus consumer.
 	// Currently, this function is not used by tested handlers.
-	// Fetch spending_date as well if needed here.
-	// row := p.db.QueryRow("SELECT id, status, is_finished, spending_date FROM ai_categorization_jobs WHERE id = ?", id)
-	// var sqlSpendingDate sql.NullTime
-	// ... scan &jobStatus.Id, &jobStatus.Status, &jobStatus.IsFinished, &sqlSpendingDate ...
-	// if sqlSpendingDate.Valid { jobStatus.SpendingDate = &sqlSpendingDate.Time }
+	// Fetch transaction_date as well if needed here.
+	// row := p.db.QueryRow("SELECT id, status, is_finished, transaction_date FROM ai_categorization_jobs WHERE id = ?", id)
+	// var sqlTransactionDate sql.NullTime
+	// ... scan &jobStatus.Id, &jobStatus.Status, &jobStatus.IsFinished, &sqlTransactionDate ...
+	// if sqlTransactionDate.Valid { jobStatus.TransactionDate = &sqlTransactionDate.Time }
 
 
 	if !jobStatus.IsFinished {
@@ -233,21 +232,31 @@ func (p *CategorizingPool) worker(id int) {
 			}
 
 
-			// Determine the spending_date to use for all items in this job.
-			var spendingDateToUse time.Time
-			if job.SpendingDate != nil {
-				spendingDateToUse = *job.SpendingDate
-				slog.Debug("Worker using provided spending date for job", "worker_id", id, "job_id", job.Id, "date", spendingDateToUse)
+			// Determine the transaction_date to use for all items in this job.
+			var transactionDateToUse time.Time
+			if job.TransactionDate != nil {
+				transactionDateToUse = *job.TransactionDate
+				slog.Debug("Worker using provided transaction date for job", "worker_id", id, "job_id", job.Id, "date", transactionDateToUse)
 			} else {
 				// Fetch job creation time as fallback if specific date wasn't provided
-				err = tx.QueryRow("SELECT created_at FROM ai_categorization_jobs WHERE id = ?", job.Id).Scan(&spendingDateToUse)
-				if err != nil {
-					slog.Error("Worker failed to query job creation time as fallback date, using current time", "worker_id", id, "job_id", job.Id, "err", err)
-					spendingDateToUse = time.Now().UTC() // Fallback to now
-					// Don't fail the job just for this, but log it.
-					err = nil // Clear the error so we don't rollback unnecessarily
+				// Note: The DB column is transaction_date, but we might still want creation_date as fallback?
+				// Let's try fetching transaction_date first, then created_at.
+				var dbTransactionDate sql.NullTime
+				err = tx.QueryRow("SELECT transaction_date FROM ai_categorization_jobs WHERE id = ?", job.Id).Scan(&dbTransactionDate)
+				if err == nil && dbTransactionDate.Valid {
+					transactionDateToUse = dbTransactionDate.Time
+					slog.Debug("Worker using job's transaction_date from DB", "worker_id", id, "job_id", job.Id, "date", transactionDateToUse)
 				} else {
-					slog.Debug("Worker using job creation date as spending date", "worker_id", id, "job_id", job.Id, "date", spendingDateToUse)
+					// If transaction_date is NULL or query failed, fallback to created_at
+					slog.Warn("Worker could not get transaction_date from DB, falling back to created_at", "worker_id", id, "job_id", job.Id, "err", err)
+					err = tx.QueryRow("SELECT created_at FROM ai_categorization_jobs WHERE id = ?", job.Id).Scan(&transactionDateToUse)
+					if err != nil {
+						slog.Error("Worker failed to query job creation time as fallback date, using current time", "worker_id", id, "job_id", job.Id, "err", err)
+						transactionDateToUse = time.Now().UTC() // Final fallback to now
+						err = nil                               // Clear the error so we don't rollback unnecessarily
+					} else {
+						slog.Debug("Worker using job creation date as transaction date", "worker_id", id, "job_id", job.Id, "date", transactionDateToUse)
+					}
 				}
 			}
 
@@ -280,9 +289,10 @@ func (p *CategorizingPool) worker(id int) {
 					spendingDesc = "AI Categorized" // Default description
 				}
 				var res sql.Result
+				// Use transactionDateToUse for the spending_date column in spendings table
 				res, err = tx.Exec(`INSERT INTO spendings (amount, description, category, made_by, spending_date)
 				VALUES (?, ?, ?, ?, ?)`,
-					spending.Amount, spendingDesc, categoryID, job.Buyer, spendingDateToUse) // Use job.Buyer and determined spendingDateToUse
+					spending.Amount, spendingDesc, categoryID, job.Buyer, transactionDateToUse) // Use job.Buyer and determined transactionDateToUse
 				if err != nil {
 					slog.Error("worker failed to insert spending", "worker_id", id, "job_id", job.Id, "err", err)
 					p.updateJobStatus(job.Id, "failed", fmt.Errorf("db error inserting spending: %w", err))
