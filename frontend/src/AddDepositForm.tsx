@@ -38,11 +38,6 @@ function AddDepositForm() {
             return;
         }
         // Validation for recurrencePeriod selection is implicitly handled by the dropdown having a default value
-        // if (isRecurring && !recurrencePeriod) { // Check if it's empty, though default prevents this
-        //     setError('Please select the recurrence period for recurring deposits.');
-        //     setIsLoading(false);
-        //     return;
-        // }
 
         const payload: AddDepositPayload = {
             amount: numericAmount,

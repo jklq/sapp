@@ -3,13 +3,13 @@ import { getToken, storeToken, removeToken } from './api';
 import { LoginResponse } from './types';
 import LoginForm from './LoginForm';
 import LogSpendingForm from './LogSpendingForm';
-import HistoryList from './HistoryList'; // Renamed import
+import HistoryList from './HistoryList';
 import TransferPage from './TransferPage';
 import PartnerRegistrationForm from './PartnerRegistrationForm';
 import AddDepositForm from './AddDepositForm';
-import EditDepositPage from './EditDepositPage'; // Import the new edit page
+import EditDepositPage from './EditDepositPage';
 
-type View = 'login' | 'register' | 'logSpending' | 'addDeposit' | 'viewHistory' | 'transfer' | 'editDeposit'; // Added 'editDeposit'
+type View = 'login' | 'register' | 'logSpending' | 'addDeposit' | 'viewHistory' | 'transfer' | 'editDeposit';
 
 interface UserInfo {
   userId: number;
@@ -33,7 +33,6 @@ function App() {
       // TODO: Optionally add an API call here to verify the token
       // and fetch user details if they aren't stored alongside the token.
       // For this demo, we assume the token is valid if present.
-      // If login response is stored, parse it. For now, we only have the token.
       setAuthToken(currentToken);
       // We don't have user info from just the token, handleLoginSuccess sets it.
       // If you stored user info in localStorage, load it here.
@@ -41,7 +40,6 @@ function App() {
       setCurrentView('logSpending');
     } else {
       // No token, stay on login view (or potentially register view if navigated there)
-      // setCurrentView('login'); // Already the default
     }
     setIsLoadingAuth(false); // Finished checking auth status
   }, []); // Run only once on initial load
@@ -52,7 +50,6 @@ function App() {
     setUserInfo({ userId: data.user_id, firstName: data.first_name });
     setCurrentView('logSpending'); // Go to main app view after login
     // Optionally store user info in localStorage as well
-    // localStorage.setItem('userInfo', JSON.stringify({ userId: data.user_id, firstName: data.first_name }));
   };
 
   const handleLogout = () => {
@@ -61,7 +58,6 @@ function App() {
     setUserInfo(null);
     setCurrentView('login'); // Go back to login view on logout
     // Optionally remove user info from localStorage
-    // localStorage.removeItem('userInfo');
   };
 
   // Navigate to registration page
@@ -84,7 +80,6 @@ function App() {
   // Determine which component to render based on auth and view state
   const renderContent = () => {
     if (isLoadingAuth) {
-      return <div className="min-h-screen bg-gray-100 flex items-center justify-center">Loading...</div>;
       return <div className="min-h-screen bg-gray-100 flex items-center justify-center">Loading...</div>;
     }
 
@@ -128,7 +123,7 @@ function App() {
           <header className="fixed bottom-0 left-0 right-0 w-full bg-white border-t border-gray-200 rounded-t-lg p-3 z-50 max-w-4xl mx-auto">
             <div className="flex justify-between items-center">
               {/* Left Group: Welcome Message (Desktop) + Navigation */}
-              <div className="flex items-center md:gap-4"> {/* Group welcome and nav */}
+              <div className="flex items-center md:gap-4">
               {/* Welcome Message (visible on larger screens) */}
               <div className="hidden md:block">
                 {userInfo && <span className="text-gray-700 text-sm">Welcome, {userInfo.firstName}!</span>}
@@ -136,7 +131,7 @@ function App() {
 
               {/* Navigation Icons/Links */}
               {/* Mobile: justify-around, w-full. Desktop: justify-start, w-auto */}
-              <nav className="w-full md:w-auto flex justify-around md:justify-start space-x-1 md:space-x-1"> {/* Adjusted classes */}
+              <nav className="w-full md:w-auto flex justify-around md:justify-start space-x-1 md:space-x-1">
                 {/* Log Spending */}
                 <button
                   onClick={() => setCurrentView('logSpending')}
@@ -152,7 +147,7 @@ function App() {
                 <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5 mb-1 md:mb-0 md:mr-1" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
                   <path strokeLinecap="round" strokeLinejoin="round" d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" />
                 </svg>
-                <span className="text-xs md:text-sm">Log Spend</span> {/* Clarified label */}
+                <span className="text-xs md:text-sm">Log Spend</span>
               </button>
 
                {/* Add Deposit */}
@@ -175,10 +170,10 @@ function App() {
 
               {/* View History */}
               <button
-                onClick={() => setCurrentView('viewHistory')} // Use new view state name
-                disabled={currentView === 'viewHistory'} // Use new view state name
+                onClick={() => setCurrentView('viewHistory')}
+                disabled={currentView === 'viewHistory'}
                 className={`flex flex-col md:flex-row items-center p-2 rounded-md transition-colors duration-150 ${
-                  currentView === 'viewHistory' // Use new view state name
+                  currentView === 'viewHistory'
                     ? 'bg-indigo-100 text-indigo-700'
                     : 'text-gray-500 hover:bg-gray-100 hover:text-gray-700'
                 }`}
@@ -208,8 +203,8 @@ function App() {
                 </svg>
                 <span className="text-xs md:text-sm">Transfer</span>
               </button>
-            </nav> {/* End Nav */}
-            </div> {/* End Left Group */}
+            </nav>
+            </div>
 
 
             {/* Logout Button (Remains on the right) */}
@@ -223,10 +218,9 @@ function App() {
                  <path strokeLinecap="round" strokeLinejoin="round" d="M17 16l4-4m0 0l-4-4m4 4H7m6 4v1a3 3 0 01-3 3H6a3 3 0 01-3-3V7a3 3 0 013-3h4a3 3 0 013 3v1" />
                </svg>
                {/* Optional: Add text label for larger screens */}
-               {/* <span className="hidden md:inline ml-1">Logout</span> */}
               </button>
             </div>
-          </header> /* End Bottom Nav Bar */
+          </header>
         )}
       </div>
     );
@@ -234,7 +228,6 @@ function App() {
 
 
   return (
-    // Remove overall padding (pt-8 px-4), add padding within content sections as needed
     <div className="min-h-screen bg-gray-100 flex flex-col items-center">
       {renderContent()}
     </div>

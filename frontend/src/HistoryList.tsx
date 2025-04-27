@@ -1,7 +1,6 @@
 import { useState, useEffect, useCallback } from 'react';
-import { fetchHistory, fetchCategories, updateSpendingItem, deleteAIJob, deleteDeposit } from './api'; // Added deleteDeposit
-// Import types. HistoryListItem now contains flattened data.
-import { Category, UpdateSpendingPayload, EditableSharingStatus, HistoryListItem, SpendingItem, DepositItem } from './types'; // Added DepositItem
+import { fetchHistory, fetchCategories, updateSpendingItem, deleteAIJob, deleteDeposit } from './api';
+import { Category, UpdateSpendingPayload, EditableSharingStatus, HistoryListItem, SpendingItem, DepositItem } from './types';
 
 interface HistoryListProps {
     onBack: () => void;
@@ -9,7 +8,6 @@ interface HistoryListProps {
     onNavigateToEditDeposit: (depositId: number) => void;
 }
 
-// No longer need local casting types like SpendingGroupItem, DepositHistoryItem
 
 function HistoryList({ onBack, onNavigateToEditDeposit }: HistoryListProps) {
     // Data states
@@ -34,8 +32,6 @@ function HistoryList({ onBack, onNavigateToEditDeposit }: HistoryListProps) {
     const [expandedGroupIds, setExpandedGroupIds] = useState<Set<number>>(new Set()); // Keep for spending groups
     const [expandedDepositKeys, setExpandedDepositKeys] = useState<Set<string>>(new Set()); // State for expanded deposits
 
-    // Navigation state (passed up to App) - Placeholder, needs implementation in App.tsx
-    // const [editingDepositId, setEditingDepositId] = useState<number | null>(null); // Removed, handled by App state now
 
     // Fetch history and categories
     const loadData = useCallback(() => {
@@ -45,14 +41,14 @@ function HistoryList({ onBack, onNavigateToEditDeposit }: HistoryListProps) {
         setEditError(null);
         setDeleteError(null);
 
-        const historyPromise = fetchHistory(); // Use fetchHistory
+        const historyPromise = fetchHistory();
         const categoriesPromise = fetchCategories(); // Still fetch categories
 
         Promise.all([historyPromise, categoriesPromise]) // Fetch history and categories concurrently
             .then(([historyResponse, categoriesData]) => {
                 // The response now has a flat 'history' array
                 setHistoryItems(historyResponse.history || []); // Store the flat list
-                setCategories(categoriesData); // Store categories
+                setCategories(categoriesData);
             })
             .catch(err => {
                 console.error("Failed to load history or categories:", err);
@@ -70,7 +66,7 @@ function HistoryList({ onBack, onNavigateToEditDeposit }: HistoryListProps) {
         loadData();
     }, [loadData]);
 
-    // Helper to format date string (can be reused)
+    // Helper to format date string
     const formatDate = (dateString: string | Date, options?: Intl.DateTimeFormatOptions) => {
         try {
             const defaultOptions: Intl.DateTimeFormatOptions = {
@@ -80,24 +76,24 @@ function HistoryList({ onBack, onNavigateToEditDeposit }: HistoryListProps) {
             const date = typeof dateString === 'string' ? new Date(dateString) : dateString;
             return date.toLocaleString(undefined, finalOptions);
         } catch (e) {
-            return String(dateString); // Fallback
+            return String(dateString);
         }
     };
 
     // Helper to format currency
     const formatCurrency = (amount: number) => {
-        return amount.toLocaleString(undefined, { style: 'currency', currency: 'NOK' }); // Adjust currency code if needed
+        // Adjust currency code if needed
+        return amount.toLocaleString(undefined, { style: 'currency', currency: 'NOK' });
     };
 
     // --- Edit Handlers ---
 
-    // Edit click now takes a SpendingItem, which is part of a HistoryListItem
     const handleEditClick = (item: SpendingItem) => {
         setEditingItemId(item.id);
         setEditError(null); // Clear previous edit errors
 
         // Determine initial EditableSharingStatus from the display string
-        let initialSharingStatus: EditableSharingStatus = 'Alone'; // Default
+        let initialSharingStatus: EditableSharingStatus = 'Alone';
         if (item.sharing_status.startsWith('Shared')) {
             initialSharingStatus = 'Shared';
         } else if (item.sharing_status.startsWith('Paid by')) {
@@ -218,18 +214,11 @@ function HistoryList({ onBack, onNavigateToEditDeposit }: HistoryListProps) {
         setDeletingJobId(jobId);
         setDeleteError(null);
 
-        try { // Added missing try block
+        try {
             await deleteAIJob(jobId);
             // Option 1: Refetch all data
             loadData();
             // Option 2: Remove the group from local state (more complex with combined list)
-            // setHistoryData(prevData => {
-            //     if (!prevData) return null;
-            //     return {
-            //         ...prevData,
-            //         spending_groups: prevData.spending_groups.filter(group => group.job_id !== jobId)
-            //     };
-            // });
         } catch (err) {
             console.error("Failed to delete spending group job:", err);
             setDeleteError(err instanceof Error ? err.message : 'Failed to delete the spending group.');
@@ -240,8 +229,8 @@ function HistoryList({ onBack, onNavigateToEditDeposit }: HistoryListProps) {
 
     // --- Render Logic ---
 
-    // Helper to render a deposit item (receives a HistoryListItem which is a DepositItem occurrence)
-    const renderDepositItem = (item: DepositItem) => { // Use DepositItem type directly
+    // Helper to render a deposit item
+    const renderDepositItem = (item: DepositItem) => {
         // Key uses original template ID + occurrence date for uniqueness
         const depositId = item.id; // This is the template ID
         const key = `dep-${depositId}-${item.date}`;
@@ -321,7 +310,7 @@ function HistoryList({ onBack, onNavigateToEditDeposit }: HistoryListProps) {
                 </div>
 
                 {/* --- Desktop View (Flex) --- */}
-                <div className="hidden md:block"> {/* Wrapper for desktop content */}
+                <div className="hidden md:block">
                     {/* Header Row */}
                     <div className="flex justify-between items-center flex-wrap gap-2 p-3 cursor-pointer hover:bg-green-100" onClick={() => toggleDepositExpansion(key)}>
                         {/* Left side: Icon, Description */}
@@ -333,7 +322,6 @@ function HistoryList({ onBack, onNavigateToEditDeposit }: HistoryListProps) {
                                 <p className="text-sm font-medium text-green-800 break-words">
                                     Deposit: <span className="text-gray-700 font-normal">{description}</span>
                                 </p>
-                                {/* Date/Recurrence moved to collapsible section */}
                             </div>
                         </div>
                         {/* Right side: Amount & Expander */}
@@ -354,7 +342,7 @@ function HistoryList({ onBack, onNavigateToEditDeposit }: HistoryListProps) {
                     {isExpanded && (
                         <div className="p-3 border-t border-green-100 bg-white">
                              {/* Date & Recurring Info */}
-                             <div className="mb-2"> {/* Add margin bottom */}
+                             <div className="mb-2">
                                 <span className="text-xs font-medium text-gray-500 uppercase">Date</span>
                                 <p className="text-sm text-gray-600">
                                     {formatDate(item.date, { hour: undefined, minute: undefined })}
@@ -392,18 +380,18 @@ function HistoryList({ onBack, onNavigateToEditDeposit }: HistoryListProps) {
         );
     };
 
-    // Helper to render either display row or edit form for a SpendingItem (within a spending group)
+    // Helper to render either display row or edit form for a SpendingItem
     const renderSpendingItemRow = (item: SpendingItem, partnerNameFromGroup: string | null | undefined) => {
         const isEditing = editingItemId === item.id && editFormData;
 
-        // Common classes for the container (card on mobile, table row on md+)
-        const containerClasses = `block md:table-row ${isEditing ? 'bg-yellow-50' : 'bg-white'} border-b border-gray-200 md:border-none`; // Add border for mobile cards
+        // Common classes for the container
+        const containerClasses = `block md:table-row ${isEditing ? 'bg-yellow-50' : 'bg-white'} border-b border-gray-200 md:border-none`;
 
         if (isEditing) {
             // --- Render Edit Form (Responsive) ---
             return (
                 <div key={`${item.id}-edit`} className={containerClasses}>
-                    {/* Description Input (Full width on mobile, table cell on md+) */}
+                    {/* Description Input */}
                     <div className="px-4 py-3 md:table-cell md:whitespace-nowrap">
                          <label htmlFor={`edit-desc-${item.id}`} className="text-xs font-medium text-gray-500 uppercase md:hidden">Desc.</label>
                          <input
@@ -415,7 +403,7 @@ function HistoryList({ onBack, onNavigateToEditDeposit }: HistoryListProps) {
                             placeholder="Description"
                         />
                     </div>
-                    {/* Category Select (Full width on mobile, table cell on md+) */}
+                    {/* Category Select */}
                     <div className="px-4 py-3 md:table-cell md:whitespace-nowrap">
                          <label htmlFor={`edit-cat-${item.id}`} className="text-xs font-medium text-gray-500 uppercase md:hidden">Category</label>
                          <select
@@ -436,12 +424,12 @@ function HistoryList({ onBack, onNavigateToEditDeposit }: HistoryListProps) {
                             )}
                         </select>
                     </div>
-                    {/* Amount (Read-only) - Moved and aligned left on mobile */}
-                    <div className="px-4 py-3 md:table-cell md:whitespace-nowrap text-sm text-gray-500 md:text-right"> {/* Keep text-right for md+ */}
+                    {/* Amount (Read-only) */}
+                    <div className="px-4 py-3 md:table-cell md:whitespace-nowrap text-sm text-gray-500 md:text-right">
                          <span className="text-xs font-medium text-gray-500 uppercase md:hidden">Amount: </span>
                          {formatCurrency(item.amount)}
                     </div>
-                    {/* Sharing Status Select (Full width on mobile, table cell on md+) */}
+                    {/* Sharing Status Select */}
                     <div className="px-4 py-3 md:table-cell md:whitespace-nowrap">
                          <label htmlFor={`edit-share-${item.id}`} className="text-xs font-medium text-gray-500 uppercase md:hidden">Sharing</label>
                          <select
@@ -456,7 +444,7 @@ function HistoryList({ onBack, onNavigateToEditDeposit }: HistoryListProps) {
                             <option value="Paid by Partner">Paid by {partnerNameFromGroup || 'Partner'}</option>
                         </select>
                     </div>
-                    {/* Actions (Save/Cancel) - Moved below other fields on mobile */}
+                    {/* Actions (Save/Cancel) */}
                     <div className="px-4 py-3 md:table-cell md:whitespace-nowrap text-right text-sm font-medium space-x-2">
                         <button
                             onClick={handleSaveEdit}
@@ -473,18 +461,16 @@ function HistoryList({ onBack, onNavigateToEditDeposit }: HistoryListProps) {
                             Cancel
                         </button>
                     </div>
-                </div> // Close the main div for the edit row
+                </div>
             );
         } else {
             // --- Render Display Row/Card (Responsive) ---
             return (
-                // Container for one item: block on mobile, table-row on md+
-                // Add padding and border for mobile card appearance
                 <div key={item.id} className={`${containerClasses} p-3 md:p-0 md:border-b md:border-gray-200`}>
 
                     {/* Mobile View Structure (md:hidden) */}
                     <div className="md:hidden space-y-2">
-                        {/* Description (Primary info) */}
+                        {/* Description */}
                         <div>
                             <span className="text-xs font-medium text-gray-500 uppercase">Description</span>
                             <p className="text-sm text-gray-900 break-words">{item.description || '-'}</p>
@@ -505,12 +491,12 @@ function HistoryList({ onBack, onNavigateToEditDeposit }: HistoryListProps) {
                         {/* Sharing Status */}
                         <div>
                             <span className="text-xs font-medium text-gray-500 uppercase">Sharing</span>
-                            <div> {/* Wrap badge in div for block layout */}
+                            <div>
                                 <span className={`mt-1 px-2 inline-flex text-xs leading-5 font-semibold rounded-full ${
                                     item.sharing_status === 'Alone' ? 'bg-blue-100 text-blue-800' :
                                     item.sharing_status.startsWith('Shared') ? 'bg-green-100 text-green-800' :
                                     item.sharing_status.startsWith('Paid by') ? 'bg-yellow-100 text-yellow-800' :
-                                    'bg-gray-100 text-gray-800' // Fallback
+                                    'bg-gray-100 text-gray-800'
                                 }`}>
                                     {item.sharing_status}
                                 </span>
@@ -518,7 +504,7 @@ function HistoryList({ onBack, onNavigateToEditDeposit }: HistoryListProps) {
                         </div>
 
                         {/* Action (Edit Button) */}
-                        <div className="pt-2 text-right"> {/* Add padding top for separation */}
+                        <div className="pt-2 text-right">
                             <button
                                 onClick={() => handleEditClick(item)}
                                 disabled={editingItemId !== null} // Disable other edit buttons while one is active
@@ -542,7 +528,7 @@ function HistoryList({ onBack, onNavigateToEditDeposit }: HistoryListProps) {
                             item.sharing_status === 'Alone' ? 'bg-blue-100 text-blue-800' :
                             item.sharing_status.startsWith('Shared') ? 'bg-green-100 text-green-800' :
                             item.sharing_status.startsWith('Paid by') ? 'bg-yellow-100 text-yellow-800' :
-                            'bg-gray-100 text-gray-800' // Fallback
+                            'bg-gray-100 text-gray-800'
                         }`}>
                             {item.sharing_status}
                         </span>
@@ -557,23 +543,22 @@ function HistoryList({ onBack, onNavigateToEditDeposit }: HistoryListProps) {
                             Edit
                         </button>
                     </div>
-                </div> // Close the main div for the display row/card
+                </div>
             );
         }
     };
 
 
     return (
-        // Remove p-6, add p-4 inside
         <div className="bg-white shadow-md rounded-lg w-full max-w-4xl">
-            <div className="p-4"> {/* Add inner padding */}
-                <div className="flex flex-wrap justify-between items-center mb-4 gap-2"> {/* Allow wrapping */}
-                    <h1 className="text-2xl font-bold text-gray-700">History</h1> {/* Renamed title */}
+            <div className="p-4">
+                <div className="flex flex-wrap justify-between items-center mb-4 gap-2">
+                    <h1 className="text-2xl font-bold text-gray-700">History</h1>
                     <button
                     onClick={onBack}
                     className="text-sm text-indigo-600 hover:text-indigo-800"
                 >
-                    &larr; Back {/* Simplified back button text */}
+                    &larr; Back
                 </button>
             </div>
 
@@ -593,7 +578,7 @@ function HistoryList({ onBack, onNavigateToEditDeposit }: HistoryListProps) {
 
             {/* Render combined history items from the flat list */}
             {!isLoading && !error && historyItems.length > 0 && (
-                <div className="space-y-4"> {/* Use less space between items */}
+                <div className="space-y-4">
                     {historyItems.map((item) => {
                         // Use unique key based on type and ID/date
                         const key = `${item.type}-${item.id ?? item.job_id ?? 'new'}-${item.date}`;
@@ -685,7 +670,6 @@ function HistoryList({ onBack, onNavigateToEditDeposit }: HistoryListProps) {
                                                     </tr>
                                                 </thead>
                                                 <tbody className="hidden md:table-row-group">
-                                                    {/* Added type annotation for sp */}
                                                     {spendings.map((sp: SpendingItem) => renderSpendingItemRow(sp, partnerNameFromGroup))}
                                                     {spendings.length === 0 && (
                                                         <tr className="md:table-row">
@@ -695,7 +679,6 @@ function HistoryList({ onBack, onNavigateToEditDeposit }: HistoryListProps) {
                                                 </tbody>
                                             </table>
                                             <div className="md:hidden space-y-3 p-2 bg-gray-50">
-                                                 {/* Added type annotation for sp */}
                                                  {spendings.map((sp: SpendingItem) => renderSpendingItemRow(sp, partnerNameFromGroup))}
                                                  {spendings.length === 0 && (
                                                     <div className="px-4 py-3 text-center text-sm text-gray-500 italic">No spending items generated for this job.</div>
@@ -703,7 +686,7 @@ function HistoryList({ onBack, onNavigateToEditDeposit }: HistoryListProps) {
                                             </div>
                                         </div>
                                     )}
-                                </div> // Close spending group div
+                                </div>
                             );
                         } else {
                             // Handle unknown item types if necessary
@@ -711,11 +694,11 @@ function HistoryList({ onBack, onNavigateToEditDeposit }: HistoryListProps) {
                             return <div key={key} className="text-red-500">Unknown item type encountered</div>;
                         }
                     })}
-                </div> // Close history items container
+                </div>
             )}
-            </div> {/* Close inner padding div */}
+            </div>
         </div>
     );
 }
 
-export default HistoryList; // Renamed export
+export default HistoryList;

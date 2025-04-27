@@ -62,8 +62,8 @@ function PartnerRegistrationForm({ onRegistrationSuccess, onBackToLogin }: Partn
 
     return (
         <div className="min-h-screen bg-gray-100 flex items-center justify-center">
-            <div className="bg-white shadow-md rounded-lg w-full max-w-2xl"> {/* Wider card */}
-                <div className="p-6"> {/* Increased padding */}
+            <div className="bg-white shadow-md rounded-lg w-full max-w-2xl">
+                <div className="p-6">
                     <div className="flex justify-between items-center mb-6">
                         <h1 className="text-2xl font-bold text-center text-gray-700">Register Partners</h1>
                         <button
@@ -78,7 +78,7 @@ function PartnerRegistrationForm({ onRegistrationSuccess, onBackToLogin }: Partn
                     {successMessage && <div className="bg-green-100 border border-green-400 text-green-700 px-4 py-3 rounded relative mb-4" role="alert">{successMessage}</div>}
 
                     <form onSubmit={handleSubmit} className="space-y-6">
-                        <div className="grid grid-cols-1 md:grid-cols-2 gap-6"> {/* Grid layout */}
+                        <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                             {/* User 1 Section */}
                             <div className="space-y-4 border border-gray-200 p-4 rounded">
                                 <h2 className="text-lg font-semibold text-gray-600">Partner 1</h2>
@@ -139,7 +139,7 @@ function PartnerRegistrationForm({ onRegistrationSuccess, onBackToLogin }: Partn
                         </div>
 
                         {/* Submit Button */}
-                        <div className="pt-4"> {/* Add padding top */}
+                        <div className="pt-4">
                             <button
                                 type="submit"
                                 disabled={isLoading || !!successMessage} // Disable after success
@@ -155,14 +155,14 @@ function PartnerRegistrationForm({ onRegistrationSuccess, onBackToLogin }: Partn
             <style>{`
                 .input-style {
                     padding: 0.5rem 0.75rem;
-                    border: 1px solid #d1d5db; /* gray-300 */
-                    border-radius: 0.375rem; /* rounded-md */
-                    box-shadow: 0 1px 2px 0 rgba(0, 0, 0, 0.05); /* shadow-sm */
+                    border: 1px solid #d1d5db;
+                    border-radius: 0.375rem;
+                    box-shadow: 0 1px 2px 0 rgba(0, 0, 0, 0.05);
                 }
                 .input-style:focus {
                     outline: none;
-                    border-color: #6366f1; /* indigo-500 */
-                    box-shadow: 0 0 0 1px #6366f1; /* ring-indigo-500 */
+                    border-color: #6366f1;
+                    box-shadow: 0 0 0 1px #6366f1;
                 }
             `}</style>
         </div>

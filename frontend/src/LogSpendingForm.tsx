@@ -9,7 +9,7 @@ interface LogSpendingFormProps {
     // For now, it seems self-contained using the API which handles auth via token
 }
 
-function LogSpendingForm({ }: LogSpendingFormProps) { // Destructure props if added
+function LogSpendingForm({ }: LogSpendingFormProps) {
     // Mode state
     const [mode, setMode] = useState<Mode>('ai'); // Default to AI mode
 
@@ -59,7 +59,6 @@ function LogSpendingForm({ }: LogSpendingFormProps) { // Destructure props if ad
         // When switching to Manual, clear prompt (it's not used)
         if (mode === 'ai') {
             // Keep prompt, clear category if needed (though it's hidden)
-            // setSelectedCategory(''); // Optional: clear category state
         } else { // mode === 'manual'
             setPrompt(''); // Clear prompt when switching to manual
             // Ensure a category is selected if possible
@@ -97,16 +96,16 @@ function LogSpendingForm({ }: LogSpendingFormProps) { // Destructure props if ad
                 const aiPayload: AICategorizationPayload = {
                     amount: numericAmount,
                     prompt: prompt,
-                    pre_settled: preSettled, // Include pre-settled flag
+                    pre_settled: preSettled,
                 };
-                console.log("Submitting AI Payload:", aiPayload); // Debug log
+                console.log("Submitting AI Payload:", aiPayload);
                 await submitAICategorization(aiPayload);
                 setSuccessMessage(`Spending submitted for AI categorization ${preSettled ? '(pre-settled)' : ''}!`);
                 // Reset form for AI mode
                 setAmount('');
                 setPrompt('');
-                setPreSettled(false); // Reset pre-settled
-                setShowAdvanced(false); // Hide advanced options
+                setPreSettled(false);
+                setShowAdvanced(false);
 
             } else { // mode === 'manual'
                 // Manual Mode Validation
@@ -120,18 +119,16 @@ function LogSpendingForm({ }: LogSpendingFormProps) { // Destructure props if ad
                     amount: numericAmount,
                     category: selectedCategory,
                     shared_status: sharedStatus,
-                    pre_settled: preSettled, // Include pre-settled flag
+                    pre_settled: preSettled,
                 };
-                console.log("Submitting Manual Payload:", manualPayload); // Debug log
+                console.log("Submitting Manual Payload:", manualPayload);
                 await submitManualPayment(manualPayload);
                 setSuccessMessage(`Manual payment submitted successfully ${preSettled ? '(pre-settled)' : ''}!`);
                 // Reset form for Manual mode
                 setAmount('');
-                setPreSettled(false); // Reset pre-settled
-                setShowAdvanced(false); // Hide advanced options
+                setPreSettled(false);
+                setShowAdvanced(false);
                 // Keep selected category and shared status? Or reset?
-                // setSelectedCategory(categories.length > 0 ? categories[0].name : '');
-                // setSharedStatus('alone');
             }
         } catch (err) {
             console.error(`Failed to submit in ${mode} mode:`, err);
@@ -152,9 +149,8 @@ function LogSpendingForm({ }: LogSpendingFormProps) { // Destructure props if ad
 
 
     return (
-        // Remove p-6, add p-4 inside for content spacing
         <div className="bg-white shadow-md rounded-lg w-full max-w-md">
-            <div className="p-4"> {/* Add inner padding */}
+            <div className="p-4">
                 <h1 className="text-2xl font-bold mb-4 text-center text-gray-700">Log Spending</h1>
 
                 {/* Mode Switcher (Tabs) */}
@@ -263,19 +259,6 @@ function LogSpendingForm({ }: LogSpendingFormProps) { // Destructure props if ad
                             <span className="ml-2 text-sm text-gray-700">Shared</span>
                           </label>
                           {/* Add 'mix' if/when backend supports it properly via pay endpoint */}
-                          {/*
-                         <label className="inline-flex items-center">
-                           <input
-                             type="radio"
-                             name="sharedStatus"
-                             value="mix"
-                             checked={sharedStatus === 'mix'}
-                             onChange={() => setSharedStatus('mix')}
-                             className="form-radio h-4 w-4 text-indigo-600"
-                           />
-                           <span className="ml-2 text-sm text-gray-700">Mix</span>
-                         </label>
-                         */}
                       </div>
                   </div>
                 )}
@@ -316,7 +299,7 @@ function LogSpendingForm({ }: LogSpendingFormProps) { // Destructure props if ad
 
 
                 {/* Submit Button (Common) */}
-                <div className="pt-4"> {/* Add padding top */}
+                <div className="pt-4">
                     <button
                         type="submit"
                         disabled={isSubmitDisabled}
@@ -326,7 +309,7 @@ function LogSpendingForm({ }: LogSpendingFormProps) { // Destructure props if ad
                         </button>
                     </div>
                 </form>
-            </div> {/* Close inner padding div */}
+            </div>
         </div>
     );
 }

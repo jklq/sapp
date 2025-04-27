@@ -56,7 +56,8 @@ function TransferPage({ onBack }: TransferPageProps) {
 
     // Helper to format currency
     const formatCurrency = (amount: number) => {
-        return amount.toLocaleString(undefined, { style: 'currency', currency: 'NOK' }); // Adjust currency code if needed
+        // Adjust currency code if needed
+        return amount.toLocaleString(undefined, { style: 'currency', currency: 'NOK' });
     };
 
     const renderStatus = () => {
@@ -71,12 +72,11 @@ function TransferPage({ onBack }: TransferPageProps) {
         }
 
         let statusText = '';
-        let statusColor = 'text-gray-700'; // Default color
+        let statusColor = 'text-gray-700';
 
         if (status.owed_by && status.owed_to) {
             // Someone owes someone
             statusText = `${status.owed_by} owes ${status.owed_to} ${formatCurrency(status.amount_owed)}`;
-            // Status text now uses names directly from backend response
             statusColor = 'text-orange-600'; // Indicate money needs to change hands
         } else {
             // Settled up
@@ -94,10 +94,9 @@ function TransferPage({ onBack }: TransferPageProps) {
     const canRecordTransfer = status && (status.owed_by !== null || status.owed_to !== null);
 
     return (
-        // Remove p-6, add p-4 inside
         <div className="bg-white shadow-md rounded-lg w-full max-w-md">
-             <div className="p-4"> {/* Add inner padding */}
-                <div className="flex flex-wrap justify-between items-center mb-6 gap-2"> {/* Allow wrapping */}
+             <div className="p-4">
+                <div className="flex flex-wrap justify-between items-center mb-6 gap-2">
                     <h1 className="text-2xl font-bold text-gray-700">Transfer Status</h1>
                     <button
                     onClick={onBack}
@@ -127,7 +126,7 @@ function TransferPage({ onBack }: TransferPageProps) {
                 <p className="text-xs text-gray-500 mt-4 text-center italic">
                     This action marks all currently shared expenses between you and {status?.partner_name || 'your partner'} as settled. It assumes the necessary bank transfer has been made outside of this app. {/* Use partner name */}
                 </p>
-            </div> {/* Close inner padding div */}
+            </div>
         </div>
     );
 }

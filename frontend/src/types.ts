@@ -3,11 +3,11 @@ export interface Category {
   name: string;
 }
 
-// Payload for manual payment submission (now uses JSON body)
+// Payload for manual payment submission
 export interface PayPayload {
   shared_status: 'alone' | 'shared'; // Backend currently only supports these
   amount: number;
-  category: string; // Category name
+  category: string;
   pre_settled?: boolean; // Optional: Flag to mark as settled immediately
 }
 
@@ -38,7 +38,7 @@ export interface SpendingDetail {
   amount: number;
   description: string;
   category_name: string;
-  created_at: string; // ISO date string
+  created_at: string;
   buyer_name: string;
   partner_name: string | null; // Can be null if not shared or partner name missing
   shared_user_takes_all: boolean;
@@ -65,11 +65,11 @@ export interface TransactionGroup {
   job_id: number;
   prompt: string;
   total_amount: number;
-  job_created_at: string; // ISO date string for the job creation
-  buyer_name: string; // Added: Name of the user who submitted the job
+  job_created_at: string;
+  buyer_name: string;
   is_ambiguity_flagged: boolean;
   ambiguity_flag_reason: string | null;
-  spendings: SpendingItem[]; // The list of individual spendings for this job
+  spendings: SpendingItem[];
 }
 
 // Type for the response from the updated /v1/spendings endpoint
@@ -97,7 +97,7 @@ export interface TransferStatusResponse {
   owed_to: string | null; // Name of the person who is owed (null if settled)
 }
 
-// --- Types for Partner Registration --- are defined above now ---
+// --- Types for Partner Registration ---
 
 // Details for registering a single user within the partner registration form
 export interface UserRegistrationDetails {
@@ -126,14 +126,14 @@ export interface PartnerRegistrationResponse {
 // It includes the original template ID.
 export interface DepositItem {
   id: number; // ID of the original template
-  type: 'deposit'; // Identifier
+  type: 'deposit';
   amount: number;
   description: string;
-  date: string; // ISO date string
+  date: string;
   is_recurring: boolean; // True if generated from a recurring template
   recurrence_period: string | null; // Period of the template
   end_date?: string | null; // Optional: End date of the template (ISO date string or null)
-  created_at: string; // ISO date string of the template creation
+  created_at: string;
 }
 
 // Payload for adding a new deposit
@@ -153,7 +153,7 @@ export interface AddDepositResponse {
 
 // Payload for updating an existing deposit template
 export interface UpdateDepositPayload {
-    amount?: number; // Optional fields
+    amount?: number;
     description?: string;
     deposit_date?: string; // Format: "YYYY-MM-DD"
     is_recurring?: boolean;
@@ -172,8 +172,6 @@ export interface DepositTemplate extends DepositItem {
     // Add any fields specific to the template view if needed
 }
 
-
-// --- Type for Combined History ---
 
 // --- Type for Combined History ---
 

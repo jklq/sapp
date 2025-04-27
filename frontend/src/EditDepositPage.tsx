@@ -1,6 +1,6 @@
 import { useState, useEffect, FormEvent, useCallback } from 'react';
 import { fetchDepositById, updateDeposit } from './api';
-import { DepositTemplate, UpdateDepositPayload } from './types'; // Use DepositTemplate for full details
+import { DepositTemplate, UpdateDepositPayload } from './types';
 
 interface EditDepositPageProps {
     depositId: number;
@@ -24,19 +24,19 @@ const formatDateForInput = (date: Date | string | null | undefined): string => {
 
 
 function EditDepositPage({ depositId, onBack }: EditDepositPageProps) {
-    // Form field states - initialize empty, populate after fetch
+    // Form field states
     const [amount, setAmount] = useState<string>('');
     const [description, setDescription] = useState<string>('');
     const [depositDate, setDepositDate] = useState<string>('');
     const [isRecurring, setIsRecurring] = useState<boolean>(false);
-    const [recurrencePeriod, setRecurrencePeriod] = useState<string>('monthly'); // Default
+    const [recurrencePeriod, setRecurrencePeriod] = useState<string>('monthly');
     const [endDate, setEndDate] = useState<string>(''); // Store as 'YYYY-MM-DD' string
 
     // UI states
-    const [isLoading, setIsLoading] = useState<boolean>(true); // Loading initial data
-    const [isSaving, setIsSaving] = useState<boolean>(false); // Saving changes
-    const [error, setError] = useState<string | null>(null); // General/fetch error
-    const [saveError, setSaveError] = useState<string | null>(null); // Save-specific error
+    const [isLoading, setIsLoading] = useState<boolean>(true);
+    const [isSaving, setIsSaving] = useState<boolean>(false);
+    const [error, setError] = useState<string | null>(null);
+    const [saveError, setSaveError] = useState<string | null>(null);
     const [successMessage, setSuccessMessage] = useState<string | null>(null);
 
     // Fetch deposit data
@@ -50,10 +50,10 @@ function EditDepositPage({ depositId, onBack }: EditDepositPageProps) {
             .then((data: DepositTemplate) => {
                 setAmount(data.amount.toString());
                 setDescription(data.description);
-                setDepositDate(formatDateForInput(data.deposit_date)); // Format date for input
+                setDepositDate(formatDateForInput(data.deposit_date));
                 setIsRecurring(data.is_recurring);
-                setRecurrencePeriod(data.recurrence_period || 'monthly'); // Default if null
-                setEndDate(formatDateForInput(data.end_date)); // Format optional end date
+                setRecurrencePeriod(data.recurrence_period || 'monthly');
+                setEndDate(formatDateForInput(data.end_date));
             })
             .catch(err => {
                 console.error(`Failed to fetch deposit ${depositId}:`, err);
@@ -98,7 +98,7 @@ function EditDepositPage({ depositId, onBack }: EditDepositPageProps) {
         // Validate end date format if provided
         if (endDate) {
             try {
-                new Date(endDate).toISOString(); // Basic check
+                new Date(endDate).toISOString();
             } catch (e) {
                 setSaveError('Invalid end date format. Use YYYY-MM-DD.');
                 setIsSaving(false);
@@ -106,14 +106,13 @@ function EditDepositPage({ depositId, onBack }: EditDepositPageProps) {
             }
         }
 
-        // Construct payload with only the fields to be updated
-        // Note: The backend handler should ideally fetch the current state and merge,
-        // but the frontend can send only changed fields or the full state.
-        // Sending the full state based on the form is simpler here.
+        // Construct payload with the full state based on the form.
+        // The backend handler should ideally fetch the current state and merge,
+        // but sending the full state is simpler here.
         const payload: UpdateDepositPayload = {
             amount: numericAmount,
             description: description.trim(),
-            deposit_date: depositDate, // Send as YYYY-MM-DD
+            deposit_date: depositDate,
             is_recurring: isRecurring,
             // Send period only if recurring, otherwise send null/undefined based on API expectation
             recurrence_period: isRecurring ? recurrencePeriod : null,

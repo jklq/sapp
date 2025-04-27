@@ -5,7 +5,6 @@ import {
     AICategorizationPayload,
     LoginPayload,
     LoginResponse,
-    // UserRegistrationDetails is unused in this file
     PartnerRegistrationPayload,
     PartnerRegistrationResponse,
     AddDepositPayload,
@@ -13,11 +12,13 @@ import {
     UpdateSpendingPayload,
     TransferStatusResponse,
     HistoryResponse,
-    // EditableSharingStatus is used internally in UpdateSpendingPayload, no direct import needed here
+    DepositTemplate, // Added for fetchDepositById and updateDeposit
+    UpdateDepositPayload, // Added for updateDeposit
+    DeleteDepositResponse, // Added for deleteDeposit
 } from './types';
 
 // --- Constants ---
-const AUTH_TOKEN_KEY = 'authToken'; // Define the key for localStorage
+const AUTH_TOKEN_KEY = 'authToken';
 // Use environment variable for API base URL, fallback for development
 const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || 'http://localhost:3000';
 
@@ -32,7 +33,7 @@ export function getToken(): string | null {
 }
 
 export function removeToken(): void {
-    localStorage.removeItem(AUTH_TOKEN_KEY); // Correct implementation
+    localStorage.removeItem(AUTH_TOKEN_KEY);
 }
 
 // --- Core Fetch Wrapper ---
@@ -68,13 +69,12 @@ export async function fetchCategories(): Promise<Category[]> {
     return await response.json();
 }
 
-// Refactored to send JSON body instead of using path parameters
 export async function submitManualPayment(payload: PayPayload): Promise<void> {
-    const url = `${API_BASE_URL}/v1/pay`; // Use base path
+    const url = `${API_BASE_URL}/v1/pay`;
 
     const response = await fetchWithAuth(url, {
         method: "POST",
-        body: JSON.stringify(payload), // Send payload as JSON body
+        body: JSON.stringify(payload),
         // fetchWithAuth will set Content-Type: application/json
     });
 
@@ -101,7 +101,7 @@ export async function submitAICategorization(payload: AICategorizationPayload): 
 
     const response = await fetchWithAuth(url, {
         method: "POST",
-        body: JSON.stringify(payload), // Include pre_settled flag if present
+        body: JSON.stringify(payload),
         // fetchWithAuth will set Content-Type: application/json
     });
 
@@ -126,13 +126,12 @@ export async function submitAICategorization(payload: AICategorizationPayload): 
     // The backend currently returns the job_id in the body on 202
     // You might want to parse and return this if the frontend needs it
     // const data = await response.json();
-    // return data.job_id; // Example
+    // return data.job_id;
 }
 
 
 // --- Auth API Functions ---
 
-// New function: Logs in the user
 export async function loginUser(payload: LoginPayload): Promise<LoginResponse> {
     const url = `${API_BASE_URL}/v1/login`;
 
@@ -164,7 +163,6 @@ export async function loginUser(payload: LoginPayload): Promise<LoginResponse> {
     return data;
 }
 
-// New function: Registers two users as partners
 export async function registerPartners(payload: PartnerRegistrationPayload): Promise<PartnerRegistrationResponse> {
     const url = `${API_BASE_URL}/v1/register/partners`;
 
@@ -209,7 +207,6 @@ export async function registerPartners(payload: PartnerRegistrationPayload): Pro
 
 // --- Deposit API Functions ---
 
-// Adds a new deposit record
 export async function addDeposit(payload: AddDepositPayload): Promise<AddDepositResponse> {
     const url = `${API_BASE_URL}/v1/deposits`;
     const response = await fetchWithAuth(url, {
@@ -239,10 +236,9 @@ export async function addDeposit(payload: AddDepositPayload): Promise<AddDeposit
     return data;
 }
 
-// Fetches details for a single deposit template
-export async function fetchDepositById(depositId: number): Promise<DepositTemplate> { // Use DepositTemplate type
+export async function fetchDepositById(depositId: number): Promise<DepositTemplate> {
     const url = `${API_BASE_URL}/v1/deposits/${depositId}`;
-    const response = await fetchWithAuth(url); // GET request
+    const response = await fetchWithAuth(url);
 
     if (!response.ok) {
         const errorBody = await response.text();
@@ -256,14 +252,14 @@ export async function fetchDepositById(depositId: number): Promise<DepositTempla
         throw new Error(errorMessage);
     }
 
-    const data: DepositTemplate = await response.json(); // Expect DepositTemplate structure
-    console.log("Fetched Deposit Details:", data); // Debug log
+    // Expect DepositTemplate structure
+    const data: DepositTemplate = await response.json();
+    console.log("Fetched Deposit Details:", data);
     return data;
 }
 
 
-// Updates an existing deposit template
-export async function updateDeposit(depositId: number, payload: UpdateDepositPayload): Promise<DepositTemplate> { // Return updated template
+export async function updateDeposit(depositId: number, payload: UpdateDepositPayload): Promise<DepositTemplate> {
     const url = `${API_BASE_URL}/v1/deposits/${depositId}`;
     const response = await fetchWithAuth(url, {
         method: "PUT",
@@ -288,7 +284,6 @@ export async function updateDeposit(depositId: number, payload: UpdateDepositPay
     return data.deposit;
 }
 
-// Deletes a deposit template
 export async function deleteDeposit(depositId: number): Promise<DeleteDepositResponse> {
     const url = `${API_BASE_URL}/v1/deposits/${depositId}`;
     const response = await fetchWithAuth(url, {
@@ -315,10 +310,9 @@ export async function deleteDeposit(depositId: number): Promise<DeleteDepositRes
 
 // --- History API Functions ---
 
-// Fetches combined history (spending groups and deposits)
 export async function fetchHistory(): Promise<HistoryResponse> {
-    const url = `${API_BASE_URL}/v1/history`; // Updated endpoint
-    const response = await fetchWithAuth(url); // GET request by default
+    const url = `${API_BASE_URL}/v1/history`;
+    const response = await fetchWithAuth(url);
 
     if (!response.ok) {
         const errorBody = await response.text();
@@ -326,11 +320,10 @@ export async function fetchHistory(): Promise<HistoryResponse> {
     }
 
     const data: HistoryResponse = await response.json();
-    console.log("Fetched History:", data); // Debug log
+    console.log("Fetched History:", data);
     return data;
 }
 
-// New function: Updates a specific spending item
 export async function updateSpendingItem(spendingId: number, payload: UpdateSpendingPayload): Promise<void> {
     const url = `${API_BASE_URL}/v1/spendings/${spendingId}`;
 
@@ -361,7 +354,6 @@ export async function updateSpendingItem(spendingId: number, payload: UpdateSpen
     }
 }
 
-// New function: Deletes an AI job and its associated spendings
 export async function deleteAIJob(jobId: number): Promise<void> {
     const url = `${API_BASE_URL}/v1/jobs/${jobId}`;
 
@@ -393,10 +385,9 @@ export async function deleteAIJob(jobId: number): Promise<void> {
 
 // --- Transfer API Functions ---
 
-// Fetches the current transfer status between the user and partner
 export async function fetchTransferStatus(): Promise<TransferStatusResponse> {
     const url = `${API_BASE_URL}/v1/transfer/status`;
-    const response = await fetchWithAuth(url); // GET request
+    const response = await fetchWithAuth(url);
 
     if (!response.ok) {
         const errorBody = await response.text();
@@ -411,11 +402,10 @@ export async function fetchTransferStatus(): Promise<TransferStatusResponse> {
     }
 
     const data: TransferStatusResponse = await response.json();
-    console.log("Fetched Transfer Status:", data); // Debug log
+    console.log("Fetched Transfer Status:", data);
     return data;
 }
 
-// Records that a transfer/settlement has occurred
 export async function recordTransfer(): Promise<void> {
     const url = `${API_BASE_URL}/v1/transfer/record`;
     const response = await fetchWithAuth(url, { method: "POST" });
