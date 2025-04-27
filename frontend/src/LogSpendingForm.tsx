@@ -95,8 +95,10 @@ function LogSpendingForm({ }: LogSpendingFormProps) {
 
                 const aiPayload: AICategorizationPayload = {
                     amount: numericAmount,
-                    prompt: prompt,
+                    prompt: prompt.trim(), // Trim prompt
                     pre_settled: preSettled,
+                    // Add spendingDate if it's not today or if it's explicitly set
+                    transaction_date: spendingDate !== new Date().toISOString().split('T')[0] ? spendingDate : undefined,
                 };
                 console.log("Submitting AI Payload:", aiPayload);
                 await submitAICategorization(aiPayload);
@@ -105,6 +107,7 @@ function LogSpendingForm({ }: LogSpendingFormProps) {
                 setAmount('');
                 setPrompt('');
                 setPreSettled(false);
+                setSpendingDate(new Date().toISOString().split('T')[0]); // Reset date
                 setShowAdvanced(false);
 
             } else { // mode === 'manual'
@@ -120,6 +123,8 @@ function LogSpendingForm({ }: LogSpendingFormProps) {
                     category: selectedCategory,
                     shared_status: sharedStatus,
                     pre_settled: preSettled,
+                    // Add spendingDate if it's not today or if it's explicitly set
+                    spending_date: spendingDate !== new Date().toISOString().split('T')[0] ? spendingDate : undefined,
                 };
                 console.log("Submitting Manual Payload:", manualPayload);
                 await submitManualPayment(manualPayload);
@@ -127,8 +132,10 @@ function LogSpendingForm({ }: LogSpendingFormProps) {
                 // Reset form for Manual mode
                 setAmount('');
                 setPreSettled(false);
+                setSpendingDate(new Date().toISOString().split('T')[0]); // Reset date
                 setShowAdvanced(false);
-                // Keep selected category and shared status? Or reset?
+                // Keep selected category and shared status? Or reset? Resetting category for now.
+                if (categories.length > 0) setSelectedCategory(categories[0].name);
             }
         } catch (err) {
             console.error(`Failed to submit in ${mode} mode:`, err);
@@ -293,6 +300,20 @@ function LogSpendingForm({ }: LogSpendingFormProps) {
                                 <label htmlFor="pre-settled" className="font-medium text-gray-700">Mark as Pre-settled</label>
                                 <p className="text-xs text-gray-500">Check this if the cost is already accounted for and should not affect the transfer balance with your partner.</p>
                             </div>
+                        </div>
+
+                        {/* Spending Date Input */}
+                        <div>
+                            <label htmlFor="spending-date" className="block text-sm font-medium text-gray-700">Spending Date</label>
+                            <input
+                                type="date"
+                                id="spending-date"
+                                value={spendingDate}
+                                onChange={(e) => setSpendingDate(e.target.value)}
+                                required
+                                className="mt-1 block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-indigo-500 focus:border-indigo-500 sm:text-sm"
+                            />
+                             <p className="mt-1 text-xs text-gray-500">Defaults to today. Change if the spending occurred on a different date.</p>
                         </div>
                     </div>
                 )}
