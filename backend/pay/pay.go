@@ -8,6 +8,13 @@ import (
 	"strconv"
 	"time" // Added time for potential use with settled_at
 
+	"encoding/json" // Added encoding/json
+	"errors"        // Import errors package
+	"log/slog"
+	"net/http"
+	// "strconv" // Removed strconv
+	"time" // Added time for potential use with settled_at
+
 	"git.sr.ht/~relay/sapp-backend/auth" // Import auth package
 )
 
@@ -30,6 +37,22 @@ func HandlePayRoute(db *sql.DB) http.HandlerFunc { // Return http.HandlerFunc di
 			return
 		}
 
+		// Decode JSON payload from request body
+		var payload PayPayload
+		if err := json.NewDecoder(r.Body).Decode(&payload); err != nil {
+			slog.Error("failed to decode pay request body", "url", r.URL, "user_id", userID, "err", err)
+			http.Error(w, "Bad Request: Invalid JSON", http.StatusBadRequest)
+			return
+		}
+		defer r.Body.Close()
+
+		// Validate payload amount
+		if payload.Amount <= 0 {
+			slog.Warn("non-positive amount received", "url", r.URL, "user_id", userID, "amount", payload.Amount)
+			http.Error(w, "Amount must be positive", http.StatusBadRequest)
+			return
+		}
+
 		tx, err := db.Begin()
 		if err != nil {
 			slog.Error("failed to begin transaction", "url", r.URL, "user_id", userID, "err", err)
@@ -40,8 +63,8 @@ func HandlePayRoute(db *sql.DB) http.HandlerFunc { // Return http.HandlerFunc di
 
 		var shared_with_id *int64 // Use *int64 for nullable foreign key
 
-		sharedStatus := r.PathValue("shared_status")
-		switch sharedStatus {
+		// Determine shared_with_id based on payload.SharedStatus
+		switch payload.SharedStatus {
 		case "alone":
 			shared_with_id = nil
 		case "shared":
@@ -49,7 +72,6 @@ func HandlePayRoute(db *sql.DB) http.HandlerFunc { // Return http.HandlerFunc di
 			partnerID, partnerOk := auth.GetPartnerUserID(tx, userID) // Pass transaction tx
 			if !partnerOk {
 				// Check if GetPartnerUserID logged the error already
-				// slog.Error("could not determine partner user ID for sharing", "url", r.URL, "user_id", userID)
 				http.Error(w, "Cannot share: Partner not found or not configured for this user.", http.StatusBadRequest)
 				return
 			}
@@ -68,45 +90,30 @@ func HandlePayRoute(db *sql.DB) http.HandlerFunc { // Return http.HandlerFunc di
 			}
 			shared_with_id = &partnerID // Assign the partner ID
 		default:
-			slog.Warn("invalid shared status received", "url", r.URL, "user_id", userID, "status", sharedStatus)
+			slog.Warn("invalid shared status received", "url", r.URL, "user_id", userID, "status", payload.SharedStatus)
 			http.Error(w, "Invalid shared status.", http.StatusBadRequest)
 			return
 		}
 
-		amountStr := r.PathValue("amount")
-		amount, err := strconv.ParseFloat(amountStr, 64)
-		if err != nil {
-			slog.Error("parsing amount float failed", "url", r.URL, "user_id", userID, "amount_str", amountStr, "err", err)
-			http.Error(w, "Invalid amount format", http.StatusBadRequest)
-			return
-		}
-		if amount <= 0 {
-			slog.Warn("non-positive amount received", "url", r.URL, "user_id", userID, "amount", amount)
-			http.Error(w, "Amount must be positive", http.StatusBadRequest)
-			return
-		}
-
+		// Get category ID from payload.Category name
 		var category_id int64 // Category ID is integer
-		categoryName := r.PathValue("category")
-		row := tx.QueryRow("SELECT id FROM categories WHERE name = ? LIMIT 1", categoryName)
+		row := tx.QueryRow("SELECT id FROM categories WHERE name = ? LIMIT 1", payload.Category)
 		err = row.Scan(&category_id)
 		if err != nil {
 			if errors.Is(err, sql.ErrNoRows) {
-				slog.Warn("category not found", "url", r.URL, "user_id", userID, "category_name", categoryName)
+				slog.Warn("category not found", "url", r.URL, "user_id", userID, "category_name", payload.Category)
 				http.Error(w, "Category not found.", http.StatusBadRequest)
 				return
 			}
-			slog.Error("querying category failed", "url", r.URL, "user_id", userID, "category_name", categoryName, "err", err)
+			slog.Error("querying category failed", "url", r.URL, "user_id", userID, "category_name", payload.Category, "err", err)
 			http.Error(w, "Internal server error", http.StatusInternalServerError)
 			return
 		}
 
 		// Insert into spendings table (assuming manual pay creates a single 'spending')
-		// Note: The original code inserted into a 'transactions' table which doesn't exist in the schema.
-		// Adapting to insert into 'spendings' and 'user_spendings' like the AI worker does.
 		spendingDesc := "Manual Entry" // Or potentially get description from frontend if added later
 		res, err := tx.Exec(`INSERT INTO spendings (amount, description, category, made_by)
-		VALUES (?,?,?,?)`, amount, spendingDesc, category_id, userID)
+		VALUES (?,?,?,?)`, payload.Amount, spendingDesc, category_id, userID)
 		if err != nil {
 			slog.Error("inserting spending failed", "url", r.URL, "user_id", userID, "err", err)
 			http.Error(w, "Internal server error", http.StatusInternalServerError)

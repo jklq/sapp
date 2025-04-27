@@ -49,6 +49,7 @@ type CategorizationParams struct {
 	Buyer       Person
 	SharedWith  *Person // Potential partner, AI decides if used. Populated by handler.
 	Prompt      string
+	PreSettled  bool // Added: Flag to indicate if the job's spendings should be settled immediately
 	tries       int
 }
 

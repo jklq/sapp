@@ -13,6 +13,7 @@ import (
 	"strings"
 
 	"git.sr.ht/~relay/sapp-backend/auth"
+	"git.sr.ht/~relay/sapp-backend/deposit" // Import deposit package
 )
 
 // EditableSharingStatus defines the possible states the frontend can send for updates.
@@ -46,10 +47,11 @@ type SpendingItem struct {
 
 // TransactionGroup represents a single purchase/submission, potentially containing multiple spending items.
 type TransactionGroup struct {
+	Type                string         `json:"type"` // Always "spending_group"
 	JobID               int64          `json:"job_id"` // ai_categorization_jobs.id
 	Prompt              string         `json:"prompt"`
 	TotalAmount         float64        `json:"total_amount"`
-	JobCreatedAt        time.Time      `json:"job_created_at"`
+	Date                time.Time      `json:"date"` // Use common field name 'date' (job creation time)
 	BuyerName           string         `json:"buyer_name"` // Added: Name of the user who submitted the job
 	IsAmbiguityFlagged  bool           `json:"is_ambiguity_flagged"`
 	AmbiguityFlagReason *string        `json:"ambiguity_flag_reason"` // Pointer to handle NULL/empty
@@ -62,8 +64,8 @@ type TransactionGroup struct {
 
 // HistoryResponse defines the structure for the combined history endpoint.
 type HistoryResponse struct {
-	SpendingGroups []TransactionGroup `json:"spending_groups"`
-	Deposits       []DepositItem      `json:"deposits"`
+	SpendingGroups []TransactionGroup    `json:"spending_groups"`
+	Deposits       []deposit.DepositItem `json:"deposits"` // Use qualified type
 }
 
 // HandleGetHistory returns an http.HandlerFunc that fetches both spendings (grouped by AI job)
@@ -81,7 +83,7 @@ func HandleGetHistory(db *sql.DB) http.HandlerFunc {
 
 		historyResponse := HistoryResponse{
 			SpendingGroups: []TransactionGroup{},
-			Deposits:       []DepositItem{},
+			Deposits:       []deposit.DepositItem{}, // Use qualified type
 		}
 
 		// 1. Fetch AI Categorization Jobs (Spending Groups) initiated by the user
@@ -235,7 +237,7 @@ func HandleGetHistory(db *sql.DB) http.HandlerFunc {
 
 		// 3. Fetch Deposits for the user
 		depositQuery := `
-			SELECT id, amount, description, deposit_date, is_recurring, recurrence_period, created_at
+			SELECT id, user_id, amount, description, deposit_date, is_recurring, recurrence_period, created_at
 			FROM deposits
 			WHERE user_id = ?
 			ORDER BY deposit_date DESC, created_at DESC;
@@ -249,12 +251,13 @@ func HandleGetHistory(db *sql.DB) http.HandlerFunc {
 		defer depositRows.Close()
 
 		for depositRows.Next() {
-			var d DepositItem
+			var d deposit.DepositItem // Use qualified type
 			d.Type = "deposit"        // Set type identifier
 			var depositDateStr string // Read date as string first
 
 			if err := depositRows.Scan(
 				&d.ID,
+				&d.UserID, // Scan UserID from DB (even if not directly used in response)
 				&d.Amount,
 				&d.Description,
 				&depositDateStr, // Scan into string
