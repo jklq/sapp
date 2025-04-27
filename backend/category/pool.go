@@ -62,12 +62,18 @@ func (p *CategorizingPool) AddJob(params CategorizationParams, transactionDate *
 		otherPersonInt = &params.SharedWith.Id
 	}
 
+	// Determine the date to insert: use provided date or current time if nil
+	dateToInsert := time.Now().UTC()
+	if transactionDate != nil {
+		dateToInsert = *transactionDate
+	}
+
 	// Store pre_settled flag and transaction_date in the job record
-	// Pass transactionDate directly (can be nil). DB column is transaction_date.
 	result, err := tx.Exec(`INSERT INTO ai_categorization_jobs (buyer, shared_with, prompt, total_amount, pre_settled, transaction_date, status)
-	VALUES (?, ?, ?, ?, ?, ?, ?)`, params.Buyer.Id, otherPersonInt, params.Prompt, params.TotalAmount, params.PreSettled, transactionDate, "pending")
+	VALUES (?, ?, ?, ?, ?, ?, ?)`, params.Buyer.Id, otherPersonInt, params.Prompt, params.TotalAmount, params.PreSettled, dateToInsert, "pending")
 	if err != nil {
-		slog.Error("error inserting ai categorization job", "error", err, "pre_settled", params.PreSettled, "transaction_date", transactionDate)
+		// Log the date that was attempted
+		slog.Error("error inserting ai categorization job", "error", err, "pre_settled", params.PreSettled, "transaction_date_attempted", dateToInsert)
 		return 0, err
 	}
 

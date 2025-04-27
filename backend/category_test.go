@@ -112,6 +112,16 @@ func TestAICategorize(t *testing.T) {
 		if dbPreSettled != false {
 			t.Errorf("DB pre_settled mismatch: got %v, want false", dbPreSettled)
 		}
+		// Verify transaction_date was set to current time (since none was provided)
+		var dbDate time.Time
+		err = env.DB.QueryRow("SELECT transaction_date FROM ai_categorization_jobs WHERE id = ?", jobID).Scan(&dbDate)
+		if err != nil {
+			t.Fatalf("Failed to query created job for transaction_date: %v", err)
+		}
+		// Check if the time is recent (e.g., within the last 10 seconds)
+		if time.Since(dbDate.UTC()) > 10*time.Second {
+			t.Errorf("Expected recent transaction_date (default), got %v", dbDate)
+		}
 	})
 
 	// --- Test Case: Successful Submission (Pre-settled with Date) ---
