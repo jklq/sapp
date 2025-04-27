@@ -399,9 +399,6 @@ func HandleUpdateDeposit(db *sql.DB) http.HandlerFunc {
 		}
 		args = append(args, depositID) // Add depositID for WHERE clause
 
-		updateQuery := fmt.Sprintf("UPDATE deposits SET %s WHERE id = $%d",
-			strings.Join(setClauses, ", "), argIdx) // This was the unused PostgreSQL query string
-
 		// Rebuild query and args for SQLite format (?)
 		setClausesSQLite := []string{}
 		argsSQLite := []interface{}{}
