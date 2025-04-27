@@ -1,7 +1,8 @@
-import { useState, useEffect, useCallback, useMemo } from 'react';
+import { useState, useEffect, useCallback } from 'react'; // Removed useMemo
 import { fetchHistory, fetchCategories, updateSpendingItem, deleteAIJob } from './api';
 // Import types. HistoryListItem now contains flattened data.
-import { Category, UpdateSpendingPayload, EditableSharingStatus, HistoryResponse, HistoryListItem, SpendingItem } from './types';
+// Removed unused HistoryResponse import
+import { Category, UpdateSpendingPayload, EditableSharingStatus, HistoryListItem, SpendingItem } from './types';
 
 interface HistoryListProps {
     onBack: () => void;
@@ -163,7 +164,7 @@ function HistoryList({ onBack }: HistoryListProps) {
         setDeletingJobId(jobId);
         setDeleteError(null);
 
-        try {
+        try { // Added missing try block
             await deleteAIJob(jobId);
             // Option 1: Refetch all data
             loadData();
@@ -513,7 +514,8 @@ function HistoryList({ onBack }: HistoryListProps) {
                                                     </tr>
                                                 </thead>
                                                 <tbody className="hidden md:table-row-group">
-                                                    {spendings.map(sp => renderSpendingItemRow(sp, partnerNameFromGroup))}
+                                                    {/* Added type annotation for sp */}
+                                                    {spendings.map((sp: SpendingItem) => renderSpendingItemRow(sp, partnerNameFromGroup))}
                                                     {spendings.length === 0 && (
                                                         <tr className="md:table-row">
                                                             <td colSpan={5} className="md:table-cell px-4 py-3 text-center text-sm text-gray-500 italic">No spending items generated for this job.</td>
@@ -522,7 +524,8 @@ function HistoryList({ onBack }: HistoryListProps) {
                                                 </tbody>
                                             </table>
                                             <div className="md:hidden space-y-3 p-2 bg-gray-50">
-                                                 {spendings.map(sp => renderSpendingItemRow(sp, partnerNameFromGroup))}
+                                                 {/* Added type annotation for sp */}
+                                                 {spendings.map((sp: SpendingItem) => renderSpendingItemRow(sp, partnerNameFromGroup))}
                                                  {spendings.length === 0 && (
                                                     <div className="px-4 py-3 text-center text-sm text-gray-500 italic">No spending items generated for this job.</div>
                                                 )}
