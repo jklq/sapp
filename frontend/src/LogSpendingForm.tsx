@@ -5,7 +5,7 @@ import { Category, PayPayload, AICategorizationPayload } from './types';
 type Mode = 'ai' | 'manual';
 
 interface LogSpendingFormProps {
-    // Add any props needed from App, e.g., user info if required by the form directly
+    
     // For now, it seems self-contained using the API which handles auth via token
 }
 
