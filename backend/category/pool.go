@@ -487,7 +487,7 @@ func (p *CategorizingPool) updateJobStatus(jobID int64, status string, jobErr er
 	}
 
 
-	_, err := p.db.Exec(`UPDATE ai_categorization_jobs SET status = ?, error_message = ?, is_finished = ?, updated_at = CURRENT_TIMESTAMP WHERE id = ?`,
+	_, err := p.db.Exec(`UPDATE ai_categorization_jobs SET status = ?, error_message = ?, is_finished = ?, status_updated_at = CURRENT_TIMESTAMP WHERE id = ?`,
 		status, errMsg, isFinished, jobID)
 	if err != nil {
 		slog.Error("Failed to update job status in database", "job_id", jobID, "new_status", status, "update_err", err)
@@ -510,7 +510,7 @@ func (p *CategorizingPool) updateJobStatusAndAmbiguity(jobID int64, status strin
 
 
 	_, err := p.db.Exec(`UPDATE ai_categorization_jobs
-		SET status = ?, error_message = ?, is_finished = ?, is_ambiguity_flagged = ?, ambiguity_flag_reason = ?, updated_at = CURRENT_TIMESTAMP
+		SET status = ?, error_message = ?, is_finished = ?, is_ambiguity_flagged = ?, ambiguity_flag_reason = ?, status_updated_at = CURRENT_TIMESTAMP
 		WHERE id = ?`,
 		status, errMsg, isFinished, isAmbiguous, ambiguityReason, jobID)
 	if err != nil {

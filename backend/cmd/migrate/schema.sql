@@ -52,6 +52,7 @@ CREATE TABLE IF NOT EXISTS ai_categorization_jobs (
     is_finished BOOLEAN DEFAULT 0,
     is_ambiguity_flagged BOOLEAN DEFAULT 0,
     ambiguity_flag_reason TEXT,
+    error_message TEXT, -- Added: Store error messages if job fails
     pre_settled BOOLEAN DEFAULT 0, -- Added: Flag to indicate if the job's spendings should be settled immediately
     transaction_date DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP, -- Date the transaction(s) in the prompt occurred
     created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
