@@ -40,7 +40,9 @@ func main() {
 	_ = godotenv.Load() // Load environment variables from .env file
 
 	// Setup logging
-	logHandler := slog.NewTextHandler(os.Stderr, nil)
+	logHandler := slog.NewTextHandler(os.Stderr, &slog.HandlerOptions{
+		Level: slog.LevelDebug,
+	})
 	logger := slog.New(logHandler)
 	slog.SetDefault(logger)
 
@@ -77,7 +79,7 @@ func main() {
 	// --- Create the real ModelAPI implementation ---
 	openRouterAPIKey := os.Getenv("OPENROUTER_KEY")
 	// Note: Consider adding more robust configuration for model name
-	openRouterModel := "deepseek/deepseek-chat"
+	openRouterModel := "x-ai/grok-3-mini-beta"
 	if openRouterAPIKey == "" {
 		slog.Warn("OPENROUTER_KEY environment variable not set. AI categorization will likely fail.")
 		// Depending on requirements, you might want to os.Exit(1) here
@@ -106,7 +108,7 @@ func main() {
 	payHandler := http.HandlerFunc(pay.HandlePayRoute(db))
 	getCategoriesHandler := http.HandlerFunc(category.HandleGetCategories(db))
 	categorizeHandler := http.HandlerFunc(category.HandleAICategorize(db, &categorizationPool)) // Pass pointer to pool
-	getHistoryHandler := http.HandlerFunc(spendings.HandleGetHistory(db)) // Use spendings.HandleGetHistory which internally uses history service
+	getHistoryHandler := http.HandlerFunc(spendings.HandleGetHistory(db))                       // Use spendings.HandleGetHistory which internally uses history service
 	updateSpendingHandler := http.HandlerFunc(spendings.HandleUpdateSpending(db))
 	getTransferStatusHandler := http.HandlerFunc(transfer.HandleGetTransferStatus(db)) // Create handler for transfer status
 	recordTransferHandler := http.HandlerFunc(transfer.HandleRecordTransfer(db))       // Create handler for recording transfer
