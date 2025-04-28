@@ -54,15 +54,15 @@ Eksempler på hvordan 'apportion_mode' skal bestemmes fra beskrivelsen:
 1. Beskrivelse: "Redbull til meg for 25kr, og resten er delt middag", Totalbeløp: 100kr, Kjøper: %s, Partner: %s
    -> [{"apportion_mode":"alone", "category":"...", "amount":25.0, "description":"Redbull"}, {"apportion_mode":"shared", "category":"...", "amount":75.0, "description":"Middag"}]
 2. Beskrivelse: "Billetter", Totalbeløp: 500kr, Kjøper: %s, Partner: %s
-   -> [{"apportion_mode":"alone", "category":"...", "amount":500.0, "description":"Billetter"}] (Fordi deling ikke er nevnt)
+   -> [{"apportion_mode":"alone", "category":"...", "amount":500.0, "description":"Billetter"}] (Standard: Anta 'alone' hvis deling ikke er nevnt)
 3. Beskrivelse: "Brød til %s", Totalbeløp: 40kr, Kjøper: %s, Partner: %s
    -> [{"apportion_mode":"other", "category":"...", "amount":40.0, "description":"Brød"}] (Fordi det er spesifikt til partneren)
 4. Beskrivelse: "Delt lunsj", Totalbeløp: 200kr, Kjøper: %s, Partner: %s
    -> [{"apportion_mode":"shared", "category":"...", "amount":200.0, "description":"Lunsj"}]
 5. Beskrivelse: "Dagligvarer", Totalbeløp: 350kr, Kjøper: %s, Partner: %s
-   -> [{"apportion_mode":"shared", "category":"Groceries", "amount":350.0, "description":"Dagligvarer"}] (Anta delt hvis partner finnes og ikke annet er spesifisert for felleskategorier som Groceries)
+   -> [{"apportion_mode":"shared", "category":"Groceries", "amount":350.0, "description":"Dagligvarer"}] (Standard for Groceries: Anta 'shared' hvis partner finnes og ikke annet er spesifisert)
 6. Beskrivelse: "Genser", Totalbeløp: 600kr, Kjøper: %s, Partner: %s
-   -> [{"apportion_mode":"alone", "category":"Shopping", "amount":600.0, "description":"Genser"}] (Anta personlig hvis ikke annet er spesifisert for ting som klær)
+   -> [{"apportion_mode":"alone", "category":"Shopping", "amount":600.0, "description":"Genser"}] (Standard for personlige ting: Anta 'alone' hvis deling ikke er nevnt)
 7. Beskrivelse: "Flybilletter til oss", Totalbeløp: 2000kr, Kjøper: %s, Partner: %s
    -> [{"apportion_mode":"shared", "category":"Transport", "amount":2000.0, "description":"Flybilletter"}]
 
