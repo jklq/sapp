@@ -14,7 +14,8 @@ import {
   DepositTemplate,
   UpdateDepositPayload,
   DeleteDepositResponse,
-  CategorySpendingStat, // Import the type needed for the new function
+  CategorySpendingStat,
+  DepositStatsResponse, // Import the type for deposit stats
 } from "./types";
 
 // --- Constants ---
@@ -457,6 +458,37 @@ export async function fetchSpendingStats(startDate: string, endDate: string): Pr
 
     const data: CategorySpendingStat[] = await response.json();
     console.log("Fetched Spending Stats:", data);
+    return data;
+}
+
+// Fetches deposit stats for a given date range.
+// Dates should be in "YYYY-MM-DD" format.
+export async function fetchDepositStats(startDate: string, endDate: string): Promise<DepositStatsResponse> {
+    const dateRegex = /^\d{4}-\d{2}-\d{2}$/;
+    if (!dateRegex.test(startDate) || !dateRegex.test(endDate)) {
+        throw new Error("Invalid date format. Use YYYY-MM-DD.");
+    }
+
+    const url = new URL(`${API_BASE_URL}/v1/stats/deposits`);
+    url.searchParams.append('startDate', startDate);
+    url.searchParams.append('endDate', endDate);
+
+    const response = await fetchWithAuth(url.toString());
+
+    if (!response.ok) {
+        const errorBody = await response.text();
+        let errorMessage = `Failed to fetch deposit stats: ${response.statusText}`;
+        try {
+            const errData = JSON.parse(errorBody);
+            errorMessage = errData.message || errData.error || errorMessage;
+        } catch /* (e) */ {
+            errorMessage += ` - ${errorBody}`;
+        }
+        throw new Error(errorMessage);
+    }
+
+    const data: DepositStatsResponse = await response.json();
+    console.log("Fetched Deposit Stats:", data);
     return data;
 }
 

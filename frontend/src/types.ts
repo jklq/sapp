@@ -192,8 +192,14 @@ export interface HistoryResponse {
 
 // --- Stats Types ---
 
-// Represents the data for one category slice in the stats endpoint
+// Represents the data for one category slice in the spending stats endpoint
 export interface CategorySpendingStat {
     category_name: string;
     total_amount: number;
+}
+
+// Response from the GET /v1/stats/deposits endpoint
+export interface DepositStatsResponse {
+    total_amount: number;
+    count: number; // Number of deposit occurrences included in the sum
 }
