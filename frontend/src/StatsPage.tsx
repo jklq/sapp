@@ -70,13 +70,8 @@ function StatsPage({ onBack }: StatsPageProps) {
                 setStatsData([]); // Clear data on error
             })
             .finally(() => {
-                // setError(err instanceof Error ? err.message : 'Failed to load stats.');
-                // Set error state, ensuring it's a string
-                const errorMessage = err instanceof Error ? err.message : 'Failed to load stats.';
-                setError(errorMessage);
-                console.error("Stats fetch error:", errorMessage); // Log the error
-            })
-            .finally(() => {
+                // The error state is already set correctly in the .catch block.
+                // We only need to set loading to false here.
                 setIsLoading(false);
             });
     };
