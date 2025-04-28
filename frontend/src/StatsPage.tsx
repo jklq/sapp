@@ -140,3 +140,5 @@ function StatsPage({ onBack }: StatsPageProps) {
         </div>
     );
 }
+
+export default StatsPage;
