@@ -102,9 +102,13 @@ function StatsPage({ onBack }: StatsPageProps) {
             },
             title: {
                 display: true,
-                text: 'Spending by Category (Last 30 Days)',
+                text: 'Spending Distribution by Category (Last 30 Days)', // Made title more descriptive
                 font: {
-                    size: 16,
+                    size: 16, // Increased font size slightly for visibility
+                },
+                padding: {
+                    top: 10,
+                    bottom: 20 // Added more padding below title
                 }
             },
         },
