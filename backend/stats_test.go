@@ -7,11 +7,13 @@ import (
 	"time"
 
 	"git.sr.ht/~relay/sapp-backend/testutil"
+	"fmt"
+	"git.sr.ht/~relay/sapp-backend/testutil"
 	"git.sr.ht/~relay/sapp-backend/types"
 )
 
-// TestGetLastMonthSpendingStats tests the GET /v1/stats/spending/last-month endpoint.
-func TestGetLastMonthSpendingStats(t *testing.T) {
+// TestGetSpendingStats tests the GET /v1/stats/spending endpoint with date ranges.
+func TestGetSpendingStats(t *testing.T) {
 	env := testutil.SetupTestEnvironment(t)
 	defer env.TearDownDB()
 
@@ -40,14 +42,18 @@ func TestGetLastMonthSpendingStats(t *testing.T) {
 	_ = testutil.InsertSpending(t, env.DB, env.UserID, &env.PartnerID, groceriesID, 200.0, "Old Shared Groceries", false, nil, &outside30Days)
 	_ = testutil.InsertSpending(t, env.DB, env.UserID, nil, transportID, 50.0, "Old Alone Transport", false, nil, &outside30Days)
 
-	// Expected Totals (within 30 days):
+	// Expected Totals (within 15 days ago to now):
 	// Groceries: 25 (from #1) + 50 (from #4) = 75
 	// Transport: 30 (from #2) + 20 (from #5) = 50
 	// Shopping: 0 (from #3) - Should not be included
 
-	// --- Test Case: Fetch Stats ---
-	t.Run("FetchStats", func(t *testing.T) {
-		req := testutil.NewAuthenticatedRequest(t, http.MethodGet, "/v1/stats/spending/last-month", env.AuthToken, nil)
+	// --- Test Case: Fetch Stats (Specific Range) ---
+	t.Run("FetchStatsSpecificRange", func(t *testing.T) {
+		startDate := now.AddDate(0, 0, -20).Format("2006-01-02") // 20 days ago
+		endDate := now.Format("2006-01-02")                     // Today
+		url := fmt.Sprintf("/v1/stats/spending?startDate=%s&endDate=%s", startDate, endDate)
+
+		req := testutil.NewAuthenticatedRequest(t, http.MethodGet, url, env.AuthToken, nil)
 		rr := testutil.ExecuteRequest(t, env.Handler, req)
 		testutil.AssertStatusCode(t, rr, http.StatusOK)
 
@@ -75,30 +81,65 @@ func TestGetLastMonthSpendingStats(t *testing.T) {
 		}
 	})
 
-	// --- Test Case: No Recent Spendings ---
-	t.Run("NoRecentSpendings", func(t *testing.T) {
-		// Delete recent spendings to test empty case
-		thirtyDaysAgo := time.Now().UTC().AddDate(0, 0, -30)
-		_, err := env.DB.Exec("DELETE FROM spendings WHERE spending_date >= ?", thirtyDaysAgo.Format(time.RFC3339))
-		if err != nil {
-			t.Fatalf("Failed to delete recent spendings for test: %v", err)
-		}
+	// --- Test Case: No Spendings in Range ---
+	t.Run("NoSpendingsInRange", func(t *testing.T) {
+		// Use a date range where no spendings occurred (e.g., far past or future)
+		startDate := now.AddDate(0, 0, -60).Format("2006-01-02") // 60 days ago
+		endDate := now.AddDate(0, 0, -50).Format("2006-01-02")   // 50 days ago (only contains the 'outside30Days' item)
+		url := fmt.Sprintf("/v1/stats/spending?startDate=%s&endDate=%s", startDate, endDate)
 
-		req := testutil.NewAuthenticatedRequest(t, http.MethodGet, "/v1/stats/spending/last-month", env.AuthToken, nil)
+		req := testutil.NewAuthenticatedRequest(t, http.MethodGet, url, env.AuthToken, nil)
 		rr := testutil.ExecuteRequest(t, env.Handler, req)
 		testutil.AssertStatusCode(t, rr, http.StatusOK)
 
 		var resp []types.CategorySpendingStat // Use types.CategorySpendingStat
 		testutil.DecodeJSONResponse(t, rr, &resp)
 
+		// Should return empty array, not null
+		if resp == nil {
+			t.Fatalf("Expected empty array, got nil")
+		}
 		if len(resp) != 0 {
-			t.Errorf("Expected 0 categories with recent spending, got %d", len(resp))
+			t.Errorf("Expected 0 categories in the specified range, got %d", len(resp))
 		}
 	})
 
+	// --- Test Cases: Bad Date Formats/Ranges ---
+	t.Run("BadDateRequests", func(t *testing.T) {
+		testCases := []struct {
+			name         string
+			startDate    string
+			endDate      string
+			expectedCode int
+			expectedBody string
+		}{
+			{"InvalidStartDate", "2024/01/01", "2024-01-31", http.StatusBadRequest, "invalid date format"},
+			{"InvalidEndDate", "2024-01-01", "31-01-2024", http.StatusBadRequest, "invalid date format"},
+			{"MissingStartDate", "", "2024-01-31", http.StatusBadRequest, "missing query parameter: startDate"},
+			{"MissingEndDate", "2024-01-01", "", http.StatusBadRequest, "missing query parameter: endDate"},
+			{"EndDateBeforeStartDate", "2024-02-01", "2024-01-31", http.StatusBadRequest, "endDate cannot be before startDate"},
+		}
+
+		for _, tc := range testCases {
+			t.Run(tc.name, func(t *testing.T) {
+				url := fmt.Sprintf("/v1/stats/spending?startDate=%s&endDate=%s", tc.startDate, tc.endDate)
+				req := testutil.NewAuthenticatedRequest(t, http.MethodGet, url, env.AuthToken, nil)
+				rr := testutil.ExecuteRequest(t, env.Handler, req)
+				testutil.AssertStatusCode(t, rr, tc.expectedCode)
+				testutil.AssertBodyContains(t, rr, tc.expectedBody)
+			})
+		}
+	})
+
+
 	// --- Test Case: Unauthorized ---
 	t.Run("Unauthorized", func(t *testing.T) {
-		req := testutil.NewAuthenticatedRequest(t, http.MethodGet, "/v1/stats/spending/last-month", "invalid-token", nil)
+		// Use valid dates but invalid token
+		startDate := now.AddDate(0, 0, -30).Format("2006-01-02")
+		endDate := now.Format("2006-01-02")
+		url := fmt.Sprintf("/v1/stats/spending?startDate=%s&endDate=%s", startDate, endDate)
+
+		req := testutil.NewAuthenticatedRequest(t, http.MethodGet, url, "invalid-token", nil)
 		rr := testutil.ExecuteRequest(t, env.Handler, req)
 		testutil.AssertStatusCode(t, rr, http.StatusUnauthorized)
 		testutil.AssertBodyContains(t, rr, "Invalid token")

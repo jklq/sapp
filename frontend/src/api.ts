@@ -427,9 +427,21 @@ export async function deleteAIJob(jobId: number): Promise<void> {
 
 // --- Stats API Functions ---
 
-export async function fetchLastMonthSpendingStats(): Promise<CategorySpendingStat[]> {
-    const url = `${API_BASE_URL}/v1/stats/spending/last-month`;
-    const response = await fetchWithAuth(url); // Use GET by default
+// Fetches spending stats for a given date range.
+// Dates should be in "YYYY-MM-DD" format.
+export async function fetchSpendingStats(startDate: string, endDate: string): Promise<CategorySpendingStat[]> {
+    // Validate date format roughly (more robust validation can be added)
+    const dateRegex = /^\d{4}-\d{2}-\d{2}$/;
+    if (!dateRegex.test(startDate) || !dateRegex.test(endDate)) {
+        throw new Error("Invalid date format. Use YYYY-MM-DD.");
+    }
+
+    // Construct URL with query parameters
+    const url = new URL(`${API_BASE_URL}/v1/stats/spending`);
+    url.searchParams.append('startDate', startDate);
+    url.searchParams.append('endDate', endDate);
+
+    const response = await fetchWithAuth(url.toString()); // Use GET by default
 
     if (!response.ok) {
         const errorBody = await response.text();
