@@ -13,7 +13,7 @@ import (
 	"git.sr.ht/~relay/sapp-backend/deposit"
 	"git.sr.ht/~relay/sapp-backend/pay"
 	"git.sr.ht/~relay/sapp-backend/spendings"
-	"git.sr.ht/~relay/sapp-backend/stats" // Import the new stats package
+	"git.sr.ht/~relay/sapp-backend/stats" // Import the stats package
 	"git.sr.ht/~relay/sapp-backend/transfer"
 	"github.com/joho/godotenv"
 	"github.com/rs/cors"
@@ -118,9 +118,8 @@ func main() {
 	addDepositHandler := http.HandlerFunc(deposit.HandleAddDeposit(db))         // Create handler for adding deposit
 	getDepositsHandler := http.HandlerFunc(deposit.HandleGetDeposits(db))       // Create handler for getting deposit templates
 	getDepositByIDHandler := http.HandlerFunc(deposit.HandleGetDepositByID(db)) // Create handler for getting single deposit template
-	updateDepositHandler := http.HandlerFunc(deposit.HandleUpdateDeposit(db)) // Create handler for updating deposit template
-	deleteDepositHandler := http.HandlerFunc(deposit.HandleDeleteDeposit(db)) // Create handler for deleting deposit template
-	// Stats Handler
+	updateDepositHandler := http.HandlerFunc(deposit.HandleUpdateDeposit(db))   // Create handler for updating deposit template
+	deleteDepositHandler := http.HandlerFunc(deposit.HandleDeleteDeposit(db))   // Create handler for deleting deposit template
 	getLastMonthSpendingStatsHandler := http.HandlerFunc(stats.HandleGetLastMonthSpendingStats(db)) // Create handler for stats
 
 	// Apply AuthMiddleware to protected handlers

@@ -8,9 +8,9 @@ import TransferPage from './TransferPage';
 import PartnerRegistrationForm from './PartnerRegistrationForm';
 import AddDepositForm from './AddDepositForm';
 import EditDepositPage from './EditDepositPage';
-import StatsPage from './StatsPage'; // Import the new StatsPage
+import StatsPage from './StatsPage'; // Import the StatsPage component
 
-type View = 'login' | 'register' | 'logSpending' | 'addDeposit' | 'viewHistory' | 'transfer' | 'editDeposit' | 'stats'; // Add 'stats' view
+type View = 'login' | 'register' | 'logSpending' | 'addDeposit' | 'viewHistory' | 'transfer' | 'editDeposit' | 'stats'; // Add 'stats' to View type
 
 interface UserInfo {
   userId: number;
@@ -117,11 +117,11 @@ function App() {
                 onBack={() => setCurrentView('viewHistory')} // Go back to history after edit/cancel
             />
         )}
-        {currentView === 'stats' && <StatsPage onBack={() => setCurrentView('logSpending')} />}
+        {currentView === 'stats' && <StatsPage onBack={() => setCurrentView('logSpending')} />} {/* Render StatsPage */}
 
 
         {/* Bottom Navigation Bar (Only show on main authenticated views) */}
-        {['logSpending', 'addDeposit', 'viewHistory', 'transfer', 'stats'].includes(currentView) && ( // Include 'stats' view
+        {['logSpending', 'addDeposit', 'viewHistory', 'transfer', 'stats'].includes(currentView) && ( // Add 'stats' to the list of views with the nav bar
           <header className="fixed bottom-0 left-0 right-0 w-full bg-white border-t border-gray-200 rounded-t-lg p-3 z-50 max-w-4xl mx-auto">
             <div className="flex justify-between items-center">
               {/* Left Group: Welcome Message (Desktop) + Navigation */}
@@ -204,6 +204,25 @@ function App() {
                   <path strokeLinecap="round" strokeLinejoin="round" d="M8 7h12m0 0l-4-4m4 4l-4 4m0 6H4m0 0l4 4m-4-4l4-4" />
                 </svg>
                 <span className="text-xs md:text-sm">Transfer</span>
+              </button>
+
+              {/* Stats Button */}
+              <button
+                onClick={() => setCurrentView('stats')}
+                disabled={currentView === 'stats'}
+                className={`flex flex-col md:flex-row items-center p-2 rounded-md transition-colors duration-150 ${
+                  currentView === 'stats'
+                    ? 'bg-indigo-100 text-indigo-700'
+                    : 'text-gray-500 hover:bg-gray-100 hover:text-gray-700'
+                }`}
+                aria-label="View Stats"
+              >
+                {/* Icon: Chart Pie */}
+                <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5 mb-1 md:mb-0 md:mr-1" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                  <path strokeLinecap="round" strokeLinejoin="round" d="M11 3.055A9.001 9.001 0 1020.945 13H11V3.055z" />
+                  <path strokeLinecap="round" strokeLinejoin="round" d="M20.488 9H15V3.512A9.025 9.025 0 0120.488 9z" />
+                </svg>
+                <span className="text-xs md:text-sm">Stats</span>
               </button>
             </nav>
             </div>
