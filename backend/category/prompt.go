@@ -91,8 +91,8 @@ Svaret skal KUN være gyldig JSON, UTEN markdown-formatering. Summen av 'amount'
 	const jsonFormatString string = `{"ambiguity_flag": "<string>", "spendings":[{"apportion_mode":"shared|alone|other", "category": "<category_name>", "amount": <float>, "description":"<string>"}]}`
 
 	// Updated explanation of apportion_mode focusing on inference from the prompt
-	const apportionModeExplanation string = `- "alone": Brukes når beskrivelsen indikerer at varen KUN er til kjøperen (%s), ELLER når ingenting om deling/partner er nevnt (standard antagelse for personlige ting som klær, billetter etc.).
-- "shared": Brukes når beskrivelsen eksplisitt sier at varen er delt, felles, til "oss", ELLER når det er en typisk fellesutgift (som dagligvarer, middag ute) OG en partner (%s) finnes OG ingenting annet er spesifisert.
+	const apportionModeExplanation string = `- "alone": Brukes når beskrivelsen indikerer at varen KUN er til kjøperen (%s), ELLER når ingenting om deling/partner er nevnt. Dette er standard antagelse med mindre det er sterke indikasjoner på deling (f.eks. "felles", "oss", "delt", eller kategori som "Groceries").
+- "shared": Brukes når beskrivelsen eksplisitt sier at varen er delt ("felles", "oss", "delt"), ELLER når det er en typisk fellesutgift (som "Groceries") OG beskrivelsen ikke indikerer at det er personlig.
 - "other": Brukes KUN når beskrivelsen eksplisitt sier at varen er KUN til partneren (%s).`
 
 	var filledApportionModeExplanation string
