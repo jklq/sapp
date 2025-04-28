@@ -6,8 +6,8 @@ import (
 	"testing"
 	"time"
 
-	"git.sr.ht/~relay/sapp-backend/testutil"
 	"fmt"
+
 	"git.sr.ht/~relay/sapp-backend/testutil"
 	"git.sr.ht/~relay/sapp-backend/types"
 )
@@ -50,7 +50,7 @@ func TestGetSpendingStats(t *testing.T) {
 	// --- Test Case: Fetch Stats (Specific Range) ---
 	t.Run("FetchStatsSpecificRange", func(t *testing.T) {
 		startDate := now.AddDate(0, 0, -20).Format("2006-01-02") // 20 days ago
-		endDate := now.Format("2006-01-02")                     // Today
+		endDate := now.Format("2006-01-02")                      // Today
 		url := fmt.Sprintf("/v1/stats/spending?startDate=%s&endDate=%s", startDate, endDate)
 
 		req := testutil.NewAuthenticatedRequest(t, http.MethodGet, url, env.AuthToken, nil)
@@ -131,7 +131,6 @@ func TestGetSpendingStats(t *testing.T) {
 		}
 	})
 
-
 	// --- Test Case: Unauthorized ---
 	t.Run("Unauthorized", func(t *testing.T) {
 		// Use valid dates but invalid token
@@ -145,17 +144,6 @@ func TestGetSpendingStats(t *testing.T) {
 		testutil.AssertBodyContains(t, rr, "Invalid token")
 	})
 }
-package main_test
-
-import (
-	"math"
-	"net/http"
-	"testing"
-	"time"
-
-	"git.sr.ht/~relay/sapp-backend/testutil"
-	"git.sr.ht/~relay/sapp-backend/types"
-)
 
 // TestGetLastMonthSpendingStats tests the GET /v1/stats/spending/last-month endpoint.
 func TestGetLastMonthSpendingStats(t *testing.T) {

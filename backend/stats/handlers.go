@@ -3,7 +3,9 @@ package stats
 import (
 	"database/sql"
 	"encoding/json"
+	"fmt"
 	"log/slog"
+	"math"
 	"net/http"
 	"time"
 
@@ -61,7 +63,6 @@ func HandleGetSpendingStats(db *sql.DB) http.HandlerFunc {
 		// Adjust endDate to the end of the day to include all spendings on that day
 		endDateEndOfDay := time.Date(endDate.Year(), endDate.Month(), endDate.Day(), 23, 59, 59, 999999999, time.UTC)
 
-
 		// Query to sum spending amounts per category for the user within the specified date range.
 		// This query considers the user's share of the cost based on user_spendings.
 		// - If buyer=userID and shared_with is NULL -> user pays full amount.
@@ -102,9 +103,9 @@ func HandleGetSpendingStats(db *sql.DB) http.HandlerFunc {
 			userID, userID, userID, // Conditions for when user is the buyer
 			userID, userID, // Conditions for when user is shared_with
 			userID, userID, // Conditions for when user is shared_with (paid by partner)
-			startDate.Format(time.RFC3339),     // Start date condition
+			startDate.Format(time.RFC3339),       // Start date condition
 			endDateEndOfDay.Format(time.RFC3339), // End date condition (end of day)
-			userID, userID,                     // Filter condition for relevant user_spendings rows
+			userID, userID,                       // Filter condition for relevant user_spendings rows
 		)
 
 		if err != nil {
