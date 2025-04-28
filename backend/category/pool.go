@@ -326,43 +326,53 @@ func (p *CategorizingPool) worker(id int) {
 
 				// 3. Insert into user_spendings
 				var sharedWithID sql.NullInt64
-				sharedUserTakesAll := false // Default
+				sharedUserTakesAll := false
 
-				// Use job.SharedWithId directly instead of job.Params
-				if job.SharedWithId != nil {
-					sharedWithID = sql.NullInt64{Int64: *job.SharedWithId, Valid: true}
-					// Determine sharedUserTakesAll based on the validated apportion_mode
-					// The AI should return "other" if the partner pays all.
-					if spending.ApportionMode == "other" {
-						sharedUserTakesAll = true
-					}
-					// Note: If apportion_mode is "shared", sharedUserTakesAll remains false.
-					// If apportion_mode is "alone", this block shouldn't be reached if logic is correct,
-					// but sharedUserTakesAll would remain false anyway.
-				} else {
-					// If there's no shared partner, it must be 'alone'
-					sharedWithID = sql.NullInt64{Valid: false}
+				// Determine sharedWithID and sharedUserTakesAll based on spending.ApportionMode and job.SharedWithId
+				switch spending.ApportionMode {
+				case "alone":
+					sharedWithID = sql.NullInt64{Valid: false} // No partner involved for this item
 					sharedUserTakesAll = false
-					// Add a check here? If spending.ApportionMode is not 'alone', it's an error state.
-					if spending.ApportionMode != "alone" {
-						err = fmt.Errorf("logic error: spending mode '%s' found but no partner associated with job %d", spending.ApportionMode, job.Id)
+				case "shared":
+					if job.SharedWithId != nil {
+						sharedWithID = sql.NullInt64{Int64: *job.SharedWithId, Valid: true} // Shared with the job's partner
+						sharedUserTakesAll = false
+					} else {
+						// Error: 'shared' mode requires a partner associated with the job
+						err = fmt.Errorf("logic error: spending mode 'shared' found but no partner associated with job %d", job.Id)
 						slog.Error("worker invalid spending mode for non-shared job", "worker_id", id, "job_id", job.Id, "mode", spending.ApportionMode, "err", err)
 						p.updateJobStatus(job.Id, "failed", err)
 						return // Error will trigger rollback
 					}
+				case "other":
+					if job.SharedWithId != nil {
+						sharedWithID = sql.NullInt64{Int64: *job.SharedWithId, Valid: true} // Involves the job's partner
+						sharedUserTakesAll = true                                          // Partner pays all for this item
+					} else {
+						// Error: 'other' mode requires a partner associated with the job
+						err = fmt.Errorf("logic error: spending mode 'other' found but no partner associated with job %d", job.Id)
+						slog.Error("worker invalid spending mode for non-shared job", "worker_id", id, "job_id", job.Id, "mode", spending.ApportionMode, "err", err)
+						p.updateJobStatus(job.Id, "failed", err)
+						return // Error will trigger rollback
+					}
+				default:
+					// This case should have been caught earlier by validation, but handle defensively
+					err = fmt.Errorf("internal error: unvalidated apportion_mode '%s' encountered during user_spendings insertion for job %d", spending.ApportionMode, job.Id)
+					slog.Error("worker unvalidated spending mode", "worker_id", id, "job_id", job.Id, "mode", spending.ApportionMode, "err", err)
+					p.updateJobStatus(job.Id, "failed", err)
+					return // Error will trigger rollback
 				}
 
-
+				// Insert with the correctly determined values
 				_, err = tx.Exec(`INSERT INTO user_spendings (spending_id, buyer, shared_with, shared_user_takes_all, settled_at)
 				VALUES (?, ?, ?, ?, ?)`,
-					spendingID, job.Buyer, sharedWithID, sharedUserTakesAll, settledAt) // Use job.Buyer
+					spendingID, job.Buyer, sharedWithID, sharedUserTakesAll, settledAt)
 				if err != nil {
 					slog.Error("worker failed to insert user_spending", "worker_id", id, "job_id", job.Id, "spending_id", spendingID, "err", err)
 					p.updateJobStatus(job.Id, "failed", fmt.Errorf("db error inserting user_spending: %w", err))
 					return // Error will trigger rollback
 				}
 			} // End loop through spendings
-
 
 			// --- Finalize Job ---
 			// Commit transaction if no errors occurred within the loop
