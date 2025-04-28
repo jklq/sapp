@@ -189,3 +189,11 @@ export interface HistoryListItem {
 export interface HistoryResponse {
   history: HistoryListItem[]; // A flat, sorted list of items
 }
+
+// --- Stats Types ---
+
+// Represents the data for one category slice in the stats endpoint
+export interface CategorySpendingStat {
+    category_name: string;
+    total_amount: number;
+}

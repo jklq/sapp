@@ -295,6 +295,29 @@ func SetupTestEnvironment(t *testing.T) *TestEnv {
 	}
 }
 
+// --- Stats API Functions ---
+
+export async function fetchLastMonthSpendingStats(): Promise<CategorySpendingStat[]> {
+    const url = `${API_BASE_URL}/v1/stats/spending/last-month`;
+    const response = await fetchWithAuth(url);
+
+    if (!response.ok) {
+        const errorBody = await response.text();
+        let errorMessage = `Failed to fetch spending stats: ${response.statusText}`;
+        try {
+            const errData = JSON.parse(errorBody);
+            errorMessage = errData.message || errData.error || errorMessage;
+        } catch /* (e) */ {
+            errorMessage += ` - ${errorBody}`;
+        }
+        throw new Error(errorMessage);
+    }
+
+    const data: CategorySpendingStat[] = await response.json();
+    console.log("Fetched Spending Stats:", data);
+    return data;
+}
+
 // Helper function to get category ID by name
 func GetCategoryID(t *testing.T, db *sql.DB, categoryName string) int64 {
 	t.Helper()

@@ -8,8 +8,9 @@ import TransferPage from './TransferPage';
 import PartnerRegistrationForm from './PartnerRegistrationForm';
 import AddDepositForm from './AddDepositForm';
 import EditDepositPage from './EditDepositPage';
+import StatsPage from './StatsPage'; // Import the new StatsPage
 
-type View = 'login' | 'register' | 'logSpending' | 'addDeposit' | 'viewHistory' | 'transfer' | 'editDeposit';
+type View = 'login' | 'register' | 'logSpending' | 'addDeposit' | 'viewHistory' | 'transfer' | 'editDeposit' | 'stats'; // Add 'stats' view
 
 interface UserInfo {
   userId: number;

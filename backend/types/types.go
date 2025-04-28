@@ -117,6 +117,16 @@ type Deposit struct {
 	CreatedAt        time.Time  `json:"created_at"`
 }
 
+// --- Stats Types ---
+
+// CategorySpendingStat represents the total spending for a specific category.
+type CategorySpendingStat struct {
+	CategoryName string  `json:"category_name"`
+	TotalAmount  float64 `json:"total_amount"`
+}
+
+// --- End Stats Types ---
+
 // UpdateDepositPayload defines the structure for the update deposit request body.
 type UpdateDepositPayload struct {
 	Amount           *float64 `json:"amount,omitempty"`           // Optional: only update if provided
