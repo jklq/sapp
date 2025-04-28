@@ -19,17 +19,22 @@ interface StatsPageProps {
     onBack: () => void; // Function to navigate back
 }
 
-// Helper to generate distinct colors (simple version)
-const generateColors = (numColors: number): string[] => {
-    const colors = [];
-    const hueStep = 360 / numColors;
-    for (let i = 0; i < numColors; i++) {
-        // Use HSL color space for better distribution
-        // Keep saturation and lightness constant, vary hue
-        colors.push(`hsl(${i * hueStep}, 70%, 60%)`);
+// Helper function to generate a consistent color from a string (category name)
+const stringToColor = (str: string): string => {
+    let hash = 0;
+    for (let i = 0; i < str.length; i++) {
+        hash = str.charCodeAt(i) + ((hash << 5) - hash);
+        hash = hash & hash; // Convert to 32bit integer
     }
-    return colors;
+    // Calculate HSL values based on the hash
+    const hue = hash % 360;
+    // Keep saturation and lightness somewhat constant for visual consistency,
+    // but slight variations can be added based on hash if needed.
+    const saturation = 70; // %
+    const lightness = 60; // %
+    return `hsl(${hue}, ${saturation}%, ${lightness}%)`;
 };
+
 
 // Helper to format currency
 const formatCurrency = (amount: number) => {
@@ -86,7 +91,25 @@ function StatsPage({ onBack }: StatsPageProps) {
     const chartData: ChartData<'pie'> = useMemo(() => {
         const labels = statsData.map(item => item.category_name);
         const data = statsData.map(item => item.total_amount);
-        const backgroundColors = generateColors(statsData.length);
+        // Generate colors based on category names for consistency
+        const backgroundColors = labels.map(label => stringToColor(label));
+        // Generate slightly darker border colors based on the background colors
+        const borderColors = backgroundColors.map(color => {
+            // Example: Decrease lightness by 10% for the border
+            // This requires parsing HSL, modifying, and formatting back.
+            // Simple approach: use the same color or a fixed border color.
+            // Let's use a slightly darker version by adjusting lightness.
+            try {
+                const match = color.match(/hsl\((\d+),\s*(\d+)%,\s*(\d+)%\)/);
+                if (match) {
+                    const [, hue, saturation, lightness] = match;
+                    const darkerLightness = Math.max(0, parseInt(lightness, 10) - 10); // Decrease lightness
+                    return `hsl(${hue}, ${saturation}%, ${darkerLightness}%)`;
+                }
+            } catch (e) { /* ignore parsing error, fallback */ }
+            return color; // Fallback to same color if parsing fails
+        });
+
 
         return {
             labels: labels,
@@ -94,8 +117,8 @@ function StatsPage({ onBack }: StatsPageProps) {
                 {
                     label: 'Spending',
                     data: data,
-                    backgroundColor: backgroundColors,
-                    borderColor: backgroundColors.map(color => color.replace('60%)', '50%)')), // Slightly darker border
+                    backgroundColor: backgroundColors, // Use category-based colors
+                    borderColor: borderColors,         // Use derived border colors
                     borderWidth: 1,
                 },
             ],
