@@ -45,11 +45,12 @@ function StatsPage({ onBack }: StatsPageProps) {
         setIsLoading(true);
         setError(null);
         fetchLastMonthSpendingStats()
-            .then(data => {
+            .then((data: CategorySpendingStat[]) => { // Add type for data
                 setStatsData(data);
             })
-            .catch(err => {
+            .catch((err: unknown) => { // Add type for err
                 console.error("Failed to load spending stats:", err);
+                // Use type guard before accessing message
                 setError(err instanceof Error ? err.message : 'Failed to load stats.');
                 setStatsData([]); // Clear data on error
             })
