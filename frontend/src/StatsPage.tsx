@@ -139,3 +139,4 @@ function StatsPage({ onBack }: StatsPageProps) {
             </div>
         </div>
     );
+}
