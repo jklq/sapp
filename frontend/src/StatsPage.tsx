@@ -5,6 +5,7 @@ import {
     ArcElement,
     Tooltip,
     Legend,
+    Title, // <-- Add this import
     ChartData,
     ChartOptions,
 } from 'chart.js';
@@ -12,7 +13,7 @@ import { fetchLastMonthSpendingStats } from './api';
 import { CategorySpendingStat } from './types';
 
 // Register Chart.js components
-ChartJS.register(ArcElement, Tooltip, Legend);
+ChartJS.register(ArcElement, Tooltip, Legend, Title); // <-- Add Title here
 
 interface StatsPageProps {
     onBack: () => void; // Function to navigate back
