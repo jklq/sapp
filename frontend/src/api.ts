@@ -14,6 +14,7 @@ import {
   DepositTemplate,
   UpdateDepositPayload,
   DeleteDepositResponse,
+  CategorySpendingStat, // Import the type needed for the new function
 } from "./types";
 
 // --- Constants ---
@@ -423,6 +424,30 @@ export async function deleteAIJob(jobId: number): Promise<void> {
     // Optionally handle other success codes if the backend changes
   }
 }
+
+// --- Stats API Functions ---
+
+export async function fetchLastMonthSpendingStats(): Promise<CategorySpendingStat[]> {
+    const url = `${API_BASE_URL}/v1/stats/spending/last-month`;
+    const response = await fetchWithAuth(url); // Use GET by default
+
+    if (!response.ok) {
+        const errorBody = await response.text();
+        let errorMessage = `Failed to fetch spending stats: ${response.statusText}`;
+        try {
+            const errData = JSON.parse(errorBody);
+            errorMessage = errData.message || errData.error || errorMessage;
+        } catch /* (e) */ {
+            errorMessage += ` - ${errorBody}`;
+        }
+        throw new Error(errorMessage);
+    }
+
+    const data: CategorySpendingStat[] = await response.json();
+    console.log("Fetched Spending Stats:", data);
+    return data;
+}
+
 
 // --- Transfer API Functions ---
 
