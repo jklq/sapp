@@ -117,10 +117,11 @@ function App() {
                 onBack={() => setCurrentView('viewHistory')} // Go back to history after edit/cancel
             />
         )}
+        {currentView === 'stats' && <StatsPage onBack={() => setCurrentView('logSpending')} />}
 
 
         {/* Bottom Navigation Bar (Only show on main authenticated views) */}
-        {['logSpending', 'addDeposit', 'viewHistory', 'transfer'].includes(currentView) && (
+        {['logSpending', 'addDeposit', 'viewHistory', 'transfer', 'stats'].includes(currentView) && ( // Include 'stats' view
           <header className="fixed bottom-0 left-0 right-0 w-full bg-white border-t border-gray-200 rounded-t-lg p-3 z-50 max-w-4xl mx-auto">
             <div className="flex justify-between items-center">
               {/* Left Group: Welcome Message (Desktop) + Navigation */}
