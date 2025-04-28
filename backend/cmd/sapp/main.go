@@ -119,8 +119,9 @@ func main() {
 	getDepositsHandler := http.HandlerFunc(deposit.HandleGetDeposits(db))       // Create handler for getting deposit templates
 	getDepositByIDHandler := http.HandlerFunc(deposit.HandleGetDepositByID(db)) // Create handler for getting single deposit template
 	updateDepositHandler := http.HandlerFunc(deposit.HandleUpdateDeposit(db))   // Create handler for updating deposit template
-	deleteDepositHandler := http.HandlerFunc(deposit.HandleDeleteDeposit(db))   // Create handler for deleting deposit template
-	getSpendingStatsHandler := http.HandlerFunc(stats.HandleGetSpendingStats(db)) // Renamed handler
+	deleteDepositHandler := http.HandlerFunc(deposit.HandleDeleteDeposit(db))       // Create handler for deleting deposit template
+	getSpendingStatsHandler := http.HandlerFunc(stats.HandleGetSpendingStats(db)) // Spending stats handler
+	getDepositStatsHandler := http.HandlerFunc(stats.HandleGetDepositStats(db))   // Deposit stats handler
 
 	// Apply AuthMiddleware to protected handlers
 	mux.Handle("POST /v1/pay", applyMiddleware(payHandler, auth.AuthMiddleware))
@@ -138,8 +139,9 @@ func main() {
 	mux.Handle("GET /v1/deposits/{deposit_id}", applyMiddleware(getDepositByIDHandler, auth.AuthMiddleware))
 	mux.Handle("PUT /v1/deposits/{deposit_id}", applyMiddleware(updateDepositHandler, auth.AuthMiddleware))
 	mux.Handle("DELETE /v1/deposits/{deposit_id}", applyMiddleware(deleteDepositHandler, auth.AuthMiddleware))
-	// Stats Route (Updated Path and Handler)
+	// Stats Routes
 	mux.Handle("GET /v1/stats/spending", applyMiddleware(getSpendingStatsHandler, auth.AuthMiddleware))
+	mux.Handle("GET /v1/stats/deposits", applyMiddleware(getDepositStatsHandler, auth.AuthMiddleware)) // Add deposit stats route
 
 	// CORS handler - Apply CORS *after* routing but *before* auth potentially
 	// Or apply CORS as the outermost layer if auth doesn't rely on headers modified by CORS

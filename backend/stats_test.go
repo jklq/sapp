@@ -145,6 +145,125 @@ func TestGetSpendingStats(t *testing.T) {
 	})
 }
 
+// TestGetDepositStats tests the GET /v1/stats/deposits endpoint.
+func TestGetDepositStats(t *testing.T) {
+	env := testutil.SetupTestEnvironment(t)
+	defer env.TearDownDB()
+
+	// --- Setup Data ---
+	// Non-recurring deposits
+	depositDate1 := time.Date(2024, 5, 15, 0, 0, 0, 0, time.UTC) // In range
+	depositDate2 := time.Date(2024, 4, 30, 0, 0, 0, 0, time.UTC) // Before range
+	depositDate3 := time.Date(2024, 6, 1, 0, 0, 0, 0, time.UTC)  // After range
+	_ = testutil.InsertDeposit(t, env.DB, env.UserID, 1000.0, "Salary May", depositDate1, false, nil)
+	_ = testutil.InsertDeposit(t, env.DB, env.UserID, 500.0, "Bonus Apr", depositDate2, false, nil)
+	_ = testutil.InsertDeposit(t, env.DB, env.UserID, 600.0, "Bonus Jun", depositDate3, false, nil)
+
+	// Recurring weekly deposit starting before range, ending within range
+	recurDateStart1 := time.Date(2024, 4, 25, 0, 0, 0, 0, time.UTC) // Thu
+	// Occurrences: Apr 25 (out), May 2 (in), May 9 (in), May 16 (in), May 23 (in), May 30 (in)
+	_ = testutil.InsertDeposit(t, env.DB, env.UserID, 50.0, "Weekly Allowance", recurDateStart1, true, testutil.Ptr("weekly"))
+
+	// Recurring monthly deposit starting within range, ending after range
+	recurDateStart2 := time.Date(2024, 5, 5, 0, 0, 0, 0, time.UTC)
+	// Occurrences: May 5 (in)
+	_ = testutil.InsertDeposit(t, env.DB, env.UserID, 200.0, "Monthly Gift", recurDateStart2, true, testutil.Ptr("monthly"))
+
+	// Recurring deposit for partner (should be ignored)
+	_ = testutil.InsertDeposit(t, env.DB, env.PartnerID, 100.0, "Partner Weekly", recurDateStart1, true, testutil.Ptr("weekly"))
+
+	// Expected total for May 1st to May 31st:
+	// Salary May: 1000.0
+	// Weekly Allowance: 50.0 * 5 (May 2, 9, 16, 23, 30) = 250.0
+	// Monthly Gift: 200.0 * 1 (May 5) = 200.0
+	// Total = 1000 + 250 + 200 = 1450.0
+	// Count = 1 + 5 + 1 = 7
+
+	// --- Test Case: Fetch Stats (Specific Range) ---
+	t.Run("FetchStatsSpecificRange", func(t *testing.T) {
+		startDate := "2024-05-01"
+		endDate := "2024-05-31"
+		url := fmt.Sprintf("/v1/stats/deposits?startDate=%s&endDate=%s", startDate, endDate)
+
+		req := testutil.NewAuthenticatedRequest(t, http.MethodGet, url, env.AuthToken, nil)
+		rr := testutil.ExecuteRequest(t, env.Handler, req)
+		testutil.AssertStatusCode(t, rr, http.StatusOK)
+
+		var resp types.DepositStatsResponse // Use types.DepositStatsResponse
+		testutil.DecodeJSONResponse(t, rr, &resp)
+
+		// Check amounts (use tolerance)
+		expectedAmount := 1450.0
+		if math.Abs(resp.TotalAmount-expectedAmount) > 0.001 {
+			t.Errorf("Expected total amount %.2f, got %f", expectedAmount, resp.TotalAmount)
+		}
+		expectedCount := 7
+		if resp.Count != expectedCount {
+			t.Errorf("Expected count %d, got %d", expectedCount, resp.Count)
+		}
+	})
+
+	// --- Test Case: No Deposits in Range ---
+	t.Run("NoDepositsInRange", func(t *testing.T) {
+		startDate := "2024-07-01"
+		endDate := "2024-07-31"
+		url := fmt.Sprintf("/v1/stats/deposits?startDate=%s&endDate=%s", startDate, endDate)
+
+		req := testutil.NewAuthenticatedRequest(t, http.MethodGet, url, env.AuthToken, nil)
+		rr := testutil.ExecuteRequest(t, env.Handler, req)
+		testutil.AssertStatusCode(t, rr, http.StatusOK)
+
+		var resp types.DepositStatsResponse // Use types.DepositStatsResponse
+		testutil.DecodeJSONResponse(t, rr, &resp)
+
+		if resp.TotalAmount != 0.0 {
+			t.Errorf("Expected total amount 0.0, got %f", resp.TotalAmount)
+		}
+		if resp.Count != 0 {
+			t.Errorf("Expected count 0, got %d", resp.Count)
+		}
+	})
+
+	// --- Test Cases: Bad Date Formats/Ranges ---
+	t.Run("BadDateRequests", func(t *testing.T) {
+		testCases := []struct {
+			name         string
+			startDate    string
+			endDate      string
+			expectedCode int
+			expectedBody string
+		}{
+			{"InvalidStartDate", "2024/05/01", "2024-05-31", http.StatusBadRequest, "invalid date format"},
+			{"InvalidEndDate", "2024-05-01", "31-05-2024", http.StatusBadRequest, "invalid date format"},
+			{"MissingStartDate", "", "2024-05-31", http.StatusBadRequest, "missing query parameter: startDate"},
+			{"MissingEndDate", "2024-05-01", "", http.StatusBadRequest, "missing query parameter: endDate"},
+			{"EndDateBeforeStartDate", "2024-05-10", "2024-05-01", http.StatusBadRequest, "endDate cannot be before startDate"},
+		}
+
+		for _, tc := range testCases {
+			t.Run(tc.name, func(t *testing.T) {
+				url := fmt.Sprintf("/v1/stats/deposits?startDate=%s&endDate=%s", tc.startDate, tc.endDate)
+				req := testutil.NewAuthenticatedRequest(t, http.MethodGet, url, env.AuthToken, nil)
+				rr := testutil.ExecuteRequest(t, env.Handler, req)
+				testutil.AssertStatusCode(t, rr, tc.expectedCode)
+				testutil.AssertBodyContains(t, rr, tc.expectedBody)
+			})
+		}
+	})
+
+	// --- Test Case: Unauthorized ---
+	t.Run("Unauthorized", func(t *testing.T) {
+		startDate := "2024-05-01"
+		endDate := "2024-05-31"
+		url := fmt.Sprintf("/v1/stats/deposits?startDate=%s&endDate=%s", startDate, endDate)
+
+		req := testutil.NewAuthenticatedRequest(t, http.MethodGet, url, "invalid-token", nil)
+		rr := testutil.ExecuteRequest(t, env.Handler, req)
+		testutil.AssertStatusCode(t, rr, http.StatusUnauthorized)
+		testutil.AssertBodyContains(t, rr, "Invalid token")
+	})
+}
+
 // TestGetLastMonthSpendingStats tests the GET /v1/stats/spending/last-month endpoint.
 func TestGetLastMonthSpendingStats(t *testing.T) {
 	env := testutil.SetupTestEnvironment(t)

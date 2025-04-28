@@ -125,6 +125,12 @@ type CategorySpendingStat struct {
 	TotalAmount  float64 `json:"total_amount"`
 }
 
+// DepositStatsResponse defines the structure for the deposit statistics response.
+type DepositStatsResponse struct {
+	TotalAmount float64 `json:"total_amount"`
+	Count       int     `json:"count"` // Number of deposits included in the sum
+}
+
 // --- End Stats Types ---
 
 // UpdateDepositPayload defines the structure for the update deposit request body.
