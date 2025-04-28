@@ -26,13 +26,16 @@ const stringToColor = (str: string): string => {
         hash = str.charCodeAt(i) + ((hash << 5) - hash);
         hash = hash & hash; // Convert to 32bit integer
     }
-    // Calculate HSL values based on the hash
-    const hue = hash % 360;
-    // Keep saturation and lightness somewhat constant for visual consistency,
-    // but slight variations can be added based on hash if needed.
-    const saturation = 70; // %
-    const lightness = 60; // %
-    return `hsl(${hue}, ${saturation}%, ${lightness}%)`;
+
+    // Use golden angle approximation (137.5 degrees) for better hue distribution
+    const hue = (hash * 137.508) % 360; // Use golden angle
+
+    // Introduce slight variations in saturation and lightness based on hash
+    // Ensure values stay within reasonable bounds (e.g., Saturation 60-80%, Lightness 50-70%)
+    const saturation = 60 + (hash % 21); // Vary saturation between 60% and 80%
+    const lightness = 50 + (hash % 21); // Vary lightness between 50% and 70%
+
+    return `hsl(${hue.toFixed(0)}, ${saturation}%, ${lightness}%)`;
 };
 
 
