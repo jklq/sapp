@@ -88,17 +88,38 @@ function HistoryList({ onBack, onNavigateToEditDeposit }: HistoryListProps) {
         return amount.toLocaleString(undefined, { style: 'currency', currency: 'NOK' });
     };
 
-    // Calculate total balance
+    // Calculate total balance considering sharing status
     const totalBalance = useMemo(() => {
         return historyItems.reduce((acc, item) => {
             if (item.type === 'deposit') {
-                // Ensure amount is treated as number, default to 0 if undefined/null
+                // Add the full deposit amount
                 return acc + (Number(item.amount) || 0);
             } else if (item.type === 'spending_group') {
-                // Ensure total_amount is treated as number, default to 0 if undefined/null
-                return acc - (Number(item.total_amount) || 0);
+                // Calculate the user's share of the spending group
+                let groupCostForUser = 0;
+                if (item.spendings && Array.isArray(item.spendings)) {
+                    item.spendings.forEach((spending: SpendingItem) => {
+                        const spendingAmount = Number(spending.amount) || 0;
+                        if (spending.sharing_status === 'Alone') {
+                            groupCostForUser += spendingAmount;
+                        } else if (spending.sharing_status?.startsWith('Shared')) {
+                            // User pays half if shared
+                            groupCostForUser += spendingAmount / 2.0;
+                        } else if (spending.sharing_status?.startsWith('Paid by')) {
+                            // User pays nothing if paid by partner
+                            groupCostForUser += 0;
+                        } else {
+                            // Default case or unknown status, assume user pays full amount?
+                            // Or log a warning. Let's assume full cost for safety/simplicity.
+                            console.warn(`Unknown sharing status "${spending.sharing_status}" for spending ID ${spending.id}, assuming full cost.`);
+                            groupCostForUser += spendingAmount;
+                        }
+                    });
+                }
+                // Subtract the user's calculated share of the group cost
+                return acc - groupCostForUser;
             }
-            return acc;
+            return acc; // Return accumulator for unknown item types
         }, 0);
     }, [historyItems]); // Recalculate only when historyItems changes
 
