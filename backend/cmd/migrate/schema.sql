@@ -130,6 +130,9 @@ INSERT OR IGNORE INTO categories (name) VALUES ('Education');
 INSERT OR IGNORE INTO categories (name) VALUES ('Health');
 INSERT OR IGNORE INTO categories (name) VALUES ('Other');
 
+INSERT OR IGNORE INTO categories (name) VALUES ('Energy Drinks');
+
+
 -- Seed demo users (Password for demo_user is "password")
 -- Use https://www.browserling.com/bcrypt or similar to generate hashes if needed.
 -- Hash for "password": $2a$10$XXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXX (Replace X with actual hash)
