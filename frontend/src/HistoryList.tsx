@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect, useCallback, useMemo } from 'react';
 import { fetchHistory, fetchCategories, updateSpendingItem, deleteAIJob, deleteDeposit } from './api';
 // Removed unused TransactionGroup import
 import { Category, UpdateSpendingPayload, EditableSharingStatus, HistoryListItem, SpendingItem, DepositItem } from './types';
@@ -565,6 +565,15 @@ function HistoryList({ onBack, onNavigateToEditDeposit }: HistoryListProps) {
                 </button>
             </div>
 
+            {/* Display Total Balance */}
+            {!isLoading && !error && historyItems.length > 0 && (
+                 <div className="mb-4 text-center">
+                    <span className="text-lg font-semibold text-gray-600">Current Balance: </span>
+                    <span className={`text-xl font-bold ${totalBalance >= 0 ? 'text-green-600' : 'text-red-600'}`}>
+                        {formatCurrency(totalBalance)}
+                    </span>
+                </div>
+            )}
 
             {isLoading && <div className="text-center p-4">Loading history...</div>}
             {/* Display general loading/fetch error */}
