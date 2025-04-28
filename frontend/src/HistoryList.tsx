@@ -88,6 +88,20 @@ function HistoryList({ onBack, onNavigateToEditDeposit }: HistoryListProps) {
         return amount.toLocaleString(undefined, { style: 'currency', currency: 'NOK' });
     };
 
+    // Calculate total balance
+    const totalBalance = useMemo(() => {
+        return historyItems.reduce((acc, item) => {
+            if (item.type === 'deposit') {
+                // Ensure amount is treated as number, default to 0 if undefined/null
+                return acc + (Number(item.amount) || 0);
+            } else if (item.type === 'spending_group') {
+                // Ensure total_amount is treated as number, default to 0 if undefined/null
+                return acc - (Number(item.total_amount) || 0);
+            }
+            return acc;
+        }, 0);
+    }, [historyItems]); // Recalculate only when historyItems changes
+
     // --- Edit Handlers ---
 
     const handleEditClick = (item: SpendingItem) => {
