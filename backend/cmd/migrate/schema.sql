@@ -112,13 +112,21 @@ CREATE TABLE IF NOT EXISTS deposits (
 -- A more robust migration system would handle this better.
 
 -- Seed default categories if they don't exist
-INSERT OR IGNORE INTO categories (name) VALUES ('Groceries');
+INSERT OR IGNORE INTO categories (name, ai_notes) VALUES ('Groceries', 'dersom bruker nevner at en har kjøpt mat/middag uten videre forklaring, anta at dette er Groceries og ikke Eating Out');
 INSERT OR IGNORE INTO categories (name) VALUES ('Transport');
 INSERT OR IGNORE INTO categories (name) VALUES ('Eating Out');
-INSERT OR IGNORE INTO categories (name) VALUES ('Entertainment');
+INSERT OR IGNORE INTO categories (name) VALUES ('Entertainment (general)');
+INSERT OR IGNORE INTO categories (name) VALUES ('Travel, Events & Vacation');
 INSERT OR IGNORE INTO categories (name) VALUES ('Utilities');
+INSERT OR IGNORE INTO categories (name, ai_notes) VALUES ('Technology', 'e.g. phone, computer, etc.');
+INSERT OR IGNORE INTO categories (name) VALUES ('Subscription (general)');
+INSERT OR IGNORE INTO categories (name) VALUES ('Coffee');
+INSERT OR IGNORE INTO categories (name) VALUES ('Alcohol');
+INSERT OR IGNORE INTO categories (name, ai_notes) VALUES ('Nutritional drink', 'e.g. Nutridrink, Fresubin, etc.');
 INSERT OR IGNORE INTO categories (name) VALUES ('Rent/Mortgage');
-INSERT OR IGNORE INTO categories (name) VALUES ('Shopping');
+INSERT OR IGNORE INTO categories (name) VALUES ('Shopping (general)');
+INSERT OR IGNORE INTO categories (name) VALUES ('Clothes');
+INSERT OR IGNORE INTO categories (name) VALUES ('Education');
 INSERT OR IGNORE INTO categories (name) VALUES ('Health');
 INSERT OR IGNORE INTO categories (name) VALUES ('Other');
 
