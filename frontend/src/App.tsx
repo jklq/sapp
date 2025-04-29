@@ -7,10 +7,11 @@ import HistoryList from './HistoryList';
 import TransferPage from './TransferPage';
 import PartnerRegistrationForm from './PartnerRegistrationForm';
 import AddDepositForm from './AddDepositForm';
+import { exportAllData } from './api'; // Import export function
 import EditDepositPage from './EditDepositPage';
-import StatsPage from './StatsPage'; // Import the StatsPage component
+import StatsPage from './StatsPage';
 
-type View = 'login' | 'register' | 'logSpending' | 'addDeposit' | 'viewHistory' | 'transfer' | 'editDeposit' | 'stats'; // Add 'stats' to View type
+type View = 'login' | 'register' | 'logSpending' | 'addDeposit' | 'viewHistory' | 'transfer' | 'editDeposit' | 'stats';
 
 // Removed unused UserInfo interface
 
@@ -22,7 +23,9 @@ function App() {
 
   // View state
   const [currentView, setCurrentView] = useState<View>('login');
-  const [editingDepositId, setEditingDepositId] = useState<number | null>(null); // State to hold ID for edit view
+  const [editingDepositId, setEditingDepositId] = useState<number | null>(null);
+  const [exportError, setExportError] = useState<string | null>(null); // State for export errors
+  const [isExporting, setIsExporting] = useState<boolean>(false); // State for export loading
 
   // Effect to check token validity or fetch user info on load
   useEffect(() => {
@@ -74,6 +77,22 @@ function App() {
     setCurrentView('editDeposit');
   };
 
+  // Handle Export Data
+  const handleExport = async () => {
+    setIsExporting(true);
+    setExportError(null);
+    try {
+      await exportAllData();
+      // Success is handled by the browser download prompt
+    } catch (err) {
+      console.error("Export failed:", err);
+      setExportError(err instanceof Error ? err.message : "An unknown error occurred during export.");
+      // Optionally show error to user in a more prominent way
+    } finally {
+      setIsExporting(false);
+    }
+  };
+
 
   // Determine which component to render based on auth and view state
   const renderContent = () => {
@@ -97,6 +116,17 @@ function App() {
       // Make this a flex container to center the view component inside
       
       <div className="w-full max-w-4xl p-4 flex flex-col items-center pb-20">
+
+        {/* Display Export Error if any */}
+        {exportError && (
+          <div className="w-full bg-red-100 border border-red-400 text-red-700 px-4 py-3 rounded relative mb-4" role="alert">
+            <strong className="font-bold">Export Error:</strong>
+            <span className="block sm:inline"> {exportError}</span>
+            <button onClick={() => setExportError(null)} className="absolute top-0 bottom-0 right-0 px-4 py-3">
+              <svg className="fill-current h-6 w-6 text-red-500" role="button" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20"><title>Close</title><path d="M14.348 14.849a1.2 1.2 0 0 1-1.697 0L10 11.819l-2.651 3.029a1.2 1.2 0 1 1-1.697-1.697l2.758-3.15-2.759-3.152a1.2 1.2 0 1 1 1.697-1.697L10 8.183l2.651-3.031a1.2 1.2 0 1 1 1.697 1.697l-2.758 3.152 2.758 3.15a1.2 1.2 0 0 1 0 1.698z"/></svg>
+            </button>
+          </div>
+        )}
 
         {/* Render the selected view */}
         {currentView === 'logSpending' && <LogSpendingForm />}
@@ -217,6 +247,25 @@ function App() {
                 </svg>
                 <span className="text-xs md:text-sm">Stats</span>
               </button>
+
+               {/* Export Button */}
+               <button
+                onClick={handleExport}
+                disabled={isExporting}
+                className={`flex flex-col md:flex-row items-center p-2 rounded-md transition-colors duration-150 ${
+                  isExporting
+                    ? 'bg-gray-200 text-gray-400 cursor-not-allowed' // Disabled style
+                    : 'text-gray-500 hover:bg-gray-100 hover:text-gray-700'
+                }`}
+                aria-label="Export Data"
+              >
+                {/* Icon: Download */}
+                <svg xmlns="http://www.w3.org/2000/svg" className="h-6 w-6 mb-1 md:mb-0 md:mr-1" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                  <path strokeLinecap="round" strokeLinejoin="round" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4" />
+                </svg>
+                <span className="text-xs md:text-sm">{isExporting ? 'Exporting...' : 'Export'}</span>
+              </button>
+
             </nav>
             </div>
 

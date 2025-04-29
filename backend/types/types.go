@@ -117,6 +117,82 @@ type Deposit struct {
 	CreatedAt        time.Time  `json:"created_at"`
 }
 
+// --- Export Types ---
+
+// UserExport defines the structure for exporting user details.
+type UserExport struct {
+	Username  string `json:"username"`
+	FirstName string `json:"first_name"`
+}
+
+// CategoryExport defines the structure for exporting category details.
+type CategoryExport struct {
+	Name    string  `json:"name"`
+	AINotes *string `json:"ai_notes,omitempty"` // Use pointer for optional field
+}
+
+// SpendingItemExport defines the structure for exporting individual spending items within a job or manual entry.
+type SpendingItemExport struct {
+	CategoryName  string  `json:"category_name"`
+	Amount        float64 `json:"amount"`
+	Description   string  `json:"description"`
+	ApportionMode string  `json:"apportion_mode"` // "Alone", "Shared", "PaidByPartner"
+}
+
+// AIJobExport defines the structure for exporting AI categorization jobs and their spendings.
+type AIJobExport struct {
+	Prompt          string               `json:"prompt"`
+	TotalAmount     float64              `json:"total_amount"`
+	TransactionDate time.Time            `json:"transaction_date"`
+	PreSettled      bool                 `json:"pre_settled"`
+	BuyerUsername   string               `json:"buyer_username"` // Username of the person who submitted the job
+	IsAmbiguous     bool                 `json:"is_ambiguous"`
+	AmbiguityReason *string              `json:"ambiguity_reason,omitempty"`
+	Spendings       []SpendingItemExport `json:"spendings"`
+}
+
+// ManualSpendingExport defines the structure for exporting manually added spendings.
+type ManualSpendingExport struct {
+	Amount        float64    `json:"amount"`
+	Description   string     `json:"description"` // Description from spendings table
+	CategoryName  string     `json:"category_name"`
+	SpendingDate  time.Time  `json:"spending_date"`
+	BuyerUsername string     `json:"buyer_username"` // Username of the person who paid
+	SharedStatus  string     `json:"shared_status"`  // "Alone", "Shared", "PaidByPartner"
+	SettledAt     *time.Time `json:"settled_at,omitempty"`
+}
+
+// DepositExport defines the structure for exporting deposit templates.
+type DepositExport struct {
+	Description      string     `json:"description"`
+	Amount           float64    `json:"amount"`
+	DepositDate      time.Time  `json:"deposit_date"` // Start date
+	IsRecurring      bool       `json:"is_recurring"`
+	RecurrencePeriod *string    `json:"recurrence_period,omitempty"`
+	EndDate          *time.Time `json:"end_date,omitempty"`
+	OwnerUsername    string     `json:"owner_username"` // Username of the deposit owner
+}
+
+// TransferExport defines the structure for exporting settlement records.
+type TransferExport struct {
+	SettlementTime    time.Time `json:"settlement_time"`
+	SettledByUsername string    `json:"settled_by_username"` // Username of the user who initiated the settlement
+}
+
+// FullExport defines the overall structure for the exported data file.
+type FullExport struct {
+	ExportedAt      time.Time              `json:"exported_at"`
+	User            UserExport             `json:"user"`
+	Partner         UserExport             `json:"partner"`
+	Categories      []CategoryExport       `json:"categories"`
+	AIJobs          []AIJobExport          `json:"ai_jobs"`
+	ManualSpendings []ManualSpendingExport `json:"manual_spendings"`
+	Deposits        []DepositExport        `json:"deposits"`
+	Transfers       []TransferExport       `json:"transfers"`
+}
+
+// --- End Export Types ---
+
 // --- Stats Types ---
 
 // CategorySpendingStat represents the total spending for a specific category.

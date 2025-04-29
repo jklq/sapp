@@ -11,9 +11,11 @@ import (
 	"git.sr.ht/~relay/sapp-backend/auth"
 	"git.sr.ht/~relay/sapp-backend/category"
 	"git.sr.ht/~relay/sapp-backend/deposit"
+	"git.sr.ht/~relay/sapp-backend/deposit"
+	"git.sr.ht/~relay/sapp-backend/export" // Import the export package
 	"git.sr.ht/~relay/sapp-backend/pay"
 	"git.sr.ht/~relay/sapp-backend/spendings"
-	"git.sr.ht/~relay/sapp-backend/stats" // Import the stats package
+	"git.sr.ht/~relay/sapp-backend/stats"
 	"git.sr.ht/~relay/sapp-backend/transfer"
 	"github.com/joho/godotenv"
 	"github.com/rs/cors"
@@ -122,6 +124,7 @@ func main() {
 	deleteDepositHandler := http.HandlerFunc(deposit.HandleDeleteDeposit(db))     // Create handler for deleting deposit template
 	getSpendingStatsHandler := http.HandlerFunc(stats.HandleGetSpendingStats(db)) // Spending stats handler
 	getDepositStatsHandler := http.HandlerFunc(stats.HandleGetDepositStats(db))   // Deposit stats handler
+	exportAllDataHandler := http.HandlerFunc(export.HandleExportAllData(db))     // Export handler
 
 	// Apply AuthMiddleware to protected handlers
 	mux.Handle("POST /v1/pay", applyMiddleware(payHandler, auth.AuthMiddleware))
@@ -141,7 +144,9 @@ func main() {
 	mux.Handle("DELETE /v1/deposits/{deposit_id}", applyMiddleware(deleteDepositHandler, auth.AuthMiddleware))
 	// Stats Routes
 	mux.Handle("GET /v1/stats/spending", applyMiddleware(getSpendingStatsHandler, auth.AuthMiddleware))
-	mux.Handle("GET /v1/stats/deposits", applyMiddleware(getDepositStatsHandler, auth.AuthMiddleware)) // Add deposit stats route
+	mux.Handle("GET /v1/stats/deposits", applyMiddleware(getDepositStatsHandler, auth.AuthMiddleware))
+	// Export Route
+	mux.Handle("GET /v1/export/all", applyMiddleware(exportAllDataHandler, auth.AuthMiddleware))
 
 	// CORS handler - Apply CORS *after* routing but *before* auth potentially
 	// Or apply CORS as the outermost layer if auth doesn't rely on headers modified by CORS

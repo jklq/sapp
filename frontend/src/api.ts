@@ -546,3 +546,49 @@ export async function recordTransfer(): Promise<void> {
     );
   }
 }
+
+// --- Export API Function ---
+
+export async function exportAllData(): Promise<void> {
+  const url = `${API_BASE_URL}/v1/export/all`;
+  const response = await fetchWithAuth(url); // GET request
+
+  if (!response.ok) {
+    const errorBody = await response.text();
+    let errorMessage = `Failed to initiate export: ${response.statusText}`;
+    try {
+      const errData = JSON.parse(errorBody);
+      errorMessage = errData.message || errData.error || errorMessage;
+    } catch /* (e) */ {
+      errorMessage += ` - ${errorBody}`;
+    }
+    throw new Error(errorMessage);
+  }
+
+  // Handle the file download
+  try {
+    const blob = await response.blob();
+    // Extract filename from Content-Disposition header, fallback to a default name
+    const contentDisposition = response.headers.get('Content-Disposition');
+    let filename = 'sapp_export.json'; // Default filename
+    if (contentDisposition) {
+      const filenameMatch = contentDisposition.match(/filename="?(.+)"?/i);
+      if (filenameMatch && filenameMatch.length > 1) {
+        filename = filenameMatch[1];
+      }
+    }
+
+    // Create a temporary link to trigger the download
+    const link = document.createElement('a');
+    link.href = window.URL.createObjectURL(blob);
+    link.download = filename;
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+    window.URL.revokeObjectURL(link.href); // Clean up the object URL
+    console.log("Export file download initiated:", filename);
+  } catch (err) {
+    console.error("Error processing export file download:", err);
+    throw new Error("Failed to process the downloaded export file.");
+  }
+}
