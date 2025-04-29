@@ -27,15 +27,15 @@ func TestExportAllData(t *testing.T) {
 	job1ID := testutil.InsertAIJob(t, env.DB, env.UserID, &env.PartnerID, "Groceries and bus ticket", 75.0, "finished", true, false, nil)
 	_, err := env.DB.Exec("UPDATE ai_categorization_jobs SET transaction_date = ?, created_at = ? WHERE id = ?", job1Date, job1Date, job1ID)
 	require.NoError(t, err)
-	spending1_1 := testutil.InsertSpending(t, env.DB, env.UserID, &env.PartnerID, groceriesID, 50.0, "Milk & Bread", false, &job1ID, nil)
-	spending1_2 := testutil.InsertSpending(t, env.DB, env.UserID, nil, transportID, 25.0, "Bus Ticket", false, &job1ID, nil)
+	_ = testutil.InsertSpending(t, env.DB, env.UserID, &env.PartnerID, groceriesID, 50.0, "Milk & Bread", false, &job1ID, nil) // Assign to _
+	_ = testutil.InsertSpending(t, env.DB, env.UserID, nil, transportID, 25.0, "Bus Ticket", false, &job1ID, nil)             // Assign to _
 
 	// AI Job 2 (Partner buys, user takes all)
 	job2Date := time.Date(2024, 5, 5, 11, 0, 0, 0, time.UTC)
 	job2ID := testutil.InsertAIJob(t, env.DB, env.PartnerID, &env.UserID, "Gift for User", 100.0, "finished", true, false, nil)
 	_, err = env.DB.Exec("UPDATE ai_categorization_jobs SET transaction_date = ?, created_at = ? WHERE id = ?", job2Date, job2Date, job2ID)
 	require.NoError(t, err)
-	spending2_1 := testutil.InsertSpending(t, env.DB, env.PartnerID, &env.UserID, shoppingID, 100.0, "Gift", true, &job2ID, nil) // User takes all
+	_ = testutil.InsertSpending(t, env.DB, env.PartnerID, &env.UserID, shoppingID, 100.0, "Gift", true, &job2ID, nil) // User takes all, Assign to _
 
 	// Manual Spending (User buys, alone, settled)
 	manualDate := time.Date(2024, 5, 10, 12, 0, 0, 0, time.UTC)
@@ -47,7 +47,7 @@ func TestExportAllData(t *testing.T) {
 	// Deposit 1 (User, recurring)
 	deposit1Date := time.Date(2024, 4, 15, 0, 0, 0, 0, time.UTC)
 	deposit1EndDate := time.Date(2024, 6, 15, 0, 0, 0, 0, time.UTC)
-	deposit1ID := testutil.InsertDeposit(t, env.DB, env.UserID, 2000.0, "Salary", deposit1Date, true, Ptr("monthly"))
+	deposit1ID := testutil.InsertDeposit(t, env.DB, env.UserID, 2000.0, "Salary", deposit1Date, true, testutil.Ptr("monthly")) // Use testutil.Ptr
 	_, err = env.DB.Exec("UPDATE deposits SET end_date = ? WHERE id = ?", deposit1EndDate, deposit1ID)
 	require.NoError(t, err)
 
@@ -183,9 +183,4 @@ func TestExportAllData(t *testing.T) {
 		testutil.AssertStatusCode(t, rrUnauth, http.StatusUnauthorized)
 		testutil.AssertBodyContains(t, rrUnauth, "Invalid token")
 	})
-}
-
-// Helper function to create a pointer to a string (copied from spendings_test.go)
-func Ptr(s string) *string {
-	return &s
 }

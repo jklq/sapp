@@ -447,6 +447,11 @@ func AssertBodyContains(t *testing.T, rr *httptest.ResponseRecorder, expectedSub
 	}
 }
 
+// Helper function to create a pointer to a string.
+func Ptr(s string) *string {
+	return &s
+}
+
 // Helper function to decode JSON response body.
 func DecodeJSONResponse(t *testing.T, rr *httptest.ResponseRecorder, target interface{}) {
 	t.Helper()

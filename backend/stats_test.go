@@ -162,15 +162,15 @@ func TestGetDepositStats(t *testing.T) {
 	// Recurring weekly deposit starting before range, ending within range
 	recurDateStart1 := time.Date(2024, 4, 25, 0, 0, 0, 0, time.UTC) // Thu
 	// Occurrences: Apr 25 (out), May 2 (in), May 9 (in), May 16 (in), May 23 (in), May 30 (in)
-	_ = testutil.InsertDeposit(t, env.DB, env.UserID, 50.0, "Weekly Allowance", recurDateStart1, true, Ptr("weekly"))
+	_ = testutil.InsertDeposit(t, env.DB, env.UserID, 50.0, "Weekly Allowance", recurDateStart1, true, testutil.Ptr("weekly")) // Use testutil.Ptr
 
 	// Recurring monthly deposit starting within range, ending after range
 	recurDateStart2 := time.Date(2024, 5, 5, 0, 0, 0, 0, time.UTC)
 	// Occurrences: May 5 (in)
-	_ = testutil.InsertDeposit(t, env.DB, env.UserID, 200.0, "Monthly Gift", recurDateStart2, true, Ptr("monthly"))
+	_ = testutil.InsertDeposit(t, env.DB, env.UserID, 200.0, "Monthly Gift", recurDateStart2, true, testutil.Ptr("monthly")) // Use testutil.Ptr
 
 	// Recurring deposit for partner (should be ignored)
-	_ = testutil.InsertDeposit(t, env.DB, env.PartnerID, 100.0, "Partner Weekly", recurDateStart1, true, Ptr("weekly"))
+	_ = testutil.InsertDeposit(t, env.DB, env.PartnerID, 100.0, "Partner Weekly", recurDateStart1, true, testutil.Ptr("weekly")) // Use testutil.Ptr
 
 	// Expected total for May 1st to May 31st:
 	// Salary May: 1000.0

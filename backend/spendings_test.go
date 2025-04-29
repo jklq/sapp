@@ -180,7 +180,7 @@ func TestGetHistory(t *testing.T) {
 	deposit2Time := time.Now().Add(-4 * time.Hour) // Ensure distinct time
 	// Set start date 35 days ago to ensure the next monthly occurrence (approx T-5d) is before 'now'
 	deposit2Date := time.Now().AddDate(0, 0, -35)
-	deposit2ID := testutil.InsertDeposit(t, env.DB, env.UserID, 50.0, "Pocket Money", deposit2Date, true, Ptr("monthly"))
+	deposit2ID := testutil.InsertDeposit(t, env.DB, env.UserID, 50.0, "Pocket Money", deposit2Date, true, testutil.Ptr("monthly")) // Use testutil.Ptr
 	_, err = env.DB.Exec("UPDATE deposits SET created_at = ? WHERE id = ?", deposit2Time, deposit2ID) // Update created_at for sorting consistency if needed
 	if err != nil {
 		t.Fatalf("Failed to update deposit2 time: %v", err)

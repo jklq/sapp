@@ -68,7 +68,7 @@ func TestAddDeposit(t *testing.T) {
 				Description:      "Pocket Money",
 				DepositDate:      "2024-05-10",
 				IsRecurring:      true,
-				RecurrencePeriod: Ptr("weekly"), // Use helper for pointer
+				RecurrencePeriod: testutil.Ptr("weekly"), // Use testutil.Ptr
 			},
 			expectedStatus: http.StatusCreated,
 			expectedBody:   "Deposit added successfully",
