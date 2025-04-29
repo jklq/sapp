@@ -5,8 +5,8 @@ import { Category, UpdateSpendingPayload, EditableSharingStatus, HistoryListItem
 
 interface HistoryListProps {
     onBack: () => void;
-    
     onNavigateToEditDeposit: (depositId: number) => void;
+    loggedInUserName: string | null; // Add missing prop
 }
 
 

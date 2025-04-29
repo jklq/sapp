@@ -43,7 +43,7 @@ function App() {
         try {
           const parsedInfo: UserInfo = JSON.parse(storedUserInfo);
           setUserInfo(parsedInfo);
-          slog.Info("Loaded user info from localStorage", "userInfo", parsedInfo); // Use slog if available, else console.log
+          console.log("Loaded user info from localStorage", { userInfo: parsedInfo }); // Use console.log
         } catch (e) {
           console.error("Failed to parse stored user info:", e);
           // If parsing fails, force logout/re-login might be needed

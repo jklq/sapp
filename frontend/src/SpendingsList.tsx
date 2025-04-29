@@ -232,7 +232,8 @@ function HistoryList({ onBack }: HistoryListProps) { // Renamed component
     };
 
     // Helper to render either display row or edit form - now responsive
-    const renderSpendingItemRow = (item: SpendingItem) => {
+    // Added partnerNameFromGroup argument
+    const renderSpendingItemRow = (item: SpendingItem, partnerNameFromGroup: string | null | undefined) => {
         const isEditing = editingItemId === item.id && editFormData;
 
         // Common classes for the container (card on mobile, table row on md+)
@@ -524,7 +525,11 @@ function HistoryList({ onBack }: HistoryListProps) { // Renamed component
                                                     </tr>
                                                 </thead>
                                                 <tbody className="hidden md:table-row-group">
-                                                    {group.spendings.map(renderSpendingItemRow)}
+                                                    {/* Extract partner name and pass to renderer */}
+                                                    {() => {
+                                                        const partnerNameFromGroup = group.spendings.length > 0 ? group.spendings[0].partner_name : null;
+                                                        return group.spendings.map((spendingItem) => renderSpendingItemRow(spendingItem, partnerNameFromGroup));
+                                                    }()}
                                                     {group.spendings.length === 0 && (
                                                         <tr className="md:table-row">
                                                             <td colSpan={5} className="md:table-cell px-4 py-3 text-center text-sm text-gray-500 italic">No spending items generated for this job.</td>
@@ -533,7 +538,11 @@ function HistoryList({ onBack }: HistoryListProps) { // Renamed component
                                                 </tbody>
                                             </table>
                                             <div className="md:hidden space-y-3 p-2 bg-gray-50">
-                                                {group.spendings.map(renderSpendingItemRow)}
+                                                {/* Extract partner name and pass to renderer */}
+                                                {() => {
+                                                    const partnerNameFromGroup = group.spendings.length > 0 ? group.spendings[0].partner_name : null;
+                                                    return group.spendings.map((spendingItem) => renderSpendingItemRow(spendingItem, partnerNameFromGroup));
+                                                }()}
                                                 {group.spendings.length === 0 && (
                                                     <div className="px-4 py-3 text-center text-sm text-gray-500 italic">No spending items generated for this job.</div>
                                                 )}
