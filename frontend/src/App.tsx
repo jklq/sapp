@@ -12,15 +12,12 @@ import StatsPage from './StatsPage'; // Import the StatsPage component
 
 type View = 'login' | 'register' | 'logSpending' | 'addDeposit' | 'viewHistory' | 'transfer' | 'editDeposit' | 'stats'; // Add 'stats' to View type
 
-interface UserInfo {
-  userId: number;
-  firstName: string;
-}
+// Removed unused UserInfo interface
 
 function App() {
   // Authentication state
   const [authToken, setAuthToken] = useState<string | null>(getToken());
-  const [userInfo, setUserInfo] = useState<UserInfo | null>(null);
+  // Removed unused userInfo state: const [userInfo, setUserInfo] = useState<UserInfo | null>(null);
   const [isLoadingAuth, setIsLoadingAuth] = useState<boolean>(true);
 
   // View state
@@ -48,7 +45,7 @@ function App() {
   const handleLoginSuccess = (data: LoginResponse) => {
     storeToken(data.token);
     setAuthToken(data.token);
-    setUserInfo({ userId: data.user_id, firstName: data.first_name });
+    // setUserInfo({ userId: data.user_id, firstName: data.first_name }); // Removed setUserInfo call
     setCurrentView('logSpending'); // Go to main app view after login
     // Optionally store user info in localStorage as well
   };
@@ -56,7 +53,7 @@ function App() {
   const handleLogout = () => {
     removeToken();
     setAuthToken(null);
-    setUserInfo(null);
+    // setUserInfo(null); // Removed setUserInfo call
     setCurrentView('login'); // Go back to login view on logout
     // Optionally remove user info from localStorage
   };
