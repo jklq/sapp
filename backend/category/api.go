@@ -32,7 +32,8 @@ func NewOpenRouterAPI(apiKey string, model string) OpenRouterAPI {
 		slog.Warn("OpenRouter API key is empty. Ensure OPENROUTER_KEY environment variable is set.")
 	} else {
 		// Log length for confirmation, not the key itself for security
-		slog.Info("OpenRouter API key loaded.", "key_length", len(apiKey))
+		// Log length at Debug level for confirmation, not the key itself for security
+		slog.Debug("OpenRouter API key loaded.", "key_length", len(apiKey))
 	}
 	return OpenRouterAPI{apiKey: apiKey, model: model}
 }
