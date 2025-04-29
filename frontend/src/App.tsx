@@ -130,10 +130,10 @@ function App() {
               <div className="hidden md:block">
                 {userInfo && <span className="text-gray-700 text-sm">Welcome, {userInfo.firstName}!</span>}
               </div>
-              <div className="flex-grow md:hidden"></div>
+              {/* Removed the flex-grow md:hidden div here */}
 
-              {/* Navigation Icons/Links - Centered on mobile, left-aligned on desktop */}
-              <nav className="flex-grow flex justify-center md:justify-start space-x-1 md:space-x-2">
+              {/* Navigation Icons/Links - Spread on mobile, left-aligned on desktop */}
+              <nav className="flex-grow flex justify-between md:justify-start md:space-x-2"> {/* Changed justify-center to justify-between, removed space-x-1 */}
                 {/* Spend */}
                 <button
                   onClick={() => setCurrentView('logSpending')}
