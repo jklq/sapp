@@ -698,17 +698,20 @@ function HistoryList({ onBack, onNavigateToEditDeposit, loggedInUserName }: Hist
                                                         ⚠️ Ambiguous
                                                     </span>
                                                 )}
-                                                <button
-                                                    onClick={(e) => { e.stopPropagation(); handleDeleteJob(jobId); }}
-                                                    disabled={deletingJobId === jobId || editingItemId !== null}
-                                                    className={`text-red-600 hover:text-red-800 disabled:opacity-50 disabled:cursor-not-allowed p-1 rounded focus:outline-none focus:ring-2 focus:ring-red-500 focus:ring-offset-1`}
-                                                    title="Delete this entire spending group"
-                                                >
-                                                    <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
-                                                        <path strokeLinecap="round" strokeLinejoin="round" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
-                                                    </svg>
-                                                    {deletingJobId === jobId && <span className="ml-1 text-xs">(Deleting...)</span>}
-                                                </button>
+                                                {/* Only allow deletion if the current user is the buyer */}
+                                                {buyerName === loggedInUserName && (
+                                                    <button
+                                                        onClick={(e) => { e.stopPropagation(); handleDeleteJob(jobId); }}
+                                                        disabled={deletingJobId === jobId || editingItemId !== null}
+                                                        className={`text-red-600 hover:text-red-800 disabled:opacity-50 disabled:cursor-not-allowed p-1 rounded focus:outline-none focus:ring-2 focus:ring-red-500 focus:ring-offset-1`}
+                                                        title="Delete this entire spending group"
+                                                    >
+                                                        <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                                                            <path strokeLinecap="round" strokeLinejoin="round" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
+                                                        </svg>
+                                                        {deletingJobId === jobId && <span className="ml-1 text-xs">(Deleting...)</span>}
+                                                    </button>
+                                                )}
                                                 {/* Expander Icon */}
                                                 <span className="text-gray-400 hover:text-gray-600 cursor-pointer p-1" onClick={(e) => { e.stopPropagation(); toggleGroupExpansion(jobId); }}>
                                                     {expandedGroupIds.has(jobId) ?
