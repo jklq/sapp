@@ -115,15 +115,15 @@ CREATE TABLE IF NOT EXISTS deposits (
 -- Seed default categories if they don't exist
 INSERT OR IGNORE INTO categories (name, ai_notes) VALUES ('Groceries', 'dersom bruker nevner at en har kjøpt mat/middag uten videre forklaring, anta at dette er Groceries og ikke Eating Out');
 INSERT OR IGNORE INTO categories (name) VALUES ('Transport');
-INSERT OR IGNORE INTO categories (name) VALUES ('Eating Out');
+INSERT OR IGNORE INTO categories (name, ai_notes) VALUES ('Eating Out', 'mat og drikke på restaurant, cafe, bar, osv. inkluderer take away. inkluderer ikke kaffe, se seperat kategori.');
+INSERT OR IGNORE INTO categories (name) VALUES ('Coffee');
 INSERT OR IGNORE INTO categories (name) VALUES ('Entertainment (general)');
 INSERT OR IGNORE INTO categories (name) VALUES ('Travel, Events & Vacation');
 INSERT OR IGNORE INTO categories (name) VALUES ('Utilities');
-INSERT OR IGNORE INTO categories (name, ai_notes) VALUES ('Technology', 'e.g. phone, computer, etc.');
+INSERT OR IGNORE INTO categories (name, ai_notes) VALUES ('Technology', 'e.g. phone, computer, osv.');
 INSERT OR IGNORE INTO categories (name) VALUES ('Subscription (general)');
-INSERT OR IGNORE INTO categories (name) VALUES ('Coffee');
 INSERT OR IGNORE INTO categories (name) VALUES ('Alcohol');
-INSERT OR IGNORE INTO categories (name, ai_notes) VALUES ('Nutritional drink', 'e.g. Nutridrink, Fresubin, etc.');
+INSERT OR IGNORE INTO categories (name, ai_notes) VALUES ('Nutritional drink', 'e.g. Nutridrink, Fresubin, osv.');
 INSERT OR IGNORE INTO categories (name) VALUES ('Rent/Mortgage');
 INSERT OR IGNORE INTO categories (name) VALUES ('Shopping (general)');
 INSERT OR IGNORE INTO categories (name) VALUES ('Clothes');
@@ -132,6 +132,8 @@ INSERT OR IGNORE INTO categories (name) VALUES ('Health');
 INSERT OR IGNORE INTO categories (name) VALUES ('Other');
 
 INSERT OR IGNORE INTO categories (name) VALUES ('Energy Drinks');
+INSERT OR IGNORE INTO categories (name) VALUES ('Digital Services');
+
 
 
 -- Seed demo users (Password for demo_user is "password")
