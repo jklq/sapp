@@ -527,10 +527,10 @@ function HistoryList({ onBack, loggedInUserName }: HistoryListProps) { // Rename
                                                 </thead>
                                                 <tbody className="hidden md:table-row-group">
                                                     {/* Extract partner name and pass to renderer */}
-                                                    {() => {
+                                                    {( () => { // Wrap IIFE in parentheses
                                                         const partnerNameFromGroup = group.spendings.length > 0 ? group.spendings[0].partner_name : null;
                                                         return group.spendings.map((spendingItem) => renderSpendingItemRow(spendingItem, partnerNameFromGroup));
-                                                    }()}
+                                                    })() }
                                                     {group.spendings.length === 0 && (
                                                         <tr className="md:table-row">
                                                             <td colSpan={5} className="md:table-cell px-4 py-3 text-center text-sm text-gray-500 italic">No spending items generated for this job.</td>
@@ -540,10 +540,10 @@ function HistoryList({ onBack, loggedInUserName }: HistoryListProps) { // Rename
                                             </table>
                                             <div className="md:hidden space-y-3 p-2 bg-gray-50">
                                                 {/* Extract partner name and pass to renderer */}
-                                                {() => {
+                                                {( () => { // Wrap IIFE in parentheses
                                                     const partnerNameFromGroup = group.spendings.length > 0 ? group.spendings[0].partner_name : null;
                                                     return group.spendings.map((spendingItem) => renderSpendingItemRow(spendingItem, partnerNameFromGroup));
-                                                }()}
+                                                })() }
                                                 {group.spendings.length === 0 && (
                                                     <div className="px-4 py-3 text-center text-sm text-gray-500 italic">No spending items generated for this job.</div>
                                                 )}
