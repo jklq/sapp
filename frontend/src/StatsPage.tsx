@@ -10,7 +10,6 @@ import {
     Tooltip,
     Legend, // Common
     Title, // Common
-    Tooltip, // Common
     ChartData,
     ChartOptions,
 } from 'chart.js';

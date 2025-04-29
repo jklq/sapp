@@ -115,11 +115,11 @@ func main() {
 	recordTransferHandler := http.HandlerFunc(transfer.HandleRecordTransfer(db))       // Create handler for recording transfer
 	deleteAIJobHandler := http.HandlerFunc(spendings.HandleDeleteAIJob(db))            // Create handler for deleting AI job
 	// Deposit Handlers
-	addDepositHandler := http.HandlerFunc(deposit.HandleAddDeposit(db))         // Create handler for adding deposit
-	getDepositsHandler := http.HandlerFunc(deposit.HandleGetDeposits(db))       // Create handler for getting deposit templates
-	getDepositByIDHandler := http.HandlerFunc(deposit.HandleGetDepositByID(db)) // Create handler for getting single deposit template
-	updateDepositHandler := http.HandlerFunc(deposit.HandleUpdateDeposit(db))   // Create handler for updating deposit template
-	deleteDepositHandler := http.HandlerFunc(deposit.HandleDeleteDeposit(db))       // Create handler for deleting deposit template
+	addDepositHandler := http.HandlerFunc(deposit.HandleAddDeposit(db))           // Create handler for adding deposit
+	getDepositsHandler := http.HandlerFunc(deposit.HandleGetDeposits(db))         // Create handler for getting deposit templates
+	getDepositByIDHandler := http.HandlerFunc(deposit.HandleGetDepositByID(db))   // Create handler for getting single deposit template
+	updateDepositHandler := http.HandlerFunc(deposit.HandleUpdateDeposit(db))     // Create handler for updating deposit template
+	deleteDepositHandler := http.HandlerFunc(deposit.HandleDeleteDeposit(db))     // Create handler for deleting deposit template
 	getSpendingStatsHandler := http.HandlerFunc(stats.HandleGetSpendingStats(db)) // Spending stats handler
 	getDepositStatsHandler := http.HandlerFunc(stats.HandleGetDepositStats(db))   // Deposit stats handler
 
