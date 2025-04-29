@@ -12,12 +12,6 @@ import (
 	"git.sr.ht/~relay/sapp-backend/types"
 )
 
-// Helper function to create a pointer to a string (copied here as it's used in TestGetHistory)
-// Consider moving to testutil if used more widely.
-func Ptr(s string) *string {
-	return &s
-}
-
 // TestDeleteAIJob tests the DELETE /v1/jobs/{job_id} endpoint.
 func TestDeleteAIJob(t *testing.T) {
 	env := testutil.SetupTestEnvironment(t)
