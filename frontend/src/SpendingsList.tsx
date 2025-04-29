@@ -6,11 +6,12 @@ import { SpendingItem, Category, UpdateSpendingPayload, EditableSharingStatus, H
 
 interface HistoryListProps { // Renamed props interface
     onBack: () => void;
+    loggedInUserName: string | null; // Add missing prop
 }
 
 // Removed unused local HistoryListItem type definition
 
-function HistoryList({ onBack }: HistoryListProps) { // Renamed component
+function HistoryList({ onBack, loggedInUserName }: HistoryListProps) { // Renamed component, added prop destructuring
     // Data states
     // Renamed historyData to historyResponse for clarity
     const [historyResponse, setHistoryResponse] = useState<HistoryResponse | null>(null); // Store the raw response
