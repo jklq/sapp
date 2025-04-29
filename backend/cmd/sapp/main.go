@@ -11,7 +11,6 @@ import (
 	"git.sr.ht/~relay/sapp-backend/auth"
 	"git.sr.ht/~relay/sapp-backend/category"
 	"git.sr.ht/~relay/sapp-backend/deposit"
-	"git.sr.ht/~relay/sapp-backend/deposit"
 	"git.sr.ht/~relay/sapp-backend/export" // Import the export package
 	"git.sr.ht/~relay/sapp-backend/pay"
 	"git.sr.ht/~relay/sapp-backend/spendings"
@@ -124,7 +123,7 @@ func main() {
 	deleteDepositHandler := http.HandlerFunc(deposit.HandleDeleteDeposit(db))     // Create handler for deleting deposit template
 	getSpendingStatsHandler := http.HandlerFunc(stats.HandleGetSpendingStats(db)) // Spending stats handler
 	getDepositStatsHandler := http.HandlerFunc(stats.HandleGetDepositStats(db))   // Deposit stats handler
-	exportAllDataHandler := http.HandlerFunc(export.HandleExportAllData(db))     // Export handler
+	exportAllDataHandler := http.HandlerFunc(export.HandleExportAllData(db))      // Export handler
 
 	// Apply AuthMiddleware to protected handlers
 	mux.Handle("POST /v1/pay", applyMiddleware(payHandler, auth.AuthMiddleware))

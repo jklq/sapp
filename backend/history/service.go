@@ -7,6 +7,7 @@ import (
 	"sort"
 	"time"
 
+	"git.sr.ht/~relay/sapp-backend/auth"
 	"git.sr.ht/~relay/sapp-backend/types"
 )
 
