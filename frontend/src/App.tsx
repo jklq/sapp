@@ -132,8 +132,8 @@ function App() {
               </div>
               {/* Removed the flex-grow md:hidden div here */}
 
-              {/* Navigation Icons/Links - Spread on mobile, left-aligned on desktop */}
-              <nav className="flex-grow flex justify-between md:justify-start md:space-x-2"> {/* Changed justify-center to justify-between, removed space-x-1 */}
+              {/* Navigation Icons/Links - Full width on mobile, left-aligned on desktop */}
+              <nav className="flex-grow flex justify-between w-full md:justify-start md:space-x-2">
                 {/* Spend */}
                 <button
                   onClick={() => setCurrentView('logSpending')}
