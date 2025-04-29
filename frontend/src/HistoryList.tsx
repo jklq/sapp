@@ -10,7 +10,7 @@ interface HistoryListProps {
 }
 
 
-function HistoryList({ onBack, onNavigateToEditDeposit }: HistoryListProps) {
+function HistoryList({ onBack, onNavigateToEditDeposit, loggedInUserName }: HistoryListProps) {
     // Data states
     const [historyItems, setHistoryItems] = useState<HistoryListItem[]>([]); // Store the flat list
     const [categories, setCategories] = useState<Category[]>([]); // Still needed for editing spendings
@@ -95,24 +95,39 @@ function HistoryList({ onBack, onNavigateToEditDeposit }: HistoryListProps) {
                 // Add the full deposit amount
                 return acc + (Number(item.amount) || 0);
             } else if (item.type === 'spending_group') {
-                // Calculate the user's share of the spending group
+                // Calculate the user's share of the spending group, considering who paid
                 let groupCostForUser = 0;
+                const buyerIsCurrentUser = item.buyer_name === loggedInUserName;
+
                 if (item.spendings && Array.isArray(item.spendings)) {
                     item.spendings.forEach((spending: SpendingItem) => {
                         const spendingAmount = Number(spending.amount) || 0;
-                        if (spending.sharing_status === 'Alone') {
-                            groupCostForUser += spendingAmount;
-                        } else if (spending.sharing_status?.startsWith('Shared')) {
-                            // User pays half if shared
-                            groupCostForUser += spendingAmount / 2.0;
-                        } else if (spending.sharing_status?.startsWith('Paid by')) {
-                            // User pays nothing if paid by partner
-                            groupCostForUser += 0;
+                        const status = spending.sharing_status || ''; // Default to empty string if null/undefined
+
+                        if (buyerIsCurrentUser) {
+                            // Current user paid
+                            if (status === 'Alone') {
+                                groupCostForUser += spendingAmount;
+                            } else if (status.startsWith('Shared with')) { // e.g., "Shared with Partner"
+                                groupCostForUser += spendingAmount / 2.0;
+                            } else if (status.startsWith('Paid by')) { // e.g., "Paid by Partner"
+                                groupCostForUser += 0; // Partner pays this item
+                            } else {
+                                console.warn(`Unknown sharing status "${status}" when user paid, assuming full cost.`);
+                                groupCostForUser += spendingAmount;
+                            }
                         } else {
-                            // Default case or unknown status, assume user pays full amount?
-                            // Or log a warning. Let's assume full cost for safety/simplicity.
-                            console.warn(`Unknown sharing status "${spending.sharing_status}" for spending ID ${spending.id}, assuming full cost.`);
-                            groupCostForUser += spendingAmount;
+                            // Partner paid
+                            if (status.startsWith('Shared with You')) { // e.g., "Shared with You (User)"
+                                groupCostForUser += spendingAmount / 2.0;
+                            } else if (status.startsWith('Paid by You')) { // e.g., "Paid by You (User)"
+                                groupCostForUser += spendingAmount; // User pays this item
+                            } else if (status.includes('Alone')) { // e.g., "Partner Alone"
+                                groupCostForUser += 0; // Partner paid alone, no cost to user
+                            } else {
+                                console.warn(`Unknown sharing status "${status}" when partner paid, assuming zero cost for user.`);
+                                groupCostForUser += 0;
+                            }
                         }
                     });
                 }
@@ -121,7 +136,7 @@ function HistoryList({ onBack, onNavigateToEditDeposit }: HistoryListProps) {
             }
             return acc; // Return accumulator for unknown item types
         }, 0);
-    }, [historyItems]); // Recalculate only when historyItems changes
+    }, [historyItems, loggedInUserName]); // Recalculate when history or user name changes
 
     // --- Edit Handlers ---
 
@@ -668,7 +683,7 @@ function HistoryList({ onBack, onNavigateToEditDeposit }: HistoryListProps) {
                                                         Spending: <span className="text-gray-700 font-normal">{prompt}</span>
                                                     </p>
                                                     <p className="text-xs text-gray-500">
-                                                        {formatDate(item.date)} by <span className="font-medium">{buyerName}</span> - Total: <span className="font-semibold text-red-700">{formatCurrency(totalAmount)}</span>
+                                                        {formatDate(item.date)} by <span className={`font-medium ${buyerName === loggedInUserName ? 'text-indigo-700' : 'text-gray-600'}`}>{buyerName === loggedInUserName ? 'You' : buyerName}</span> - Total: <span className="font-semibold text-red-700">{formatCurrency(totalAmount)}</span>
                                                     </p>
                                                 </div>
                                             </div>

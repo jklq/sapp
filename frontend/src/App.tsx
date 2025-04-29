@@ -13,12 +13,16 @@ import StatsPage from './StatsPage';
 
 type View = 'login' | 'register' | 'logSpending' | 'addDeposit' | 'viewHistory' | 'transfer' | 'editDeposit' | 'stats';
 
-// Removed unused UserInfo interface
+// Define UserInfo interface again
+interface UserInfo {
+    userId: number;
+    firstName: string;
+}
 
 function App() {
   // Authentication state
   const [authToken, setAuthToken] = useState<string | null>(getToken());
-  // Removed unused userInfo state: const [userInfo, setUserInfo] = useState<UserInfo | null>(null);
+  const [userInfo, setUserInfo] = useState<UserInfo | null>(null); // Restore userInfo state
   const [isLoadingAuth, setIsLoadingAuth] = useState<boolean>(true);
 
   // View state
@@ -33,12 +37,25 @@ function App() {
     if (currentToken) {
       // TODO: Optionally add an API call here to verify the token
       // and fetch user details if they aren't stored alongside the token.
-      // For this demo, we assume the token is valid if present.
+      // For now, try to load stored user info if token exists
+      const storedUserInfo = localStorage.getItem('userInfo');
+      if (storedUserInfo) {
+        try {
+          const parsedInfo: UserInfo = JSON.parse(storedUserInfo);
+          setUserInfo(parsedInfo);
+          slog.Info("Loaded user info from localStorage", "userInfo", parsedInfo); // Use slog if available, else console.log
+        } catch (e) {
+          console.error("Failed to parse stored user info:", e);
+          // If parsing fails, force logout/re-login might be needed
+          handleLogout(); // Or just clear stored info: localStorage.removeItem('userInfo');
+        }
+      } else {
+         // If no stored info but token exists, maybe force logout or fetch info
+         // For now, let's assume login flow will populate it. If not, history might lack names.
+         console.warn("Auth token exists but no user info found in localStorage.");
+      }
       setAuthToken(currentToken);
-      // We don't have user info from just the token, handleLoginSuccess sets it.
-      // If you stored user info in localStorage, load it here.
-      // If token exists, assume logged in and go to default logged-in view
-      setCurrentView('logSpending');
+      setCurrentView('logSpending'); // Go to default logged-in view
     } else {
       // No token, stay on login view (or potentially register view if navigated there)
     }
@@ -48,17 +65,18 @@ function App() {
   const handleLoginSuccess = (data: LoginResponse) => {
     storeToken(data.token);
     setAuthToken(data.token);
-    // setUserInfo({ userId: data.user_id, firstName: data.first_name }); // Removed setUserInfo call
+    const newUserInfo: UserInfo = { userId: data.user_id, firstName: data.first_name };
+    setUserInfo(newUserInfo); // Set user info state
+    localStorage.setItem('userInfo', JSON.stringify(newUserInfo)); // Store user info
     setCurrentView('logSpending'); // Go to main app view after login
-    // Optionally store user info in localStorage as well
   };
 
   const handleLogout = () => {
     removeToken();
+    localStorage.removeItem('userInfo'); // Remove user info on logout
     setAuthToken(null);
-    // setUserInfo(null); // Removed setUserInfo call
+    setUserInfo(null); // Clear user info state
     setCurrentView('login'); // Go back to login view on logout
-    // Optionally remove user info from localStorage
   };
 
   // Navigate to registration page
@@ -134,7 +152,8 @@ function App() {
         {currentView === 'viewHistory' && (
             <HistoryList
                 onBack={() => setCurrentView('logSpending')}
-                onNavigateToEditDeposit={showEditDeposit} // Pass navigation handler
+                onNavigateToEditDeposit={showEditDeposit}
+                loggedInUserName={userInfo?.firstName || null} // Pass logged-in user's name
             />
         )}
         {currentView === 'transfer' && <TransferPage onBack={() => setCurrentView('logSpending')} />}

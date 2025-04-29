@@ -86,16 +86,28 @@ function HistoryList({ onBack }: HistoryListProps) { // Renamed component
 
     // --- Edit Handlers ---
 
-    const handleEditClick = (item: SpendingItem) => {
+    const handleEditClick = (item: SpendingItem, buyerName: string | null | undefined) => {
+        // Prevent editing if the logged-in user is not the buyer
+        if (buyerName !== loggedInUserName) {
+            console.warn("Attempted to edit an item bought by the partner.");
+            setEditError("You can only edit items you paid for."); // Set an error message
+            return;
+        }
+
         setEditingItemId(item.id);
         setEditError(null); // Clear previous edit errors
 
         // Determine initial EditableSharingStatus from the display string
         let initialSharingStatus: EditableSharingStatus = 'Alone'; // Default
-        if (item.sharing_status.startsWith('Shared')) {
+        // Adjust logic based on the backend's perspective strings
+        if (item.sharing_status.startsWith('Shared with')) { // "Shared with Partner" or "Shared with You" -> Shared
             initialSharingStatus = 'Shared';
-        } else if (item.sharing_status.startsWith('Paid by')) {
+        } else if (item.sharing_status.startsWith('Paid by Partner')) { // "Paid by Partner" -> Paid by Partner
             initialSharingStatus = 'Paid by Partner';
+        } else if (item.sharing_status.startsWith('Paid by You')) { // "Paid by You" -> Paid by Partner (from user's edit perspective)
+             initialSharingStatus = 'Paid by Partner';
+        } else if (item.sharing_status === 'Alone') { // "Alone" -> Alone
+             initialSharingStatus = 'Alone';
         }
 
         setEditFormData({
@@ -332,11 +344,14 @@ function HistoryList({ onBack }: HistoryListProps) { // Renamed component
                         {/* Sharing Status */}
                         <div>
                             <span className="text-xs font-medium text-gray-500 uppercase">Sharing</span>
-                            <div> {/* Wrap badge in div for block layout */}
+                            <div>
                                 <span className={`mt-1 px-2 inline-flex text-xs leading-5 font-semibold rounded-full ${
-                                    item.sharing_status === 'Alone' ? 'bg-blue-100 text-blue-800' :
-                                    item.sharing_status.startsWith('Shared') ? 'bg-green-100 text-green-800' :
-                                    item.sharing_status.startsWith('Paid by') ? 'bg-yellow-100 text-yellow-800' :
+                                    item.sharing_status === 'Alone' ? 'bg-blue-100 text-blue-800' : // User paid, alone
+                                    item.sharing_status.startsWith('Shared with Partner') ? 'bg-green-100 text-green-800' : // User paid, shared
+                                    item.sharing_status.startsWith('Paid by Partner') ? 'bg-yellow-100 text-yellow-800' : // User paid, partner pays
+                                    item.sharing_status.startsWith('Shared with You') ? 'bg-teal-100 text-teal-800' : // Partner paid, shared
+                                    item.sharing_status.startsWith('Paid by You') ? 'bg-orange-100 text-orange-800' : // Partner paid, user pays
+                                    item.sharing_status.includes('Alone') ? 'bg-gray-100 text-gray-800' : // Partner paid, alone
                                     'bg-gray-100 text-gray-800' // Fallback
                                 }`}>
                                     {item.sharing_status}
@@ -344,16 +359,18 @@ function HistoryList({ onBack }: HistoryListProps) { // Renamed component
                             </div>
                         </div>
 
-                        {/* Action (Edit Button) */}
-                        <div className="pt-2 text-right"> {/* Add padding top for separation */}
-                            <button
-                                onClick={() => handleEditClick(item)}
-                                disabled={editingItemId !== null} // Disable other edit buttons while one is active
-                                className={`text-sm text-indigo-600 hover:text-indigo-900 ${editingItemId !== null ? 'opacity-50 cursor-not-allowed' : ''}`}
-                            >
-                                Edit
-                            </button>
-                        </div>
+                        {/* Action (Edit Button) - Conditionally render/disable */}
+                        {partnerNameFromGroup === loggedInUserName && ( // Only show if current user is the buyer
+                            <div className="pt-2 text-right">
+                                <button
+                                    onClick={() => handleEditClick(item, partnerNameFromGroup)}
+                                    disabled={editingItemId !== null} // Disable other edit buttons while one is active
+                                    className={`text-sm text-indigo-600 hover:text-indigo-900 ${editingItemId !== null ? 'opacity-50 cursor-not-allowed' : ''}`}
+                                >
+                                    Edit
+                                </button>
+                            </div>
+                        )}
                     </div>
 
                     {/* Desktop Table Cell View (hidden on mobile) */}
@@ -365,26 +382,33 @@ function HistoryList({ onBack }: HistoryListProps) { // Renamed component
                     <div className="hidden md:table-cell px-4 py-3 whitespace-nowrap text-sm text-gray-900 text-right">{formatCurrency(item.amount)}</div>
                     {/* Sharing Status */}
                     <div className="hidden md:table-cell px-4 py-3 whitespace-nowrap text-sm text-gray-500">
-                        <span className={`px-2 inline-flex text-xs leading-5 font-semibold rounded-full ${
-                            item.sharing_status === 'Alone' ? 'bg-blue-100 text-blue-800' :
-                            item.sharing_status.startsWith('Shared') ? 'bg-green-100 text-green-800' :
-                            item.sharing_status.startsWith('Paid by') ? 'bg-yellow-100 text-yellow-800' :
+                         <span className={`px-2 inline-flex text-xs leading-5 font-semibold rounded-full ${
+                            item.sharing_status === 'Alone' ? 'bg-blue-100 text-blue-800' : // User paid, alone
+                            item.sharing_status.startsWith('Shared with Partner') ? 'bg-green-100 text-green-800' : // User paid, shared
+                            item.sharing_status.startsWith('Paid by Partner') ? 'bg-yellow-100 text-yellow-800' : // User paid, partner pays
+                            item.sharing_status.startsWith('Shared with You') ? 'bg-teal-100 text-teal-800' : // Partner paid, shared
+                            item.sharing_status.startsWith('Paid by You') ? 'bg-orange-100 text-orange-800' : // Partner paid, user pays
+                            item.sharing_status.includes('Alone') ? 'bg-gray-100 text-gray-800' : // Partner paid, alone
                             'bg-gray-100 text-gray-800' // Fallback
                         }`}>
                             {item.sharing_status}
                         </span>
                     </div>
-                    {/* Action (Edit Button) - Only for spendings */}
+                    {/* Action (Edit Button) - Conditionally render/disable */}
                     <div className="hidden md:table-cell px-4 py-3 whitespace-nowrap text-right text-sm font-medium">
-                        <button
-                            onClick={() => handleEditClick(item)}
-                            disabled={editingItemId !== null} // Disable if any item is being edited
-                            className={`text-indigo-600 hover:text-indigo-900 ${editingItemId !== null ? 'opacity-50 cursor-not-allowed' : ''}`}
-                        >
-                            Edit
-                        </button>
+                         {partnerNameFromGroup === loggedInUserName ? ( // Only enable if current user is the buyer
+                            <button
+                                onClick={() => handleEditClick(item, partnerNameFromGroup)}
+                                disabled={editingItemId !== null} // Disable if any item is being edited
+                                className={`text-indigo-600 hover:text-indigo-900 ${editingItemId !== null ? 'opacity-50 cursor-not-allowed' : ''}`}
+                            >
+                                Edit
+                            </button>
+                         ) : (
+                            <span className="text-gray-400 text-xs italic"></span> // Indicate non-editable
+                         )}
                     </div>
-                </div> // Close the main div for the display row/card
+                </div>
             );
         }
     };

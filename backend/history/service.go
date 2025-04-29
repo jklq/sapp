@@ -80,20 +80,28 @@ func GenerateHistory(db *sql.DB, userID int64, endDate time.Time) ([]HistoryList
 	return allHistoryItems, nil
 }
 
-// fetchSpendingGroups fetches transaction groups (as types.TransactionGroup) initiated by the user.
+// fetchSpendingGroups fetches transaction groups (as types.TransactionGroup) initiated by the user OR their partner.
 func fetchSpendingGroups(db *sql.DB, userID int64) ([]types.TransactionGroup, error) {
+	// Get partner ID first
+	partnerID, partnerOk := auth.GetPartnerUserID(db, userID)
+	if !partnerOk {
+		// If no partner, proceed as before, only fetching user's jobs
+		partnerID = -1 // Use an invalid ID to ensure partner clause doesn't match
+		slog.Debug("No partner found, fetching only user's spending groups", "user_id", userID)
+	}
+
 	groups := []types.TransactionGroup{} // Use types.TransactionGroup
 	jobQuery := `
 		SELECT
-			j.id, j.prompt, j.total_amount, j.transaction_date AS date, j.is_ambiguity_flagged, j.ambiguity_flag_reason, u.first_name AS buyer_name
+			j.id, j.prompt, j.total_amount, j.transaction_date AS date, j.is_ambiguity_flagged, j.ambiguity_flag_reason, u.first_name AS buyer_name, j.buyer -- Fetch buyer ID as well
 		FROM ai_categorization_jobs j
 		JOIN users u ON j.buyer = u.id
-		WHERE j.buyer = ?
-		ORDER BY j.created_at DESC;
+		WHERE j.buyer = ? OR j.buyer = ? -- Fetch jobs from user OR partner
+		ORDER BY j.transaction_date DESC, j.created_at DESC; -- Sort primarily by transaction date
 	`
-	jobRows, err := db.Query(jobQuery, userID)
+	jobRows, err := db.Query(jobQuery, userID, partnerID) // Pass both IDs
 	if err != nil {
-		slog.Error("failed to query AI categorization jobs", "user_id", userID, "err", err)
+		slog.Error("failed to query AI categorization jobs for user and partner", "user_id", userID, "partner_id", partnerID, "err", err)
 		return nil, err
 	}
 	defer jobRows.Close()
@@ -119,13 +127,23 @@ func fetchSpendingGroups(db *sql.DB, userID int64) ([]types.TransactionGroup, er
 	}
 	defer spendingStmt.Close()
 
+	// Fetch requesting user's name once for determineSharingStatus
+	var requestingUserName string
+	err = db.QueryRow("SELECT first_name FROM users WHERE id = ?", userID).Scan(&requestingUserName)
+	if err != nil {
+		slog.Error("failed to fetch requesting user's name for history", "user_id", userID, "err", err)
+		// Proceed without name, status strings might be less specific
+		requestingUserName = "You"
+	}
+
 	for jobRows.Next() {
 		var group types.TransactionGroup // Use types.TransactionGroup
 		var ambiguityReason sql.NullString
+		var jobBuyerID int64 // To store the buyer ID from the job
 
 		if err := jobRows.Scan(
 			&group.JobID, &group.Prompt, &group.TotalAmount, &group.TransactionDate, // Scan directly into TransactionDate field
-			&group.IsAmbiguityFlagged, &ambiguityReason, &group.BuyerName,
+			&group.IsAmbiguityFlagged, &ambiguityReason, &group.BuyerName, &jobBuyerID, // Scan jobBuyerID
 		); err != nil {
 			slog.Error("failed to scan AI job row for history", "user_id", userID, "err", err)
 			return nil, err
@@ -154,7 +172,8 @@ func fetchSpendingGroups(db *sql.DB, userID int64) ([]types.TransactionGroup, er
 			}
 
 			item.PartnerName = sqlNullStringToPointer(partnerName)
-			item.SharingStatus = determineSharingStatus(sharedWithID.Valid, item.SharedUserTakesAll, item.PartnerName)
+			// Determine status from the perspective of the requesting user (userID)
+			item.SharingStatus = determineSharingStatus(userID, item.BuyerID, sharedWithID.Valid, item.SharedUserTakesAll, item.PartnerName, requestingUserName)
 			group.Spendings = append(group.Spendings, item)
 		}
 		spendingRows.Close()
@@ -303,16 +322,36 @@ func sqlNullStringToPointer(ns sql.NullString) *string {
 	return nil
 }
 
-func determineSharingStatus(isShared bool, takesAll bool, partnerName *string) string {
-	if !isShared {
-		return "Alone"
-	}
-	partner := "Partner" // Default name
+// determineSharingStatus calculates the sharing status string from the perspective of the requesting user.
+func determineSharingStatus(requestingUserID, buyerID int64, isShared bool, takesAll bool, partnerName *string, requestingUserName string) string {
+	partner := "Partner" // Default partner name
 	if partnerName != nil && *partnerName != "" {
 		partner = *partnerName
 	}
-	if takesAll {
-		return "Paid by " + partner
+
+	if buyerID == requestingUserID {
+		// Requesting user paid
+		if !isShared {
+			return "Alone"
+		}
+		if takesAll {
+			// User paid, partner takes all -> Partner owes user full amount
+			return fmt.Sprintf("Paid by %s", partner) // Corrected: Partner benefits, owes user
+		}
+		// User paid, shared 50/50
+		return fmt.Sprintf("Shared with %s", partner)
+	} else {
+		// Partner (or someone else) paid
+		if !isShared {
+			// Partner paid, alone (doesn't involve requesting user) - Should ideally not be fetched, but handle defensively
+			return fmt.Sprintf("%s Alone", partner) // Indicate partner paid alone
+		}
+		// Partner paid, shared with requesting user
+		if takesAll {
+			// Partner paid, user takes all -> User owes partner full amount
+			return fmt.Sprintf("Paid by You (%s)", requestingUserName) // Corrected: User benefits, owes partner
+		}
+		// Partner paid, shared 50/50
+		return fmt.Sprintf("Shared with You (%s)", requestingUserName)
 	}
-	return "Shared with " + partner
 }
