@@ -125,15 +125,14 @@ function App() {
           <header className="fixed bottom-0 left-0 right-0 w-full bg-white border-t border-gray-200 rounded-t-lg p-3 z-50 max-w-4xl mx-auto">
             <div className="flex justify-between items-center">
               {/* Left Group: Welcome Message (Desktop) + Navigation */}
-              <div className="flex items-center md:gap-4">
+              <div className="w-full flex flex-col md:flex-row md:items-center md:gap-4">
               {/* Welcome Message (visible on larger screens) */}
               <div className="hidden md:block">
                 {userInfo && <span className="text-gray-700 text-sm">Welcome, {userInfo.firstName}!</span>}
               </div>
-              {/* Removed the flex-grow md:hidden div here */}
 
               {/* Navigation Icons/Links - Full width on mobile, left-aligned on desktop */}
-              <nav className="flex-grow flex justify-between w-full md:justify-start md:space-x-2">
+              <nav className="w-full flex justify-between md:justify-start md:space-x-2">
                 {/* Spend */}
                 <button
                   onClick={() => setCurrentView('logSpending')}
