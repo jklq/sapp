@@ -15,7 +15,7 @@ import {
 } from 'chart.js';
 // Import necessary API functions and types
 import { fetchSpendingStats, fetchDepositStats, fetchHistory } from './api';
-import { CategorySpendingStat, DepositStatsResponse, HistoryResponse, HistoryListItem, SpendingItem } from './types';
+import { CategorySpendingStat, HistoryListItem, SpendingItem } from './types';
 
 // Register Chart.js components
 ChartJS.register(
