@@ -91,17 +91,31 @@ func fetchSpendingGroups(db *sql.DB, userID int64) ([]types.TransactionGroup, er
 	}
 
 	groups := []types.TransactionGroup{} // Use types.TransactionGroup
+
+	// Query Explanation:
+	// Selects jobs where:
+	// 1. The buyer is the requesting user (j.buyer = userID)
+	// OR
+	// 2. The buyer is the partner (j.buyer = partnerID) AND there exists at least one spending item
+	//    in that job (linked via ai_categorized_spendings) where the requesting user is the
+	//    'shared_with' participant (us.shared_with = userID).
+	// This ensures we only get partner's jobs if the requesting user is actually involved.
 	jobQuery := `
-		SELECT
-			j.id, j.prompt, j.total_amount, j.transaction_date AS date, j.is_ambiguity_flagged, j.ambiguity_flag_reason, u.first_name AS buyer_name, j.buyer -- Fetch buyer ID as well
+		SELECT DISTINCT
+			j.id, j.prompt, j.total_amount, j.transaction_date AS date, j.is_ambiguity_flagged, j.ambiguity_flag_reason, u.first_name AS buyer_name, j.buyer
 		FROM ai_categorization_jobs j
 		JOIN users u ON j.buyer = u.id
-		WHERE j.buyer = ? OR j.buyer = ? -- Fetch jobs from user OR partner
+		LEFT JOIN ai_categorized_spendings acs ON j.id = acs.job_id
+		LEFT JOIN user_spendings us ON acs.spending_id = us.spending_id
+		WHERE j.buyer = ? OR (j.buyer = ? AND us.shared_with = ?)
 		ORDER BY j.transaction_date DESC, j.created_at DESC; -- Sort primarily by transaction date
 	`
-	jobRows, err := db.Query(jobQuery, userID, partnerID) // Pass both IDs
+	// Note: Using LEFT JOINs and DISTINCT because a job might have multiple spendings involving the user.
+	// We only need to know *if* the user is involved in *any* spending for partner-bought jobs.
+
+	jobRows, err := db.Query(jobQuery, userID, partnerID, userID) // Pass userID, partnerID, userID
 	if err != nil {
-		slog.Error("failed to query AI categorization jobs for user and partner", "user_id", userID, "partner_id", partnerID, "err", err)
+		slog.Error("failed to query AI categorization jobs for user and involved partner jobs", "user_id", userID, "partner_id", partnerID, "err", err)
 		return nil, err
 	}
 	defer jobRows.Close()
@@ -110,7 +124,7 @@ func fetchSpendingGroups(db *sql.DB, userID int64) ([]types.TransactionGroup, er
 		SELECT
 			s.id, s.amount, s.description, c.name AS category_name,
 			u_buyer.first_name AS buyer_name, u_partner.first_name AS partner_name,
-			us.shared_user_takes_all, us.shared_with
+			us.shared_user_takes_all, us.shared_with, us.buyer -- Select buyer ID from user_spendings
 		FROM spendings s
 		JOIN ai_categorized_spendings acs ON s.id = acs.spending_id
 		JOIN user_spendings us ON s.id = us.spending_id
@@ -161,10 +175,11 @@ func fetchSpendingGroups(db *sql.DB, userID int64) ([]types.TransactionGroup, er
 			var item types.SpendingItem // Use types.SpendingItem
 			var partnerName sql.NullString
 			var sharedWithID sql.NullInt64
+			var itemBuyerID int64 // To store the buyer ID from user_spendings
 
 			if err := spendingRows.Scan(
 				&item.ID, &item.Amount, &item.Description, &item.CategoryName,
-				&item.BuyerName, &partnerName, &item.SharedUserTakesAll, &sharedWithID,
+				&item.BuyerName, &partnerName, &item.SharedUserTakesAll, &sharedWithID, &itemBuyerID, // Scan itemBuyerID
 			); err != nil {
 				slog.Error("failed to scan spending item row for history", "user_id", userID, "job_id", group.JobID, "err", err)
 				spendingRows.Close()
@@ -173,7 +188,8 @@ func fetchSpendingGroups(db *sql.DB, userID int64) ([]types.TransactionGroup, er
 
 			item.PartnerName = sqlNullStringToPointer(partnerName)
 			// Determine status from the perspective of the requesting user (userID)
-			item.SharingStatus = determineSharingStatus(userID, item.BuyerID, sharedWithID.Valid, item.SharedUserTakesAll, item.PartnerName, requestingUserName)
+			// Use itemBuyerID (from user_spendings) and sharedWithID for accurate status
+			item.SharingStatus = determineSharingStatus(userID, itemBuyerID, sharedWithID.Valid, item.SharedUserTakesAll, item.PartnerName, requestingUserName)
 			group.Spendings = append(group.Spendings, item)
 		}
 		spendingRows.Close()
