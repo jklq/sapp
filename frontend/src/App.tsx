@@ -126,10 +126,7 @@ function App() {
             <div className="flex justify-between items-center">
               {/* Left Group: Welcome Message (Desktop) + Navigation */}
               <div className="w-full flex flex-col md:flex-row md:items-center md:gap-4">
-              {/* Welcome Message (visible on larger screens) */}
-              <div className="hidden md:block">
-                {userInfo && <span className="text-gray-700 text-sm">Welcome, {userInfo.firstName}!</span>}
-              </div>
+              
 
               {/* Navigation Icons/Links - Full width on mobile, left-aligned on desktop */}
               <nav className="w-full flex justify-evenly md:justify-start md:space-x-2">
