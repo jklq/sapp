@@ -157,7 +157,7 @@ function App() {
                 disabled={currentView === 'addDeposit'}
                 className={`flex flex-col md:flex-row items-center p-2 rounded-md transition-colors duration-150 ${
                   currentView === 'addDeposit'
-                    ? 'bg-green-100 text-green-700' // Use green theme for deposit
+                    ? 'bg-indigo-100 text-indigo-700' // Use indigo theme like others
                     : 'text-gray-500 hover:bg-gray-100 hover:text-gray-700'
                 }`}
                 aria-label="Add Deposit"
