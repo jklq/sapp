@@ -22,7 +22,7 @@ import {
 const AUTH_TOKEN_KEY = "authToken";
 // Use environment variable for API base URL, fallback for development
 const API_BASE_URL =
-  import.meta.env.VITE_API_BASE_URL || "https://sappi.angeltvedt.net";
+  import.meta.env.VITE_API_BASE_URL || "http://localhost:3000"; // "https://sappi.angeltvedt.net";
 
 // --- Auth Token Helpers ---
 
@@ -569,8 +569,8 @@ export async function exportAllData(): Promise<void> {
   try {
     const blob = await response.blob();
     // Extract filename from Content-Disposition header, fallback to a default name
-    const contentDisposition = response.headers.get('Content-Disposition');
-    let filename = 'sapp_export.json'; // Default filename
+    const contentDisposition = response.headers.get("Content-Disposition");
+    let filename = "sapp_export.json"; // Default filename
     if (contentDisposition) {
       const filenameMatch = contentDisposition.match(/filename="?(.+)"?/i);
       if (filenameMatch && filenameMatch.length > 1) {
@@ -579,7 +579,7 @@ export async function exportAllData(): Promise<void> {
     }
 
     // Create a temporary link to trigger the download
-    const link = document.createElement('a');
+    const link = document.createElement("a");
     link.href = window.URL.createObjectURL(blob);
     link.download = filename;
     document.body.appendChild(link);
