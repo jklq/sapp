@@ -149,9 +149,9 @@ func SetupTestEnvironment(t *testing.T) *TestEnv {
 	slog.Info("Setting up test environment...")
 
 	// --- Set JWT Secret for Testing ---
-	// Use t.Setenv to ensure the secret is available for token generation/validation within tests
-	// Use the previous default value for consistency with existing tests/schema.
-	testJwtSecret := "a-secure-secret-key-for-dev-only-replace-in-prod"
+	// Use t.Setenv to ensure the secret is available for token generation/validation within tests.
+	// Use a distinct, clearly marked test secret. DO NOT use this value in production.
+	testJwtSecret := "test-only-jwt-secret-key-1234567890-abcdef"
 	t.Setenv("JWT_SECRET_KEY", testJwtSecret)
 	slog.Debug("Set JWT_SECRET_KEY environment variable for test duration")
 
