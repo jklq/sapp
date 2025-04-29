@@ -131,10 +131,10 @@ function App() {
                 {userInfo && <span className="text-gray-700 text-sm">Welcome, {userInfo.firstName}!</span>}
               </div>
 
-              {/* Navigation Icons/Links */}
-              {/* Mobile: justify-around, w-full. Desktop: justify-start, w-auto */}
-              <nav className="w-full md:w-auto flex justify-around md:justify-start space-x-1 md:space-x-1">
-                {/* Log Spending */}
+              {/* Navigation Icons/Links - Centered */}
+              {/* Use flex-grow to take available space and justify-center to center the items */}
+              <nav className="flex-grow flex justify-center space-x-1 md:space-x-2">
+                {/* Spend */}
                 <button
                   onClick={() => setCurrentView('logSpending')}
                 disabled={currentView === 'logSpending'}
@@ -149,10 +149,10 @@ function App() {
                 <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5 mb-1 md:mb-0 md:mr-1" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
                   <path strokeLinecap="round" strokeLinejoin="round" d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" />
                 </svg>
-                <span className="text-xs md:text-sm">Log Spend</span>
+                <span className="text-xs md:text-sm">Spend</span>
               </button>
 
-               {/* Add Deposit */}
+               {/* Deposit */}
                <button
                 onClick={() => setCurrentView('addDeposit')}
                 disabled={currentView === 'addDeposit'}
@@ -167,7 +167,7 @@ function App() {
                  <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5 mb-1 md:mb-0 md:mr-1" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
                    <path strokeLinecap="round" strokeLinejoin="round" d="M12 9v3m0 0v3m0-3h3m-3 0H9m12 0a9 9 0 11-18 0 9 9 0 0118 0z" />
                  </svg>
-                <span className="text-xs md:text-sm">Add Deposit</span>
+                <span className="text-xs md:text-sm">Deposit</span>
               </button>
 
               {/* View History */}
