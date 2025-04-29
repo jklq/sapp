@@ -529,7 +529,7 @@ function HistoryList({ onBack, loggedInUserName }: HistoryListProps) { // Rename
                                                     {/* Extract partner name and pass to renderer */}
                                                     {( () => { // Wrap IIFE in parentheses
                                                         const partnerNameFromGroup = group.spendings.length > 0 ? group.spendings[0].partner_name : null;
-                                                        return group.spendings.map((spendingItem) => renderSpendingItemRow(spendingItem, partnerNameFromGroup));
+                                                        return group.spendings.map((spendingItem: SpendingItem) => renderSpendingItemRow(spendingItem, partnerNameFromGroup)); // Add type annotation
                                                     })() }
                                                     {group.spendings.length === 0 && (
                                                         <tr className="md:table-row">
@@ -542,7 +542,7 @@ function HistoryList({ onBack, loggedInUserName }: HistoryListProps) { // Rename
                                                 {/* Extract partner name and pass to renderer */}
                                                 {( () => { // Wrap IIFE in parentheses
                                                     const partnerNameFromGroup = group.spendings.length > 0 ? group.spendings[0].partner_name : null;
-                                                    return group.spendings.map((spendingItem) => renderSpendingItemRow(spendingItem, partnerNameFromGroup));
+                                                    return group.spendings.map((spendingItem: SpendingItem) => renderSpendingItemRow(spendingItem, partnerNameFromGroup)); // Add type annotation
                                                 })() }
                                                 {group.spendings.length === 0 && (
                                                     <div className="px-4 py-3 text-center text-sm text-gray-500 italic">No spending items generated for this job.</div>
