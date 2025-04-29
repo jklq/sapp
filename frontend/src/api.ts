@@ -22,7 +22,7 @@ import {
 const AUTH_TOKEN_KEY = "authToken";
 // Use environment variable for API base URL, fallback for development
 const API_BASE_URL =
-  import.meta.env.VITE_API_BASE_URL || "http://localhost:3000";
+  import.meta.env.VITE_API_BASE_URL || "https://sappi.angeltvedt.net";
 
 // --- Auth Token Helpers ---
 
@@ -430,68 +430,73 @@ export async function deleteAIJob(jobId: number): Promise<void> {
 
 // Fetches spending stats for a given date range.
 // Dates should be in "YYYY-MM-DD" format.
-export async function fetchSpendingStats(startDate: string, endDate: string): Promise<CategorySpendingStat[]> {
-    // Validate date format roughly (more robust validation can be added)
-    const dateRegex = /^\d{4}-\d{2}-\d{2}$/;
-    if (!dateRegex.test(startDate) || !dateRegex.test(endDate)) {
-        throw new Error("Invalid date format. Use YYYY-MM-DD.");
+export async function fetchSpendingStats(
+  startDate: string,
+  endDate: string
+): Promise<CategorySpendingStat[]> {
+  // Validate date format roughly (more robust validation can be added)
+  const dateRegex = /^\d{4}-\d{2}-\d{2}$/;
+  if (!dateRegex.test(startDate) || !dateRegex.test(endDate)) {
+    throw new Error("Invalid date format. Use YYYY-MM-DD.");
+  }
+
+  // Construct URL with query parameters
+  const url = new URL(`${API_BASE_URL}/v1/stats/spending`);
+  url.searchParams.append("startDate", startDate);
+  url.searchParams.append("endDate", endDate);
+
+  const response = await fetchWithAuth(url.toString()); // Use GET by default
+
+  if (!response.ok) {
+    const errorBody = await response.text();
+    let errorMessage = `Failed to fetch spending stats: ${response.statusText}`;
+    try {
+      const errData = JSON.parse(errorBody);
+      errorMessage = errData.message || errData.error || errorMessage;
+    } catch /* (e) */ {
+      errorMessage += ` - ${errorBody}`;
     }
+    throw new Error(errorMessage);
+  }
 
-    // Construct URL with query parameters
-    const url = new URL(`${API_BASE_URL}/v1/stats/spending`);
-    url.searchParams.append('startDate', startDate);
-    url.searchParams.append('endDate', endDate);
-
-    const response = await fetchWithAuth(url.toString()); // Use GET by default
-
-    if (!response.ok) {
-        const errorBody = await response.text();
-        let errorMessage = `Failed to fetch spending stats: ${response.statusText}`;
-        try {
-            const errData = JSON.parse(errorBody);
-            errorMessage = errData.message || errData.error || errorMessage;
-        } catch /* (e) */ {
-            errorMessage += ` - ${errorBody}`;
-        }
-        throw new Error(errorMessage);
-    }
-
-    const data: CategorySpendingStat[] = await response.json();
-    console.log("Fetched Spending Stats:", data);
-    return data;
+  const data: CategorySpendingStat[] = await response.json();
+  console.log("Fetched Spending Stats:", data);
+  return data;
 }
 
 // Fetches deposit stats for a given date range.
 // Dates should be in "YYYY-MM-DD" format.
-export async function fetchDepositStats(startDate: string, endDate: string): Promise<DepositStatsResponse> {
-    const dateRegex = /^\d{4}-\d{2}-\d{2}$/;
-    if (!dateRegex.test(startDate) || !dateRegex.test(endDate)) {
-        throw new Error("Invalid date format. Use YYYY-MM-DD.");
+export async function fetchDepositStats(
+  startDate: string,
+  endDate: string
+): Promise<DepositStatsResponse> {
+  const dateRegex = /^\d{4}-\d{2}-\d{2}$/;
+  if (!dateRegex.test(startDate) || !dateRegex.test(endDate)) {
+    throw new Error("Invalid date format. Use YYYY-MM-DD.");
+  }
+
+  const url = new URL(`${API_BASE_URL}/v1/stats/deposits`);
+  url.searchParams.append("startDate", startDate);
+  url.searchParams.append("endDate", endDate);
+
+  const response = await fetchWithAuth(url.toString());
+
+  if (!response.ok) {
+    const errorBody = await response.text();
+    let errorMessage = `Failed to fetch deposit stats: ${response.statusText}`;
+    try {
+      const errData = JSON.parse(errorBody);
+      errorMessage = errData.message || errData.error || errorMessage;
+    } catch /* (e) */ {
+      errorMessage += ` - ${errorBody}`;
     }
+    throw new Error(errorMessage);
+  }
 
-    const url = new URL(`${API_BASE_URL}/v1/stats/deposits`);
-    url.searchParams.append('startDate', startDate);
-    url.searchParams.append('endDate', endDate);
-
-    const response = await fetchWithAuth(url.toString());
-
-    if (!response.ok) {
-        const errorBody = await response.text();
-        let errorMessage = `Failed to fetch deposit stats: ${response.statusText}`;
-        try {
-            const errData = JSON.parse(errorBody);
-            errorMessage = errData.message || errData.error || errorMessage;
-        } catch /* (e) */ {
-            errorMessage += ` - ${errorBody}`;
-        }
-        throw new Error(errorMessage);
-    }
-
-    const data: DepositStatsResponse = await response.json();
-    console.log("Fetched Deposit Stats:", data);
-    return data;
+  const data: DepositStatsResponse = await response.json();
+  console.log("Fetched Deposit Stats:", data);
+  return data;
 }
-
 
 // --- Transfer API Functions ---
 
