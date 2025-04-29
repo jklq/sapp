@@ -132,7 +132,7 @@ function App() {
               </div>
 
               {/* Navigation Icons/Links - Full width on mobile, left-aligned on desktop */}
-              <nav className="w-full flex justify-between md:justify-start md:space-x-2">
+              <nav className="w-full flex justify-evenly md:justify-start md:space-x-2">
                 {/* Spend */}
                 <button
                   onClick={() => setCurrentView('logSpending')}
@@ -145,7 +145,7 @@ function App() {
                 aria-label="Log Spending"
               >
                 {/* Icon: Pencil */}
-                <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5 mb-1 md:mb-0 md:mr-1" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                <svg xmlns="http://www.w3.org/2000/svg" className="h-6 w-6 mb-1 md:mb-0 md:mr-1" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
                   <path strokeLinecap="round" strokeLinejoin="round" d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" />
                 </svg>
                 <span className="text-xs md:text-sm">Spend</span>
@@ -163,7 +163,7 @@ function App() {
                 aria-label="Add Deposit"
               >
                 {/* Icon: Plus Circle */}
-                 <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5 mb-1 md:mb-0 md:mr-1" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                 <svg xmlns="http://www.w3.org/2000/svg" className="h-6 w-6 mb-1 md:mb-0 md:mr-1" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
                    <path strokeLinecap="round" strokeLinejoin="round" d="M12 9v3m0 0v3m0-3h3m-3 0H9m12 0a9 9 0 11-18 0 9 9 0 0118 0z" />
                  </svg>
                 <span className="text-xs md:text-sm">Deposit</span>
@@ -181,7 +181,7 @@ function App() {
                 aria-label="View History"
               >
                 {/* Icon: List */}
-                 <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5 mb-1 md:mb-0 md:mr-1" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                 <svg xmlns="http://www.w3.org/2000/svg" className="h-6 w-6 mb-1 md:mb-0 md:mr-1" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
                   <path strokeLinecap="round" strokeLinejoin="round" d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2m-3 7h3m-3 4h3m-6-4h.01M9 16h.01" />
                 </svg>
                 <span className="text-xs md:text-sm">History</span>
@@ -199,7 +199,7 @@ function App() {
                 aria-label="Transfer Status"
               >
                 {/* Icon: Arrows */}
-                <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5 mb-1 md:mb-0 md:mr-1" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                <svg xmlns="http://www.w3.org/2000/svg" className="h-6 w-6 mb-1 md:mb-0 md:mr-1" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
                   <path strokeLinecap="round" strokeLinejoin="round" d="M8 7h12m0 0l-4-4m4 4l-4 4m0 6H4m0 0l4 4m-4-4l4-4" />
                 </svg>
                 <span className="text-xs md:text-sm">Transfer</span>
@@ -217,7 +217,7 @@ function App() {
                 aria-label="View Stats"
               >
                 {/* Icon: Chart Pie */}
-                <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5 mb-1 md:mb-0 md:mr-1" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                <svg xmlns="http://www.w3.org/2000/svg" className="h-6 w-6 mb-1 md:mb-0 md:mr-1" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
                   <path strokeLinecap="round" strokeLinejoin="round" d="M11 3.055A9.001 9.001 0 1020.945 13H11V3.055z" />
                   <path strokeLinecap="round" strokeLinejoin="round" d="M20.488 9H15V3.512A9.025 9.025 0 0120.488 9z" />
                 </svg>
@@ -234,7 +234,7 @@ function App() {
               aria-label="Logout"
             >
                {/* Icon: Logout */}
-               <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+               <svg xmlns="http://www.w3.org/2000/svg" className="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
                  <path strokeLinecap="round" strokeLinejoin="round" d="M17 16l4-4m0 0l-4-4m4 4H7m6 4v1a3 3 0 01-3 3H6a3 3 0 01-3-3V7a3 3 0 013-3h4a3 3 0 013 3v1" />
                </svg>
                {/* Optional: Add text label for larger screens */}
