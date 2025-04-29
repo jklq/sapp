@@ -19,10 +19,9 @@ import (
 )
 
 // JWT secret key - SHOULD be loaded securely from environment variables in production
-// For development, we can use a default, but warn if it's not set.
 var jwtSecretKey = []byte(os.Getenv("JWT_SECRET_KEY"))
 
-const defaultJwtSecret = "a-secure-secret-key-for-dev-only-replace-in-prod" // CHANGE THIS IN PRODUCTION
+// Default secret removed - must be set via environment variable.
 
 type contextKey string
 
@@ -43,11 +42,11 @@ type Claims struct {
 
 // generateJWT generates a new JWT for a given user ID.
 func generateJWT(userID int64) (string, error) {
-	if len(jwtSecretKey) == 0 {
-		slog.Warn("JWT_SECRET_KEY environment variable not set, using insecure default key for development.")
-		jwtSecretKey = []byte(defaultJwtSecret)
-		// In a real production scenario, you might want to return an error here
-		// return "", errors.New("JWT secret key is not configured")
+	// Ensure JWT secret key is configured
+	secret := []byte(os.Getenv("JWT_SECRET_KEY"))
+	if len(secret) == 0 {
+		slog.Error("CRITICAL: JWT_SECRET_KEY environment variable is not set. Cannot generate token.")
+		return "", errors.New("JWT secret key is not configured")
 	}
 
 	// Set token claims (e.g., expiration time)
@@ -66,7 +65,7 @@ func generateJWT(userID int64) (string, error) {
 	token := jwt.NewWithClaims(jwt.SigningMethodHS256, claims)
 
 	// Sign the token with the secret key
-	tokenString, err := token.SignedString(jwtSecretKey)
+	tokenString, err := token.SignedString(secret) // Use the fetched secret
 	if err != nil {
 		return "", fmt.Errorf("failed to sign token: %w", err)
 	}
@@ -135,11 +134,12 @@ func HandleLogin(db *sql.DB) http.HandlerFunc {
 // AuthMiddleware validates the JWT token from the Authorization header.
 func AuthMiddleware(next http.Handler) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		// Check if JWT secret is configured (only needs to check once, but doing it here is simple)
-		if len(jwtSecretKey) == 0 {
-			slog.Warn("JWT_SECRET_KEY environment variable not set, using insecure default key for development.")
-			jwtSecretKey = []byte(defaultJwtSecret)
-			// Allow proceeding in dev, but log warning. In prod, you might want to fail here.
+		// Ensure JWT secret key is configured before attempting validation
+		secret := []byte(os.Getenv("JWT_SECRET_KEY"))
+		if len(secret) == 0 {
+			slog.Error("CRITICAL: JWT_SECRET_KEY environment variable is not set. Cannot validate token.", "url", r.URL)
+			http.Error(w, "Internal Server Error: Service configuration incomplete", http.StatusInternalServerError)
+			return
 		}
 
 		authHeader := r.Header.Get("Authorization")
@@ -164,7 +164,7 @@ func AuthMiddleware(next http.Handler) http.Handler {
 			if _, ok := token.Method.(*jwt.SigningMethodHMAC); !ok {
 				return nil, fmt.Errorf("unexpected signing method: %v", token.Header["alg"])
 			}
-			return jwtSecretKey, nil
+			return secret, nil // Use the fetched secret
 		})
 
 		if err != nil {

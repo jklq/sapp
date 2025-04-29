@@ -148,6 +148,13 @@ func SetupTestEnvironment(t *testing.T) *TestEnv {
 	slog.SetDefault(logger)
 	slog.Info("Setting up test environment...")
 
+	// --- Set JWT Secret for Testing ---
+	// Use t.Setenv to ensure the secret is available for token generation/validation within tests
+	// Use the previous default value for consistency with existing tests/schema.
+	testJwtSecret := "a-secure-secret-key-for-dev-only-replace-in-prod"
+	t.Setenv("JWT_SECRET_KEY", testJwtSecret)
+	slog.Debug("Set JWT_SECRET_KEY environment variable for test duration")
+
 	// --- Setup Test Database ---
 	dbPath := "file::memory:?cache=shared" // Use shared cache in-memory DB
 	slog.Debug("Setting up in-memory SQLite database", "path", dbPath)

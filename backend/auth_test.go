@@ -44,10 +44,15 @@ func TestLogin(t *testing.T) {
 		// Validate the JWT token
 		claims := &auth.Claims{}
 		_, err := jwt.ParseWithClaims(respBody.Token, claims, func(token *jwt.Token) (interface{}, error) {
-			// Use the same secret retrieval logic as in auth middleware (or a test helper)
+			// Use the secret set by t.Setenv in SetupTestEnvironment
 			secret := []byte(os.Getenv("JWT_SECRET_KEY"))
 			if len(secret) == 0 {
-				secret = []byte("a-secure-secret-key-for-dev-only-replace-in-prod") // Default from auth.go
+				// This should not happen if SetupTestEnvironment ran correctly
+				t.Fatal("JWT_SECRET_KEY not set in test environment")
+			}
+			// Check signing method
+			if _, ok := token.Method.(*jwt.SigningMethodHMAC); !ok {
+				return nil, fmt.Errorf("unexpected signing method: %v", token.Header["alg"])
 			}
 			return secret, nil
 		})
@@ -137,9 +142,15 @@ func TestLogin(t *testing.T) {
 		// Validate the JWT token for the partner
 		claimsPartner := &auth.Claims{}
 		_, err := jwt.ParseWithClaims(respBodyPartner.Token, claimsPartner, func(token *jwt.Token) (interface{}, error) {
+			// Use the secret set by t.Setenv in SetupTestEnvironment
 			secret := []byte(os.Getenv("JWT_SECRET_KEY"))
 			if len(secret) == 0 {
-				secret = []byte("a-secure-secret-key-for-dev-only-replace-in-prod")
+				// This should not happen if SetupTestEnvironment ran correctly
+				t.Fatal("JWT_SECRET_KEY not set in test environment")
+			}
+			// Check signing method
+			if _, ok := token.Method.(*jwt.SigningMethodHMAC); !ok {
+				return nil, fmt.Errorf("unexpected signing method: %v", token.Header["alg"])
 			}
 			return secret, nil
 		})
