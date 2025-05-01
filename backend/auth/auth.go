@@ -13,6 +13,10 @@ import (
 	"time"
 
 	"github.com/golang-jwt/jwt/v5"
+	"crypto/rand"
+	"crypto/sha256"
+	"encoding/base64"
+
 	"golang.org/x/crypto/bcrypt"
 
 	"git.sr.ht/~relay/sapp-backend/types"
@@ -20,6 +24,10 @@ import (
 
 // JWT secret key - SHOULD be loaded securely from environment variables in production
 var jwtSecretKey = []byte(os.Getenv("JWT_SECRET_KEY"))
+
+// Constants for token expiration
+const accessTokenDuration = 15 * time.Minute // Short-lived access token (e.g., 15 minutes)
+const refreshTokenDuration = 30 * 24 * time.Hour // Long-lived refresh token (e.g., 30 days)
 
 // Default secret removed - must be set via environment variable.
 
@@ -40,38 +48,103 @@ type Claims struct {
 // UserRegistrationDetails moved to types package
 // PartnerRegistrationResponse moved to types package
 
-// generateJWT generates a new JWT for a given user ID.
-func generateJWT(userID int64) (string, error) {
-	// Ensure JWT secret key is configured
-	secret := []byte(os.Getenv("JWT_SECRET_KEY"))
-	if len(secret) == 0 {
-		slog.Error("CRITICAL: JWT_SECRET_KEY environment variable is not set. Cannot generate token.")
-		return "", errors.New("JWT secret key is not configured")
-	}
+// --- Token Generation ---
 
-	// Set token claims (e.g., expiration time)
-	expirationTime := time.Now().Add(24 * time.Hour) // Token valid for 24 hours
-	claims := &Claims{
+// generateAccessToken generates a short-lived JWT access token.
+func generateAccessToken(userID int64, secret []byte) (string, error) {
+	expirationTime := time.Now().Add(accessTokenDuration)
+	claims := &AccessTokenClaims{
 		UserID: userID,
 		RegisteredClaims: jwt.RegisteredClaims{
 			ExpiresAt: jwt.NewNumericDate(expirationTime),
 			IssuedAt:  jwt.NewNumericDate(time.Now()),
 			NotBefore: jwt.NewNumericDate(time.Now()),
-			Issuer:    "sapp-backend", // Optional: identify the issuer
+			Issuer:    "sapp-backend",
 		},
 	}
-
-	// Create token with claims
 	token := jwt.NewWithClaims(jwt.SigningMethodHS256, claims)
+	return token.SignedString(secret)
+}
 
-	// Sign the token with the secret key
-	tokenString, err := token.SignedString(secret) // Use the fetched secret
+// generateRefreshToken generates a long-lived, secure random string for the refresh token.
+// It does NOT generate a JWT for the refresh token itself, only the access token.
+// The refresh token value stored in the DB is a hash of this generated string.
+func generateRefreshTokenValue() (string, error) {
+	b := make([]byte, 32) // Generate 32 random bytes
+	_, err := rand.Read(b)
 	if err != nil {
-		return "", fmt.Errorf("failed to sign token: %w", err)
+		return "", err
+	}
+	return base64.URLEncoding.EncodeToString(b), nil // Encode to URL-safe base64 string
+}
+
+// hashToken hashes a token string using SHA256.
+func hashToken(token string) string {
+	hash := sha256.Sum256([]byte(token))
+	return base64.URLEncoding.EncodeToString(hash[:]) // Store hash as base64 string
+}
+
+// storeRefreshToken stores the hashed refresh token in the database.
+func storeRefreshToken(db *sql.DB, userID int64, tokenValue string) error {
+	hashedToken := hashToken(tokenValue)
+	expiresAt := time.Now().Add(refreshTokenDuration)
+
+	// Consider removing old tokens for the user first for cleanliness
+	_, err := db.Exec("DELETE FROM refresh_tokens WHERE user_id = ?", userID)
+	if err != nil {
+		slog.Error("Failed to delete old refresh tokens", "user_id", userID, "err", err)
+		// Continue execution, but log the error
 	}
 
-	return tokenString, nil
+	_, err = db.Exec(`
+		INSERT INTO refresh_tokens (user_id, token_hash, expires_at)
+		VALUES (?, ?, ?)
+	`, userID, hashedToken, expiresAt)
+
+	if err != nil {
+		slog.Error("Failed to store refresh token", "user_id", userID, "err", err)
+		return fmt.Errorf("could not store refresh token: %w", err)
+	}
+	slog.Debug("Refresh token stored successfully", "user_id", userID)
+	return nil
 }
+
+// validateRefreshToken checks if the provided refresh token value is valid in the database.
+// Returns the user ID if valid, otherwise returns 0 and an error.
+func validateRefreshToken(db *sql.DB, tokenValue string) (int64, error) {
+	hashedToken := hashToken(tokenValue)
+	var userID int64
+	var expiresAt time.Time
+
+	err := db.QueryRow(`
+		SELECT user_id, expires_at FROM refresh_tokens
+		WHERE token_hash = ?
+	`, hashedToken).Scan(&userID, &expiresAt)
+
+	if err != nil {
+		if err == sql.ErrNoRows {
+			slog.Warn("Refresh token validation failed: token not found", "token_hash_prefix", hashedToken[:min(10, len(hashedToken))]) // Log prefix for debugging
+			return 0, errors.New("invalid refresh token")
+		}
+		slog.Error("Database error validating refresh token", "err", err)
+		return 0, fmt.Errorf("database error during refresh token validation: %w", err)
+	}
+
+	if time.Now().After(expiresAt) {
+		slog.Warn("Refresh token validation failed: token expired", "user_id", userID, "expires_at", expiresAt)
+		// Optionally delete the expired token
+		_, delErr := db.Exec("DELETE FROM refresh_tokens WHERE token_hash = ?", hashedToken)
+		if delErr != nil {
+			slog.Error("Failed to delete expired refresh token", "user_id", userID, "err", delErr)
+		}
+		return 0, errors.New("refresh token expired")
+	}
+
+	slog.Debug("Refresh token validated successfully", "user_id", userID)
+	return userID, nil
+}
+
+// --- HTTP Handlers ---
 
 // HandleLogin creates a handler for user login
 func HandleLogin(db *sql.DB) http.HandlerFunc {
@@ -113,20 +186,45 @@ func HandleLogin(db *sql.DB) http.HandlerFunc {
 			return
 		}
 
-		// Password matches - Generate JWT
-		slog.Info("User logged in successfully, generating JWT", "username", req.Username, "userID", userID, "firstName", firstName)
-		tokenString, err := generateJWT(userID)
+		// Password matches - Generate Tokens
+		slog.Info("User logged in successfully, generating tokens", "username", req.Username, "userID", userID, "firstName", firstName)
+
+		// Ensure JWT secret key is configured
+		secret := []byte(os.Getenv("JWT_SECRET_KEY"))
+		if len(secret) == 0 {
+			slog.Error("CRITICAL: JWT_SECRET_KEY environment variable is not set. Cannot generate tokens.")
+			http.Error(w, "Internal Server Error: Service configuration incomplete", http.StatusInternalServerError)
+			return
+		}
+
+		accessToken, err := generateAccessToken(userID, secret)
 		if err != nil {
-			slog.Error("Failed to generate JWT", "username", req.Username, "userID", userID, "err", err)
+			slog.Error("Failed to generate access token", "username", req.Username, "userID", userID, "err", err)
+			http.Error(w, "Internal server error during login", http.StatusInternalServerError)
+			return
+		}
+
+		refreshTokenValue, err := generateRefreshTokenValue()
+		if err != nil {
+			slog.Error("Failed to generate refresh token value", "username", req.Username, "userID", userID, "err", err)
+			http.Error(w, "Internal server error during login", http.StatusInternalServerError)
+			return
+		}
+
+		// Store the hashed refresh token in the database
+		err = storeRefreshToken(db, userID, refreshTokenValue)
+		if err != nil {
+			// Error already logged in storeRefreshToken
 			http.Error(w, "Internal server error during login", http.StatusInternalServerError)
 			return
 		}
 
 		w.Header().Set("Content-Type", "application/json")
 		json.NewEncoder(w).Encode(types.LoginResponse{ // Use types.LoginResponse
-			Token:     tokenString, // Return the generated JWT
-			UserID:    userID,
-			FirstName: firstName,
+			AccessToken:  accessToken,
+			RefreshToken: refreshTokenValue, // Return the raw refresh token value to the client
+			UserID:       userID,
+			FirstName:    firstName,
 		})
 	}
 }
@@ -185,10 +283,18 @@ func AuthMiddleware(next http.Handler) http.Handler {
 		}
 
 		// Token is valid, extract user ID and add to context
-		userID := claims.UserID
+		// Ensure we are parsing AccessTokenClaims
+		accessTokenClaims, ok := token.Claims.(*AccessTokenClaims)
+		if !ok || !token.Valid {
+			slog.Warn("JWT validation failed: invalid claims type or token invalid", "url", r.URL)
+			http.Error(w, "Invalid token", http.StatusUnauthorized)
+			return
+		}
+
+		userID := accessTokenClaims.UserID
 		if userID <= 0 {
 			// Should not happen if token generation is correct, but check defensively
-			slog.Error("Invalid user ID found in valid JWT claims", "url", r.URL, "userID", userID)
+			slog.Error("Invalid user ID found in valid access token claims", "url", r.URL, "userID", userID)
 			http.Error(w, "Invalid token claims", http.StatusUnauthorized)
 			return
 		}
@@ -214,8 +320,101 @@ func GetUserIDFromContext(ctx context.Context) (int64, bool) {
 // GenerateTestJWT is a helper function specifically for tests to generate a token.
 // It should NOT be used in production code.
 func GenerateTestJWT(userID int64) (string, error) {
-	// Use the same logic as generateJWT, potentially with shorter expiry for tests if desired
-	return generateJWT(userID)
+	// Use the same logic as generateAccessToken, potentially with different expiry for tests if desired
+	secret := []byte(os.Getenv("JWT_SECRET_KEY"))
+	if len(secret) == 0 {
+		return "", errors.New("JWT_SECRET_KEY not set for test JWT generation")
+	}
+	return generateAccessToken(userID, secret)
+}
+
+// HandleRefresh handles requests to refresh an access token using a refresh token.
+func HandleRefresh(db *sql.DB) http.HandlerFunc {
+	return func(w http.ResponseWriter, r *http.Request) {
+		var req types.RefreshTokenRequest
+		if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+			http.Error(w, "Invalid request body", http.StatusBadRequest)
+			return
+		}
+		defer r.Body.Close()
+
+		if req.RefreshToken == "" {
+			http.Error(w, "Refresh token is required", http.StatusBadRequest)
+			return
+		}
+
+		// Validate the refresh token against the database
+		userID, err := validateRefreshToken(db, req.RefreshToken)
+		if err != nil {
+			// Errors logged in validateRefreshToken
+			http.Error(w, err.Error(), http.StatusUnauthorized) // Return specific error (invalid/expired)
+			return
+		}
+
+		// Refresh token is valid, generate a new access token
+		secret := []byte(os.Getenv("JWT_SECRET_KEY"))
+		if len(secret) == 0 {
+			slog.Error("CRITICAL: JWT_SECRET_KEY environment variable is not set. Cannot generate access token during refresh.")
+			http.Error(w, "Internal Server Error: Service configuration incomplete", http.StatusInternalServerError)
+			return
+		}
+
+		newAccessToken, err := generateAccessToken(userID, secret)
+		if err != nil {
+			slog.Error("Failed to generate new access token during refresh", "user_id", userID, "err", err)
+			http.Error(w, "Internal server error during token refresh", http.StatusInternalServerError)
+			return
+		}
+
+		// --- Optional: Refresh Token Rotation ---
+		// If implementing rotation, generate a new refresh token value here,
+		// store it (deleting the old one), and return it in the response.
+		// For simplicity, we are not rotating refresh tokens in this example.
+		// --- End Optional Rotation ---
+
+		slog.Info("Access token refreshed successfully", "user_id", userID)
+		w.Header().Set("Content-Type", "application/json")
+		json.NewEncoder(w).Encode(types.RefreshTokenResponse{
+			AccessToken: newAccessToken,
+			// RefreshToken: newRefreshTokenValue, // Include if rotating
+		})
+	}
+}
+
+// HandleVerify handles requests to verify the current access token and return basic user info.
+// It relies on AuthMiddleware to validate the token first.
+func HandleVerify(db *sql.DB) http.HandlerFunc {
+	return func(w http.ResponseWriter, r *http.Request) {
+		// AuthMiddleware should have already run and put the user ID in the context.
+		userID, ok := GetUserIDFromContext(r.Context())
+		if !ok {
+			// This should not happen if AuthMiddleware is working correctly
+			slog.Error("User ID not found in context after AuthMiddleware in HandleVerify", "url", r.URL)
+			http.Error(w, "Authentication context error", http.StatusInternalServerError)
+			return
+		}
+
+		// Fetch user's first name (or any other needed info)
+		var firstName string
+		err := db.QueryRow("SELECT first_name FROM users WHERE id = ?", userID).Scan(&firstName)
+		if err != nil {
+			if err == sql.ErrNoRows {
+				slog.Error("User ID from valid token not found in database", "user_id", userID)
+				http.Error(w, "User not found", http.StatusUnauthorized) // Treat as unauthorized
+			} else {
+				slog.Error("Database error fetching user info for verification", "user_id", userID, "err", err)
+				http.Error(w, "Internal server error", http.StatusInternalServerError)
+			}
+			return
+		}
+
+		slog.Debug("Token verified successfully, returning user info", "user_id", userID)
+		w.Header().Set("Content-Type", "application/json")
+		json.NewEncoder(w).Encode(types.VerifyResponse{
+			UserID:    userID,
+			FirstName: firstName,
+		})
+	}
 }
 
 // Querier defines an interface with the QueryRow method, satisfied by *sql.DB and *sql.Tx.

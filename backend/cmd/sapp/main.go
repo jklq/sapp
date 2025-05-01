@@ -102,11 +102,13 @@ func main() {
 	mux := http.NewServeMux()
 
 	// --- Public Routes ---
-	mux.HandleFunc("POST /v1/login", auth.HandleLogin(db))                           // Login is public
-	mux.HandleFunc("POST /v1/register/partners", auth.HandlePartnerRegistration(db)) // Partner registration is public
+	mux.HandleFunc("POST /v1/login", auth.HandleLogin(db))                           // Login
+	mux.HandleFunc("POST /v1/register/partners", auth.HandlePartnerRegistration(db)) // Partner registration
+	mux.HandleFunc("POST /v1/refresh", auth.HandleRefresh(db))                       // Token Refresh
 
-	// --- Protected Routes ---
+	// --- Protected Routes (require valid access token via AuthMiddleware) ---
 	// Create handlers for protected routes
+	verifyHandler := http.HandlerFunc(auth.HandleVerify(db)) // Verify token handler
 	payHandler := http.HandlerFunc(pay.HandlePayRoute(db))
 	getCategoriesHandler := http.HandlerFunc(category.HandleGetCategories(db))
 	categorizeHandler := http.HandlerFunc(category.HandleAICategorize(db, &categorizationPool)) // Pass pointer to pool
@@ -126,6 +128,7 @@ func main() {
 	exportAllDataHandler := http.HandlerFunc(export.HandleExportAllData(db))      // Export handler
 
 	// Apply AuthMiddleware to protected handlers
+	mux.Handle("GET /v1/verify", applyMiddleware(verifyHandler, auth.AuthMiddleware)) // Verify endpoint
 	mux.Handle("POST /v1/pay", applyMiddleware(payHandler, auth.AuthMiddleware))
 	mux.Handle("GET /v1/categories", applyMiddleware(getCategoriesHandler, auth.AuthMiddleware))
 	mux.Handle("POST /v1/categorize", applyMiddleware(categorizeHandler, auth.AuthMiddleware))
