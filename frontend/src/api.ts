@@ -65,6 +65,17 @@ async function fetchWithAuth(
     ...options,
     headers: headers,
   });
+
+  // Check for unauthorized status (token expired/invalid)
+  if (response.status === 401) {
+    console.warn("Received 401 Unauthorized. Token might be expired or invalid. Logging out.");
+    removeToken(); // Clear the invalid token
+    window.location.reload(); // Reload the page to redirect to login
+    // Throw an error to prevent further processing in the original caller
+    throw new Error("Unauthorized: Token expired or invalid.");
+  }
+
+  return response; // Return the original response if not 401
 }
 
 // --- API Functions ---
