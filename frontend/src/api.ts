@@ -4,6 +4,8 @@ import {
   AICategorizationPayload,
   LoginPayload,
   LoginResponse,
+  RefreshTokenRequest, // Added
+  RefreshTokenResponse, // Added
   PartnerRegistrationPayload,
   PartnerRegistrationResponse,
   AddDepositPayload,
@@ -19,39 +21,84 @@ import {
 } from "./types";
 
 // --- Constants ---
-const AUTH_TOKEN_KEY = "authToken";
+const ACCESS_TOKEN_KEY = "accessToken"; // Renamed
+const REFRESH_TOKEN_KEY = "refreshToken"; // Added
 // Use environment variable for API base URL, fallback for development
 const API_BASE_URL =
   import.meta.env.VITE_API_BASE_URL || "http://localhost:3000";
 
 // --- Auth Token Helpers ---
 
-export function storeToken(token: string): void {
-  localStorage.setItem(AUTH_TOKEN_KEY, token);
+export function storeTokens(accessToken: string, refreshToken: string): void {
+  localStorage.setItem(ACCESS_TOKEN_KEY, accessToken);
+  localStorage.setItem(REFRESH_TOKEN_KEY, refreshToken);
 }
 
-export function getToken(): string | null {
-  return localStorage.getItem(AUTH_TOKEN_KEY);
+export function getAccessToken(): string | null {
+  return localStorage.getItem(ACCESS_TOKEN_KEY);
 }
 
-export function removeToken(): void {
-  localStorage.removeItem(AUTH_TOKEN_KEY);
+export function getRefreshToken(): string | null {
+  return localStorage.getItem(REFRESH_TOKEN_KEY);
+}
+
+export function removeTokens(): void {
+  localStorage.removeItem(ACCESS_TOKEN_KEY);
+  localStorage.removeItem(REFRESH_TOKEN_KEY);
 }
 
 // --- Core Fetch Wrapper ---
 
-// Wrapper for fetch that automatically adds Authorization header if token exists
+// Flag to prevent infinite refresh loops
+let isRefreshing = false;
+// Queue for requests that arrive while token is being refreshed
+let refreshSubscribers: ((token: string | null) => void)[] = [];
+
+// Function to add request callbacks to the queue
+const subscribeTokenRefresh = (cb: (token: string | null) => void) => {
+  refreshSubscribers.push(cb);
+};
+
+// Function to notify all queued requests with the new token (or null if refresh failed)
+const onRefreshed = (token: string | null) => {
+  refreshSubscribers.forEach((cb) => cb(token));
+  // Clear the queue after notifying
+  refreshSubscribers = [];
+};
+
+
+// Wrapper for fetch that automatically adds Authorization header and handles token refresh
 async function fetchWithAuth(
   url: string,
   options: RequestInit = {}
 ): Promise<Response> {
-  const token = getToken();
+  // Check if currently refreshing. If so, queue this request.
+  if (isRefreshing) {
+    return new Promise((resolve) => {
+      subscribeTokenRefresh((newToken: string | null) => {
+        // When refresh is done, retry the request with the new token
+        if (newToken) {
+          const newOptions = { ...options };
+          const headers = new Headers(newOptions.headers || {});
+          headers.set("Authorization", `Bearer ${newToken}`);
+          newOptions.headers = headers;
+          resolve(fetch(url, newOptions)); // Re-run fetch, not fetchWithAuth to avoid loop
+        } else {
+          // Refresh failed, reject the promise (or handle as needed)
+          // This case should ideally trigger logout in the refresh logic itself
+          reject(new Error("Token refresh failed, unable to proceed."));
+        }
+      });
+    });
+  }
+
+  const accessToken = getAccessToken();
   const headers = new Headers(options.headers || {});
 
-  if (token) {
-    // Prepend "Bearer " to the token for standard JWT authorization
-    headers.set("Authorization", `Bearer ${token}`);
+  if (accessToken) {
+    headers.set("Authorization", `Bearer ${accessToken}`);
   }
+
   // Ensure Content-Type is set for methods that have a body, unless it's FormData
   if (
     options.body &&
@@ -67,17 +114,104 @@ async function fetchWithAuth(
     headers: headers,
   });
 
-  // Check for unauthorized status (token expired/invalid) *before* returning
-  if (response.status === 401) {
-    console.warn("Received 401 Unauthorized. Token might be expired or invalid. Logging out.");
-    removeToken(); // Clear the invalid token
-    // TODO: Implement refresh token logic here instead of immediate logout
-    window.location.reload(); // Reload the page to redirect to login (temporary)
-    // Throw an error to prevent further processing in the original caller
-    throw new Error("Unauthorized: Token expired or invalid.");
+  // Check for unauthorized status (token expired/invalid)
+  if (response.status === 401 && !options.headers?.has("X-Skip-Refresh")) { // Check for 401 and ensure we aren't already refreshing
+    const currentRefreshToken = getRefreshToken();
+    if (!currentRefreshToken) {
+      console.error("401 received but no refresh token found. Logging out.");
+      removeTokens();
+      window.location.href = '/login'; // Redirect to login
+      throw new Error("Unauthorized: No refresh token available.");
+    }
+
+    // Prevent multiple refresh attempts simultaneously
+    if (!isRefreshing) {
+        isRefreshing = true;
+        try {
+            console.log("Access token expired or invalid. Attempting refresh...");
+            const refreshResponse = await refreshToken(currentRefreshToken);
+            storeTokens(refreshResponse.access_token, currentRefreshToken); // Store new access token (and potentially new refresh token if rotation is implemented)
+            console.log("Token refresh successful.");
+
+            // Notify queued requests
+            onRefreshed(refreshResponse.access_token);
+
+            // Retry the original request with the new token
+            headers.set("Authorization", `Bearer ${refreshResponse.access_token}`);
+            // Add a header to prevent refresh loop if the refresh endpoint itself returns 401
+            // (though it shouldn't if the refresh token is valid)
+            const retryOptions = { ...options, headers };
+            isRefreshing = false; // Reset flag before retrying
+            return fetch(url, retryOptions); // Re-run fetch directly
+
+        } catch (refreshError) {
+            console.error("Token refresh failed:", refreshError);
+            isRefreshing = false; // Reset flag on failure
+            onRefreshed(null); // Notify queued requests that refresh failed
+            removeTokens(); // Clear invalid tokens
+            window.location.href = '/login'; // Redirect to login
+            // Throw error to prevent further processing in the original caller
+            throw new Error(`Unauthorized: Token refresh failed. ${refreshError}`);
+        } finally {
+           // Ensure flag is reset even if unexpected errors occur
+           isRefreshing = false;
+        }
+    } else {
+      // If already refreshing, queue this request (handled at the start of the function)
+      return new Promise((resolve, reject) => { // Added reject here
+        subscribeTokenRefresh((newToken: string | null) => {
+          if (newToken) {
+            const newOptions = { ...options };
+            const headers = new Headers(newOptions.headers || {});
+            headers.set("Authorization", `Bearer ${newToken}`);
+            newOptions.headers = headers;
+            resolve(fetch(url, newOptions)); // Re-run fetch
+          } else {
+            reject(new Error("Token refresh failed while request was queued."));
+          }
+        });
+      });
+    }
+  } else if (!response.ok && response.status !== 401) {
+    // Handle other non-401 errors immediately
+    // We might want to parse the error body here as well
+    console.error(`HTTP error! status: ${response.status}`, await response.text());
+    // Throw an error or handle as appropriate for non-auth errors
+    // throw new Error(`HTTP error! status: ${response.status}`);
   }
 
-  return response; // Return the original response if not 401
+  return response; // Return the original response if not 401 or other handled error
+}
+
+// --- API Function for Refreshing Token ---
+async function refreshToken(refreshTokenValue: string): Promise<RefreshTokenResponse> {
+    const url = `${API_BASE_URL}/v1/refresh`;
+    const payload: RefreshTokenRequest = { refresh_token: refreshTokenValue };
+
+    const response = await fetch(url, { // Use plain fetch, no auth needed for refresh endpoint
+        method: 'POST',
+        headers: {
+            'Content-Type': 'application/json',
+            // Add a header to signal this is the refresh request itself,
+            // preventing fetchWithAuth from trying to refresh again if this fails with 401
+            'X-Skip-Refresh': 'true',
+        },
+        body: JSON.stringify(payload),
+    });
+
+    if (!response.ok) {
+        // If refresh fails, backend should ideally return a specific status code or error message
+        const errorBody = await response.text();
+        console.error("Refresh token request failed:", response.status, errorBody);
+        // Throw specific error to be caught by the fetchWithAuth retry logic
+        throw new Error(`Failed to refresh token: ${response.status} - ${errorBody}`);
+    }
+
+    const data: RefreshTokenResponse = await response.json();
+    if (!data.access_token) {
+        throw new Error("Refresh successful, but no new access token received.");
+    }
+    return data;
 }
 
 // --- API Functions ---
@@ -181,11 +315,15 @@ export async function loginUser(payload: LoginPayload): Promise<LoginResponse> {
     throw new Error(errorBody);
   }
 
-  // Assuming the backend returns JSON with token, user_id, first_name
+  // Assuming the backend returns JSON with access_token, refresh_token, user_id, first_name
   const data: LoginResponse = await response.json();
-  if (!data.token) {
-    throw new Error("Login successful, but no token received.");
+  if (!data.access_token || !data.refresh_token) {
+    throw new Error("Login successful, but tokens not received.");
   }
+  // Store both tokens
+  storeTokens(data.access_token, data.refresh_token);
+
+  // Return the full response data (excluding tokens if preferred, but usually includes user info)
   return data;
 }
 

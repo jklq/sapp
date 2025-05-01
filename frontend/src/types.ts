@@ -29,9 +29,22 @@ export interface LoginPayload {
 
 // Response from the login endpoint
 export interface LoginResponse {
-  token: string;
-  user_id: number; // Assuming backend sends user_id
-  first_name: string; // Assuming backend sends first_name
+  access_token: string; // Renamed from token to match backend
+  refresh_token: string; // Added refresh token
+  user_id: number;
+  first_name: string;
+}
+
+// Payload for the refresh token request
+export interface RefreshTokenRequest {
+  refresh_token: string;
+}
+
+// Response from the refresh token endpoint
+export interface RefreshTokenResponse {
+  access_token: string;
+  // Optionally include a new refresh token if implementing rotation
+  // refresh_token?: string;
 }
 
 // Structure for detailed spending info fetched from the backend
