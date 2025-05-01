@@ -155,7 +155,7 @@ func main() {
 	corsHandler := cors.New(cors.Options{
 		AllowedOrigins: []string{"*"}, // Allow all origins for now, restrict in production
 		AllowedMethods: []string{"GET", "POST", "PUT", "DELETE", "OPTIONS"},
-		AllowedHeaders: []string{"Authorization", "Content-Type"}, // Ensure Authorization is allowed
+		AllowedHeaders: []string{"Authorization", "Content-Type", "X-Skip-Refresh"}, // Added X-Skip-Refresh
 	})
 	// Apply CORS first, then logging, then the mux router
 	handler := corsHandler.Handler(loggingMiddleware(mux))
