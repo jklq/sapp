@@ -61,16 +61,18 @@ async function fetchWithAuth(
     headers.set("Content-Type", "application/json");
   }
 
-  return fetch(url, {
+  // Execute the fetch request
+  const response = await fetch(url, {
     ...options,
     headers: headers,
   });
 
-  // Check for unauthorized status (token expired/invalid)
+  // Check for unauthorized status (token expired/invalid) *before* returning
   if (response.status === 401) {
     console.warn("Received 401 Unauthorized. Token might be expired or invalid. Logging out.");
     removeToken(); // Clear the invalid token
-    window.location.reload(); // Reload the page to redirect to login
+    // TODO: Implement refresh token logic here instead of immediate logout
+    window.location.reload(); // Reload the page to redirect to login (temporary)
     // Throw an error to prevent further processing in the original caller
     throw new Error("Unauthorized: Token expired or invalid.");
   }

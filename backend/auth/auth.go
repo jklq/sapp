@@ -265,7 +265,7 @@ func AuthMiddleware(next http.Handler) http.Handler {
 		tokenString := parts[1]
 
 		// Parse and validate the token
-		claims := &Claims{}
+		claims := &AccessTokenClaims{} // Use AccessTokenClaims here
 		token, err := jwt.ParseWithClaims(tokenString, claims, func(token *jwt.Token) (interface{}, error) {
 			// Check the signing method
 			if _, ok := token.Method.(*jwt.SigningMethodHMAC); !ok {
