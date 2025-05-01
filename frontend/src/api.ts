@@ -74,7 +74,7 @@ async function fetchWithAuth(
 ): Promise<Response> {
   // Check if currently refreshing. If so, queue this request.
   if (isRefreshing) {
-    return new Promise((resolve) => {
+    return new Promise((resolve, reject) => { // Added reject parameter
       subscribeTokenRefresh((newToken: string | null) => {
         // When refresh is done, retry the request with the new token
         if (newToken) {
@@ -115,7 +115,8 @@ async function fetchWithAuth(
   });
 
   // Check for unauthorized status (token expired/invalid)
-  if (response.status === 401 && !options.headers?.has("X-Skip-Refresh")) { // Check for 401 and ensure we aren't already refreshing
+  // Use the 'headers' object which is guaranteed to be a Headers instance
+  if (response.status === 401 && !headers.has("X-Skip-Refresh")) { // Check for 401 and ensure we aren't already refreshing
     const currentRefreshToken = getRefreshToken();
     if (!currentRefreshToken) {
       console.error("401 received but no refresh token found. Logging out.");

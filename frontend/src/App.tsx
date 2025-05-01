@@ -1,5 +1,6 @@
 import { useState, useEffect } from 'react';
-import { getToken, storeToken, removeToken } from './api';
+// Updated imports for token functions
+import { getAccessToken, storeTokens, removeTokens } from './api';
 import { LoginResponse } from './types';
 import LoginForm from './LoginForm';
 import LogSpendingForm from './LogSpendingForm';
@@ -21,7 +22,7 @@ interface UserInfo {
 
 function App() {
   // Authentication state
-  const [authToken, setAuthToken] = useState<string | null>(getToken());
+  const [authToken, setAuthToken] = useState<string | null>(getAccessToken()); // Use getAccessToken
   const [userInfo, setUserInfo] = useState<UserInfo | null>(null); // Restore userInfo state
   const [isLoadingAuth, setIsLoadingAuth] = useState<boolean>(true);
 
@@ -33,7 +34,7 @@ function App() {
 
   // Effect to check token validity or fetch user info on load
   useEffect(() => {
-    const currentToken = getToken();
+    const currentToken = getAccessToken(); // Use getAccessToken
     if (currentToken) {
       // TODO: Optionally add an API call here to verify the token
       // and fetch user details if they aren't stored alongside the token.
@@ -63,8 +64,10 @@ function App() {
   }, []); // Run only once on initial load
 
   const handleLoginSuccess = (data: LoginResponse) => {
-    storeToken(data.token);
-    setAuthToken(data.token);
+    // Use storeTokens with both access and refresh tokens
+    storeTokens(data.access_token, data.refresh_token);
+    // Set authToken state with the access token
+    setAuthToken(data.access_token);
     const newUserInfo: UserInfo = { userId: data.user_id, firstName: data.first_name };
     setUserInfo(newUserInfo); // Set user info state
     localStorage.setItem('userInfo', JSON.stringify(newUserInfo)); // Store user info
@@ -72,7 +75,7 @@ function App() {
   };
 
   const handleLogout = () => {
-    removeToken();
+    removeTokens(); // Use removeTokens
     localStorage.removeItem('userInfo'); // Remove user info on logout
     setAuthToken(null);
     setUserInfo(null); // Clear user info state
