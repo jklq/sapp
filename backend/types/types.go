@@ -32,9 +32,29 @@ type LoginRequest struct {
 
 // LoginResponse defines the structure for the login response body
 type LoginResponse struct {
-	Token     string `json:"token"`
+	AccessToken  string `json:"access_token"` // Renamed from token
+	RefreshToken string `json:"refresh_token"`
+	UserID       int64  `json:"user_id"`
+	FirstName    string `json:"first_name"`
+}
+
+// RefreshTokenRequest defines the structure for the token refresh request body
+type RefreshTokenRequest struct {
+	RefreshToken string `json:"refresh_token"`
+}
+
+// RefreshTokenResponse defines the structure for the token refresh response body
+type RefreshTokenResponse struct {
+	AccessToken string `json:"access_token"`
+	// Optionally include a new refresh token if implementing rotation
+	// RefreshToken string `json:"refresh_token,omitempty"`
+}
+
+// VerifyResponse defines the structure for the token verification response body
+type VerifyResponse struct {
 	UserID    int64  `json:"user_id"`
 	FirstName string `json:"first_name"`
+	// Add any other user details the frontend might need initially
 }
 
 // PartnerRegistrationRequest defines the structure for the partner registration request body

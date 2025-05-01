@@ -104,6 +104,19 @@ CREATE TABLE IF NOT EXISTS deposits (
     FOREIGN KEY(user_id) REFERENCES users(id) ON UPDATE CASCADE ON DELETE CASCADE
 );
 
+-- Refresh Tokens table stores hashed refresh tokens for users
+CREATE TABLE IF NOT EXISTS refresh_tokens (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    user_id INTEGER NOT NULL,
+    token_hash TEXT NOT NULL UNIQUE, -- Store a hash of the token, not the token itself
+    expires_at DATETIME NOT NULL,
+    created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+    FOREIGN KEY(user_id) REFERENCES users(id) ON DELETE CASCADE -- Delete tokens if user is deleted
+);
+
+-- Index for faster lookup by user_id
+CREATE INDEX IF NOT EXISTS idx_refresh_tokens_user_id ON refresh_tokens (user_id);
+
 
 -- Add settled_at column to user_spendings to track settlement status
 -- We need to add this column separately as ALTER TABLE ADD COLUMN is standard SQL
