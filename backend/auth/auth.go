@@ -38,8 +38,17 @@ const userContextKey = contextKey("userID")
 // LoginRequest moved to types package
 // LoginResponse moved to types package
 
-// Claims defines the structure for JWT claims
-type Claims struct {
+// AccessTokenClaims defines the structure for JWT access token claims
+type AccessTokenClaims struct {
+	UserID int64 `json:"user_id"`
+	jwt.RegisteredClaims
+}
+
+// RefreshTokenClaims defines the structure for JWT refresh token claims (can be simpler)
+// We primarily rely on the database record for refresh token validity.
+// The JWT itself mainly serves as a carrier for the user ID if needed during refresh,
+// but we'll validate against the DB hash.
+type RefreshTokenClaims struct {
 	UserID int64 `json:"user_id"`
 	jwt.RegisteredClaims
 }
