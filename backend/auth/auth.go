@@ -12,10 +12,11 @@ import (
 	"strings"
 	"time"
 
-	"github.com/golang-jwt/jwt/v5"
 	"crypto/rand"
 	"crypto/sha256"
 	"encoding/base64"
+
+	"github.com/golang-jwt/jwt/v5"
 
 	"golang.org/x/crypto/bcrypt"
 
@@ -26,7 +27,7 @@ import (
 var jwtSecretKey = []byte(os.Getenv("JWT_SECRET_KEY"))
 
 // Constants for token expiration
-const accessTokenDuration = 15 * time.Minute // Short-lived access token (e.g., 15 minutes)
+const accessTokenDuration = 15 * time.Minute     // Short-lived access token (e.g., 15 minutes)
 const refreshTokenDuration = 30 * 24 * time.Hour // Long-lived refresh token (e.g., 30 days)
 
 // Default secret removed - must be set via environment variable.
