@@ -84,8 +84,8 @@ async function fetchWithAuth(
           newOptions.headers = headers;
           resolve(fetch(url, newOptions)); // Re-run fetch, not fetchWithAuth to avoid loop
         } else {
-          // Refresh failed, reject the promise (or handle as needed)
-          // This case should ideally trigger logout in the refresh logic itself
+          // Refresh failed, reject the promise. Logout/redirect is handled
+          // in the main catch block of the refresh attempt.
           reject(new Error("Token refresh failed, unable to proceed."));
         }
       });
@@ -308,8 +308,8 @@ export async function loginUser(payload: LoginPayload): Promise<LoginResponse> {
     try {
       const errData = await response.json();
       errorBody = errData.message || errData.error || errorBody; // Adjust based on backend error format
-    } catch /* (e) */ {
-      // Remove unused 'e'
+    } catch (e) {
+      // eslint-disable-next-line @typescript-eslint/no-unused-vars
       // Ignore if response is not JSON
     }
     throw new Error(errorBody);
@@ -347,16 +347,16 @@ export async function registerPartners(
     try {
       const errData = await response.json();
       errorBody = errData.message || errData.error || errorBody; // Adjust based on backend error format
-    } catch /* (e) */ {
-      // Remove unused 'e'
+    } catch (e) {
+      // eslint-disable-next-line @typescript-eslint/no-unused-vars
       try {
         // If not JSON, try reading as text
         const textError = await response.text();
         if (textError) {
           errorBody += ` - ${textError}`;
         }
-      } catch /* (textErr) */ {
-        // Remove unused 'textErr'
+      } catch (textErr) {
+        // eslint-disable-next-line @typescript-eslint/no-unused-vars
         // Ignore if reading text also fails
       }
     }
@@ -393,8 +393,8 @@ export async function addDeposit(
     try {
       const errData = JSON.parse(errorBody);
       errorMessage = errData.message || errData.error || errorMessage;
-    } catch /* (e) */ {
-      // Remove unused 'e'
+    } catch (e) {
+      // eslint-disable-next-line @typescript-eslint/no-unused-vars
       errorMessage += ` - ${errorBody}`;
     }
     throw new Error(errorMessage);
@@ -423,8 +423,8 @@ export async function fetchDepositById(
     try {
       const errData = JSON.parse(errorBody);
       errorMessage = errData.message || errData.error || errorMessage;
-    } catch /* (e) */ {
-      // Remove unused 'e'
+    } catch (e) {
+      // eslint-disable-next-line @typescript-eslint/no-unused-vars
       errorMessage += ` - ${errorBody}`;
     }
     throw new Error(errorMessage);
@@ -453,8 +453,8 @@ export async function updateDeposit(
     try {
       const errData = JSON.parse(errorBody);
       errorMessage = errData.message || errData.error || errorMessage;
-    } catch /* (e) */ {
-      // Remove unused 'e'
+    } catch (e) {
+      // eslint-disable-next-line @typescript-eslint/no-unused-vars
       errorMessage += ` - ${errorBody}`;
     }
     throw new Error(errorMessage);
@@ -480,8 +480,8 @@ export async function deleteDeposit(
     try {
       const errData = JSON.parse(errorBody);
       errorMessage = errData.message || errData.error || errorMessage;
-    } catch /* (e) */ {
-      // Remove unused 'e'
+    } catch (e) {
+      // eslint-disable-next-line @typescript-eslint/no-unused-vars
       errorMessage += ` - ${errorBody}`;
     }
     throw new Error(errorMessage);
@@ -529,8 +529,8 @@ export async function updateSpendingItem(
       // Try to parse backend error message
       const errData = JSON.parse(errorBody);
       errorMessage = errData.message || errData.error || errorMessage;
-    } catch /* (e) */ {
-      // Remove unused 'e'
+    } catch (e) {
+      // eslint-disable-next-line @typescript-eslint/no-unused-vars
       // Use text if not JSON
       errorMessage += ` - ${errorBody}`;
     }
@@ -560,8 +560,8 @@ export async function deleteAIJob(jobId: number): Promise<void> {
       // Try to parse backend error message
       const errData = JSON.parse(errorBody);
       errorMessage = errData.message || errData.error || errorMessage;
-    } catch /* (e) */ {
-      // Remove unused 'e'
+    } catch (e) {
+      // eslint-disable-next-line @typescript-eslint/no-unused-vars
       // Use text if not JSON
       errorMessage += ` - ${errorBody}`;
     }
@@ -604,7 +604,8 @@ export async function fetchSpendingStats(
     try {
       const errData = JSON.parse(errorBody);
       errorMessage = errData.message || errData.error || errorMessage;
-    } catch /* (e) */ {
+    } catch (e) {
+      // eslint-disable-next-line @typescript-eslint/no-unused-vars
       errorMessage += ` - ${errorBody}`;
     }
     throw new Error(errorMessage);
@@ -638,7 +639,8 @@ export async function fetchDepositStats(
     try {
       const errData = JSON.parse(errorBody);
       errorMessage = errData.message || errData.error || errorMessage;
-    } catch /* (e) */ {
+    } catch (e) {
+      // eslint-disable-next-line @typescript-eslint/no-unused-vars
       errorMessage += ` - ${errorBody}`;
     }
     throw new Error(errorMessage);
@@ -661,8 +663,8 @@ export async function fetchTransferStatus(): Promise<TransferStatusResponse> {
     try {
       const errData = JSON.parse(errorBody);
       errorMessage = errData.message || errData.error || errorMessage;
-    } catch /* (e) */ {
-      // Remove unused 'e'
+    } catch (e) {
+      // eslint-disable-next-line @typescript-eslint/no-unused-vars
       errorMessage += ` - ${errorBody}`;
     }
     throw new Error(errorMessage);
@@ -683,8 +685,8 @@ export async function recordTransfer(): Promise<void> {
     try {
       const errData = JSON.parse(errorBody);
       errorMessage = errData.message || errData.error || errorMessage;
-    } catch /* (e) */ {
-      // Remove unused 'e'
+    } catch (e) {
+      // eslint-disable-next-line @typescript-eslint/no-unused-vars
       errorMessage += ` - ${errorBody}`;
     }
     throw new Error(errorMessage);
@@ -710,7 +712,8 @@ export async function exportAllData(): Promise<void> {
     try {
       const errData = JSON.parse(errorBody);
       errorMessage = errData.message || errData.error || errorMessage;
-    } catch /* (e) */ {
+    } catch (e) {
+      // eslint-disable-next-line @typescript-eslint/no-unused-vars
       errorMessage += ` - ${errorBody}`;
     }
     throw new Error(errorMessage);
