@@ -2,11 +2,14 @@ package main
 
 import (
 	"database/sql"
+	"errors"
 	"fmt"
 	"log/slog"
 	"net/http"
 	"os"
+	"path/filepath"
 	"runtime"
+	"strings"
 
 	"git.sr.ht/~relay/sapp-backend/auth"
 	"git.sr.ht/~relay/sapp-backend/category"
@@ -20,6 +23,8 @@ import (
 	"github.com/rs/cors"
 	_ "modernc.org/sqlite"
 )
+
+const defaultDatabasePath = "/data/sapp.db"
 
 // Logging middleware
 func loggingMiddleware(next http.Handler) http.Handler {
@@ -53,7 +58,12 @@ func main() {
 	// Database connection
 	dbPath := os.Getenv("DATABASE_PATH")
 	if dbPath == "" {
-		slog.Error("DATABASE_PATH environment variable not set")
+		dbPath = defaultDatabasePath
+		slog.Warn("DATABASE_PATH environment variable not set, using default", "path", dbPath)
+	}
+
+	if err := ensureDir(filepath.Dir(dbPath)); err != nil {
+		slog.Error("failed to ensure database directory", "path", dbPath, "err", err)
 		os.Exit(1)
 	}
 	db, err := sql.Open("sqlite", dbPath)
@@ -81,7 +91,7 @@ func main() {
 	// --- Create the real ModelAPI implementation ---
 	openRouterAPIKey := os.Getenv("OPENROUTER_KEY")
 	// Note: Consider adding more robust configuration for model name
-	openRouterModel := "x-ai/grok-3-mini-beta"
+	openRouterModel := "x-ai/grok-4-fast"
 	if openRouterAPIKey == "" {
 		slog.Warn("OPENROUTER_KEY environment variable not set. AI categorization will likely fail.")
 		// Depending on requirements, you might want to os.Exit(1) here
@@ -96,6 +106,16 @@ func main() {
 	// Start the pool workers in the background
 	go categorizationPool.StartPool()
 	slog.Info("AI categorization pool started")
+	if category.IsLikelyValidOpenRouterAPIKey(openRouterAPIKey) {
+		requeuedJobs, err := categorizationPool.RequeueBackfillJobs()
+		if err != nil {
+			slog.Error("failed to requeue uncategorized AI jobs", "err", err)
+		} else if requeuedJobs > 0 {
+			slog.Info("requeued uncategorized AI jobs for backfill", "count", requeuedJobs)
+		}
+	} else {
+		slog.Info("skipping AI backfill because OPENROUTER_KEY is missing or invalid")
+	}
 	// --- End AI Categorization Pool ---
 
 	// --- HTTP Server Setup ---
@@ -157,6 +177,17 @@ func main() {
 		AllowedMethods: []string{"GET", "POST", "PUT", "DELETE", "OPTIONS"},
 		AllowedHeaders: []string{"Authorization", "Content-Type", "X-Skip-Refresh"}, // Added X-Skip-Refresh
 	})
+	staticDir := os.Getenv("STATIC_DIR")
+	if staticDir != "" {
+		spaHandler, err := newSPAHandler(staticDir)
+		if err != nil {
+			slog.Error("failed to set up static file handler", "err", err)
+			os.Exit(1)
+		}
+		mux.Handle("/", spaHandler)
+		slog.Info("Serving static files", "dir", staticDir)
+	}
+
 	// Apply CORS first, then logging, then the mux router
 	handler := corsHandler.Handler(loggingMiddleware(mux))
 
@@ -176,4 +207,45 @@ func main() {
 		slog.Error("HTTP server failed", "err", err)
 		os.Exit(1)
 	}
+}
+
+func ensureDir(path string) error {
+	if path == "." || path == "" {
+		return nil
+	}
+	return os.MkdirAll(path, 0o755)
+}
+
+func newSPAHandler(staticDir string) (http.Handler, error) {
+	indexPath := filepath.Join(staticDir, "index.html")
+	if _, err := os.Stat(indexPath); err != nil {
+		if errors.Is(err, os.ErrNotExist) {
+			return nil, fmt.Errorf("index file not found in static directory: %w", err)
+		}
+		return nil, fmt.Errorf("unable to stat index file: %w", err)
+	}
+
+	fileServer := http.FileServer(http.Dir(staticDir))
+
+	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if r.Method != http.MethodGet && r.Method != http.MethodHead {
+			fileServer.ServeHTTP(w, r)
+			return
+		}
+
+		cleanPath := filepath.Clean(r.URL.Path)
+		if cleanPath == "." {
+			cleanPath = "/"
+		}
+
+		trimmedPath := strings.TrimPrefix(cleanPath, "/")
+		requestedPath := filepath.Join(staticDir, trimmedPath)
+
+		if info, err := os.Stat(requestedPath); err == nil && !info.IsDir() {
+			fileServer.ServeHTTP(w, r)
+			return
+		}
+
+		http.ServeFile(w, r, indexPath)
+	}), nil
 }

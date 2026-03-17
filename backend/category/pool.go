@@ -10,15 +10,15 @@ import (
 
 // SharedMode removed from Job struct
 type Job struct {
-	Id           int64 `json:"id"`
-	TotalAmount  float64
-	Status       string `json:"status"`
-	IsFinished   bool   `json:"isFinished"`
-	Prompt       string `json:"prompt"`
+	Id              int64 `json:"id"`
+	TotalAmount     float64
+	Status          string     `json:"status"`
+	IsFinished      bool       `json:"isFinished"`
+	Prompt          string     `json:"prompt"`
 	Buyer           int64      `json:"buyer_id"`
 	SharedWithId    *int64     `json:"other_id"`
-	PreSettled      bool       `json:"pre_settled"` // Added: Pre-settled flag from the job table
-	Result          *JobResult `json:"result"`      // Removed duplicate Result field
+	PreSettled      bool       `json:"pre_settled"`      // Added: Pre-settled flag from the job table
+	Result          *JobResult `json:"result"`           // Removed duplicate Result field
 	TransactionDate *time.Time `json:"transaction_date"` // Renamed from SpendingDate to match DB schema
 }
 
@@ -27,6 +27,7 @@ type CategorizingPoolStrategy interface {
 	AddJob(params CategorizationParams, transactionDate *time.Time) (int64, error)
 	StartPool()
 	GetStatus(int64) (Job, error)
+	RequeueBackfillJobs() (int, error)
 }
 
 type CategorizingPool struct {
@@ -93,8 +94,8 @@ func (p *CategorizingPool) AddJob(params CategorizationParams, transactionDate *
 	job := Job{
 		Id: jobId,
 		// Populate other fields from params as needed by the worker
-		TotalAmount:  params.TotalAmount,
-		Prompt:       params.Prompt,
+		TotalAmount:     params.TotalAmount,
+		Prompt:          params.Prompt,
 		Buyer:           params.Buyer.Id,
 		SharedWithId:    otherPersonInt,
 		PreSettled:      params.PreSettled,
@@ -115,6 +116,66 @@ func (p *CategorizingPool) StartPool() {
 		go p.worker(i)
 	}
 	slog.Info("Categorization pool workers started", "count", p.numWorkers)
+}
+
+// RequeueBackfillJobs finds AI jobs that never produced categorized spendings
+// and puts them back on the worker queue.
+func (p *CategorizingPool) RequeueBackfillJobs() (int, error) {
+	rows, err := p.db.Query(`
+		SELECT j.id, j.prompt, j.buyer, j.shared_with, j.total_amount, j.pre_settled, j.transaction_date
+		FROM ai_categorization_jobs j
+		LEFT JOIN ai_categorized_spendings acs ON acs.job_id = j.id
+		WHERE acs.job_id IS NULL
+		  AND j.status IN ('queued', 'pending', 'processing', 'failed')
+		ORDER BY j.id ASC
+	`)
+	if err != nil {
+		return 0, fmt.Errorf("querying uncategorized AI jobs: %w", err)
+	}
+
+	var jobsToRequeue []Job
+	requeued := 0
+	for rows.Next() {
+		var job Job
+		var sharedWithID sql.NullInt64
+		var transactionDate sql.NullTime
+
+		if err := rows.Scan(&job.Id, &job.Prompt, &job.Buyer, &sharedWithID, &job.TotalAmount, &job.PreSettled, &transactionDate); err != nil {
+			return requeued, fmt.Errorf("scanning uncategorized AI job: %w", err)
+		}
+
+		job.Status = "pending"
+		if sharedWithID.Valid {
+			job.SharedWithId = &sharedWithID.Int64
+		}
+		if transactionDate.Valid {
+			job.TransactionDate = &transactionDate.Time
+		}
+		jobsToRequeue = append(jobsToRequeue, job)
+	}
+
+	if err := rows.Err(); err != nil {
+		return requeued, fmt.Errorf("iterating uncategorized AI jobs: %w", err)
+	}
+	if err := rows.Close(); err != nil {
+		return requeued, fmt.Errorf("closing uncategorized AI job rows: %w", err)
+	}
+
+	for _, job := range jobsToRequeue {
+		_, err := p.db.Exec(`
+			UPDATE ai_categorization_jobs
+			SET status = ?, is_finished = 0, error_message = NULL, status_updated_at = CURRENT_TIMESTAMP
+			WHERE id = ?
+		`, job.Status, job.Id)
+		if err != nil {
+			return requeued, fmt.Errorf("resetting AI job %d for backfill: %w", job.Id, err)
+		}
+
+		p.unhandledJobs <- job
+		requeued++
+	}
+
+	return requeued, nil
 }
 
 func (p *CategorizingPool) GetStatus(id int64) (Job, error) {
@@ -138,7 +199,6 @@ func (p *CategorizingPool) GetStatus(id int64) (Job, error) {
 	// var sqlTransactionDate sql.NullTime
 	// ... scan &jobStatus.Id, &jobStatus.Status, &jobStatus.IsFinished, &sqlTransactionDate ...
 	// if sqlTransactionDate.Valid { jobStatus.TransactionDate = &sqlTransactionDate.Time }
-
 
 	if !jobStatus.IsFinished {
 		return jobStatus, nil
@@ -230,13 +290,11 @@ func (p *CategorizingPool) worker(id int) {
 				}
 			}()
 
-
 			// Determine settled_at based on job parameters
 			var settledAt sql.NullTime
 			if job.PreSettled { // Use job.PreSettled from the Job struct
 				settledAt = sql.NullTime{Time: time.Now().UTC(), Valid: true}
 			}
-
 
 			// Determine the transaction_date to use for all items in this job.
 			var transactionDateToUse time.Time
@@ -266,7 +324,6 @@ func (p *CategorizingPool) worker(id int) {
 				}
 			}
 
-
 			// Pre-fetch category IDs needed for this job
 			var categoryIDs map[string]int64
 			categoryIDs, err = p.fetchCategoryIDs(tx, jobResult.Spendings)
@@ -275,7 +332,6 @@ func (p *CategorizingPool) worker(id int) {
 				p.updateJobStatus(job.Id, "failed", fmt.Errorf("db error fetching categories: %w", err))
 				return // Error will trigger rollback
 			}
-
 
 			for _, spending := range jobResult.Spendings {
 				var categoryID int64
@@ -287,7 +343,6 @@ func (p *CategorizingPool) worker(id int) {
 					p.updateJobStatus(job.Id, "failed", err)
 					return // Error will trigger rollback
 				}
-
 
 				// 1. Insert into spendings
 				spendingDesc := spending.Description
@@ -305,7 +360,6 @@ func (p *CategorizingPool) worker(id int) {
 					return // Error will trigger rollback
 				}
 
-
 				var spendingID int64
 				spendingID, err = res.LastInsertId()
 				if err != nil {
@@ -314,7 +368,6 @@ func (p *CategorizingPool) worker(id int) {
 					return // Error will trigger rollback
 				}
 
-
 				// 2. Insert into ai_categorized_spendings
 				_, err = tx.Exec(`INSERT INTO ai_categorized_spendings (job_id, spending_id) VALUES (?, ?)`, job.Id, spendingID)
 				if err != nil {
@@ -322,7 +375,6 @@ func (p *CategorizingPool) worker(id int) {
 					p.updateJobStatus(job.Id, "failed", fmt.Errorf("db error inserting categorized spending link: %w", err))
 					return // Error will trigger rollback
 				}
-
 
 				// 3. Insert into user_spendings
 				var sharedWithID sql.NullInt64
@@ -347,7 +399,7 @@ func (p *CategorizingPool) worker(id int) {
 				case "other":
 					if job.SharedWithId != nil {
 						sharedWithID = sql.NullInt64{Int64: *job.SharedWithId, Valid: true} // Involves the job's partner
-						sharedUserTakesAll = true                                          // Partner pays all for this item
+						sharedUserTakesAll = true                                           // Partner pays all for this item
 					} else {
 						// Error: 'other' mode requires a partner associated with the job
 						err = fmt.Errorf("logic error: spending mode 'other' found but no partner associated with job %d", job.Id)
@@ -384,7 +436,6 @@ func (p *CategorizingPool) worker(id int) {
 				return
 			}
 
-
 			// Update job status to completed and store ambiguity flag/reason AFTER successful commit
 			finalStatus := "completed"
 			var ambiguityReason sql.NullString
@@ -393,13 +444,11 @@ func (p *CategorizingPool) worker(id int) {
 			}
 			p.updateJobStatusAndAmbiguity(job.Id, finalStatus, nil, jobResult.IsAmbiguityFlagged, ambiguityReason) // Pass nil error on success
 
-
 			slog.Info("Worker finished processing job successfully", "worker_id", id, "job_id", job.Id)
 		}() // End of func literal for defer tx.Rollback()
 	}
 	slog.Info("Worker shutting down", "worker_id", id)
 }
-
 
 // fetchCategoryIDs pre-fetches category IDs for the given spending items within a transaction.
 // Uses standard library database/sql.
@@ -407,18 +456,15 @@ func (p *CategorizingPool) fetchCategoryIDs(tx *sql.Tx, spendings []Spendings) (
 	categoryIDs := make(map[string]int64)
 	catNamesMap := make(map[string]struct{}) // Use map for unique names
 
-
 	for _, sp := range spendings {
 		if sp.Category != "" {
 			catNamesMap[sp.Category] = struct{}{}
 		}
 	}
 
-
 	if len(catNamesMap) == 0 {
 		return categoryIDs, nil // No categories to fetch
 	}
-
 
 	// Convert map keys to slice for query
 	catNames := make([]string, 0, len(catNamesMap))
@@ -426,11 +472,9 @@ func (p *CategorizingPool) fetchCategoryIDs(tx *sql.Tx, spendings []Spendings) (
 		catNames = append(catNames, name)
 	}
 
-
 	// Build IN clause placeholders
 	placeholders := strings.Repeat("?,", len(catNames)-1) + "?"
 	query := fmt.Sprintf("SELECT id, name FROM categories WHERE name IN (%s);", placeholders)
-
 
 	// Convert slice of strings to slice of interface{} for Query args
 	args := make([]interface{}, len(catNames))
@@ -438,13 +482,11 @@ func (p *CategorizingPool) fetchCategoryIDs(tx *sql.Tx, spendings []Spendings) (
 		args[i] = v
 	}
 
-
 	rows, err := tx.Query(query, args...)
 	if err != nil {
 		return nil, fmt.Errorf("failed to execute category query: %w", err)
 	}
 	defer rows.Close()
-
 
 	for rows.Next() {
 		var catId int64
@@ -455,11 +497,9 @@ func (p *CategorizingPool) fetchCategoryIDs(tx *sql.Tx, spendings []Spendings) (
 		categoryIDs[catName] = catId
 	}
 
-
 	if err = rows.Err(); err != nil {
 		return nil, fmt.Errorf("error iterating category rows: %w", err)
 	}
-
 
 	// Verify all requested categories were found
 	for name := range catNamesMap {
@@ -470,10 +510,8 @@ func (p *CategorizingPool) fetchCategoryIDs(tx *sql.Tx, spendings []Spendings) (
 		}
 	}
 
-
 	return categoryIDs, nil
 }
-
 
 // updateJobStatus updates the status and error message of a job in the database.
 func (p *CategorizingPool) updateJobStatus(jobID int64, status string, jobErr error) {
@@ -486,7 +524,6 @@ func (p *CategorizingPool) updateJobStatus(jobID int64, status string, jobErr er
 		}
 	}
 
-
 	_, err := p.db.Exec(`UPDATE ai_categorization_jobs SET status = ?, error_message = ?, is_finished = ?, status_updated_at = CURRENT_TIMESTAMP WHERE id = ?`,
 		status, errMsg, isFinished, jobID)
 	if err != nil {
@@ -495,7 +532,6 @@ func (p *CategorizingPool) updateJobStatus(jobID int64, status string, jobErr er
 		slog.Debug("Updated job status in database", "job_id", jobID, "new_status", status, "is_finished", isFinished)
 	}
 }
-
 
 // updateJobStatusAndAmbiguity updates status, error, finished flag, and ambiguity details.
 func (p *CategorizingPool) updateJobStatusAndAmbiguity(jobID int64, status string, jobErr error, isAmbiguous bool, ambiguityReason sql.NullString) {
@@ -507,7 +543,6 @@ func (p *CategorizingPool) updateJobStatusAndAmbiguity(jobID int64, status strin
 			errMsg = sql.NullString{String: jobErr.Error(), Valid: true}
 		}
 	}
-
 
 	_, err := p.db.Exec(`UPDATE ai_categorization_jobs
 		SET status = ?, error_message = ?, is_finished = ?, is_ambiguity_flagged = ?, ambiguity_flag_reason = ?, status_updated_at = CURRENT_TIMESTAMP
