@@ -27,10 +27,12 @@ RUN apt-get update && apt-get install -y --no-install-recommends ca-certificates
 WORKDIR /app
 COPY --from=backend-builder /out/sapp /usr/local/bin/sapp
 COPY --from=backend-builder /out/migrate /usr/local/bin/migrate
+COPY backend/cmd/migrate/schema.sql /app/schema.sql
 COPY --from=frontend-builder /app/frontend/dist /app/static
 COPY docker-entrypoint.sh /usr/local/bin/docker-entrypoint.sh
 RUN chmod +x /usr/local/bin/docker-entrypoint.sh
 ENV DATABASE_PATH=/data/sapp.db \
+    SCHEMA_PATH=/app/schema.sql \
     STATIC_DIR=/app/static \
     PORT=3000
 EXPOSE 3000
