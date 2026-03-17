@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"log/slog"
 	"net/http"
+	"net/url"
 	"os"
 	"path/filepath"
 	"runtime"
@@ -66,7 +67,7 @@ func main() {
 		slog.Error("failed to ensure database directory", "path", dbPath, "err", err)
 		os.Exit(1)
 	}
-	db, err := sql.Open("sqlite", dbPath)
+	db, err := sql.Open("sqlite", sqliteDSN(dbPath))
 
 	if err != nil {
 		slog.Error("failed to open database", "path", dbPath, "err", err)
@@ -214,6 +215,21 @@ func ensureDir(path string) error {
 		return nil
 	}
 	return os.MkdirAll(path, 0o755)
+}
+
+func sqliteDSN(path string) string {
+	pragmas := url.Values{}
+	pragmas.Add("_pragma", "busy_timeout(5000)")
+	pragmas.Add("_pragma", "journal_mode(WAL)")
+	pragmas.Add("_pragma", "synchronous(NORMAL)")
+	pragmas.Add("_pragma", "foreign_keys(ON)")
+
+	separator := "?"
+	if strings.Contains(path, "?") {
+		separator = "&"
+	}
+
+	return path + separator + pragmas.Encode()
 }
 
 func newSPAHandler(staticDir string) (http.Handler, error) {
