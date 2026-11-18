@@ -1,0 +1,18 @@
+import { cloudflareTest, readD1Migrations } from "@cloudflare/vitest-plugin";
+import { defineConfig } from "vitest/config";
+
+export default defineConfig(async () => ({
+  plugins: [
+    cloudflareTest({
+      wrangler: { configPath: "./wrangler.jsonc" },
+      miniflare: {
+        bindings: {
+          TEST_MIGRATIONS: await readD1Migrations("migrations"),
+          JWT_SECRET_KEY: "test-secret",
+          OPENROUTER_KEY: "sk-or-test",
+        },
+      },
+    }),
+  ],
+  test: { setupFiles: ["./test/setup.ts"] },
+}));

@@ -23,9 +23,8 @@ import {
 // --- Constants ---
 const ACCESS_TOKEN_KEY = "accessToken"; // Renamed
 const REFRESH_TOKEN_KEY = "refreshToken"; // Added
-// Use environment variable for API base URL, fallback for development
-const API_BASE_URL =
-  import.meta.env.VITE_API_BASE_URL || "http://localhost:3000";
+// The API is served from the same origin; VITE_API_BASE_URL can point elsewhere in development.
+const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || "";
 
 // --- Auth Token Helpers ---
 
@@ -593,7 +592,7 @@ export async function fetchSpendingStats(
   }
 
   // Construct URL with query parameters
-  const url = new URL(`${API_BASE_URL}/v1/stats/spending`);
+  const url = new URL(`${API_BASE_URL}/v1/stats/spending`, window.location.origin);
   url.searchParams.append("startDate", startDate);
   url.searchParams.append("endDate", endDate);
 
@@ -628,7 +627,7 @@ export async function fetchDepositStats(
     throw new Error("Invalid date format. Use YYYY-MM-DD.");
   }
 
-  const url = new URL(`${API_BASE_URL}/v1/stats/deposits`);
+  const url = new URL(`${API_BASE_URL}/v1/stats/deposits`, window.location.origin);
   url.searchParams.append("startDate", startDate);
   url.searchParams.append("endDate", endDate);
 
